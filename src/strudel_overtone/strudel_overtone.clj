@@ -11,9 +11,9 @@
 
 (defsynth snare [amp 1 sustain 0.2 freq 200]
   (let [env (env-gen (perc 0.01 sustain) :action FREE)
-        tone (sin-osc freq)
+        ;;tone (sin-osc freq)
         noise (ov/lpf (white-noise) 3000)
-        snd (+ (* 0.5 tone) (* 0.8 noise))]
+        snd (+ (* 0.5 #_tone) (* 0.8 noise))]
     (out 0 (pan2 (* snd env amp) 0))))
 
 (defsynth saw-synth [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
@@ -57,11 +57,12 @@
   "Creates a pattern from a sound string (mini-notation), or sets the sound of an existing pattern."
   ([pat-str]
    (let [parsed (parse-mini pat-str)
-         events (map (fn [p]
-                       (->Event (:start p)
-                                (:duration p)
-                                {:sound (:value p)}))
-                     parsed)]
+         events (keep (fn [p]
+                        (when (not= "_" (:value p))
+                          (->Event (:start p)
+                                   (:duration p)
+                                   {:sound (:value p)})))
+                      parsed)]
      (make-pattern events)))
   ([pattern sound-val]
    (with-param pattern :sound sound-val)))
@@ -70,11 +71,12 @@
   "Creates a pattern from a note string (mini-notation), or sets the note of an existing pattern."
   ([pat-str]
    (let [parsed (parse-mini pat-str)
-         events (map (fn [p]
-                       (->Event (:start p)
-                                (:duration p)
-                                {:note (:value p)}))
-                     parsed)]
+         events (keep (fn [p]
+                        (when (not= "_" (:value p))
+                          (->Event (:start p)
+                                   (:duration p)
+                                   {:note (:value p)})))
+                      parsed)]
      (make-pattern events)))
   ([pattern note-val]
    (with-param pattern :note note-val)))
@@ -177,7 +179,8 @@
   (play! :bass (-> (note "c2 g2") (s "saw-synth")))
 
   ;; Layer drums on top (aligned)
-  (play! :drums (s "bd sd bd sd"))
+  (play! :snare (s "sd sd sd sd sd sd sd sd"))
+  (play! :bd (s "bd _ bd _"))
 
   ;; Update bassline
   (play! :bass (-> (note "c2 e2 g2 b2") (s "saw-synth")))

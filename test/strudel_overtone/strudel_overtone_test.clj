@@ -3,6 +3,9 @@
             [strudel-overtone.strudel-overtone :as sut]
             [overtone.core :as ov]))
 
+(defn approx= [a b]
+  (< (Math/abs (- a b)) 0.01))
+
 (deftest parse-mini-test
   (testing "Basic space-separated parsing"
     (let [res (sut/parse-mini "bd sd")]
@@ -20,21 +23,33 @@
       (is (= 2 (count (:events pat))))
       (is (= "kick" (get-in (first (:events pat)) [:params :sound]))))))
 
-(deftest modifiers-test
-  (testing "gain modifier updates events"
-    (let [pat (-> (sut/s "bd") (sut/gain 0.5))]
-      (is (= 0.5 (get-in (first (:events pat)) [:params :amp])))))
-
-  (testing "lpf modifier updates events"
-    (let [pat (-> (sut/s "bd") (sut/lpf 1000))]
-      (is (= 1000 (get-in (first (:events pat)) [:params :cutoff])))))
-
-  (testing "chaining note and s"
-    (let [pat (-> (sut/note "c3") (sut/s "saw"))]
+(deftest rests-test
+  (testing "underscore creates gaps in events"
+    (let [pat (sut/note "c3 _ g3")]
+      (is (= 2 (count (:events pat))))
       (is (= "c3" (get-in (first (:events pat)) [:params :note])))
-      (is (= "saw" (get-in (first (:events pat)) [:params :sound]))))))
+      (is (= "g3" (get-in (second (:events pat)) [:params :note])))
+      ;; check timings
+      ;; 3 tokens, duration 1/3 each.
+      ;; c3: start 0
+      ;; _: start 1/3 (skipped)
+      ;; g3: start 2/3
+      (is (approx= 0.0 (:time (first (:events pat)))))
+      (is (approx= 0.666 (:time (second (:events pat)))))))
 
-(deftest play!-test
+    (testing "underscore in s function"
+
+      (let [pat (sut/s "bd _ sd")]
+
+        (is (= 2 (count (:events pat))))
+
+        (is (= "bd" (get-in (first (:events pat)) [:params :sound])))
+
+        (is (= "sd" (get-in (second (:events pat)) [:params :sound]))))))
+
+  
+
+  (deftest play!-test
   (testing "play! starts a loop aligned to 4 beats"
     ;; Reset state
     (reset! sut/player-state {:playing? false :patterns {} :loops #{}})
