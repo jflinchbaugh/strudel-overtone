@@ -106,7 +106,7 @@
         sustain-sec (* dur-beats (/ 60 (metro-bpm metro)))
         ;; Default sound if only note is provided
         sound (or sound (if n "saw-synth" nil))]
-    
+
     (when sound
       (let [synth-fn (case sound
                        "bd" kick
@@ -128,7 +128,7 @@
             cycles (:cycles pat 1) ;; Speed multiplier
             cycle-dur (/ 4 cycles) ;; Beats per cycle (assuming 4/4)
             next-beat (+ beat cycle-dur)]
-        
+
         ;; Schedule events for this cycle
         (doseq [ev (:events pat)]
           (let [rel-start (:time ev)
@@ -136,8 +136,9 @@
                 ev-beat (+ beat (* rel-start cycle-dur))
                 ev-dur-beats (* rel-dur cycle-dur)]
             (trigger-event ev ev-beat ev-dur-beats)))
-        
+
         (apply-at (metro next-beat) #'play-loop [next-beat])))))
+
 (defn play! [pattern]
   (reset! player-state {:playing? true :pattern pattern})
   (let [now (metro)]
@@ -159,10 +160,13 @@
   (connect-server)
 
   (play! (-> (note "c3 e3 g3 b3") (s "bd")))
+
   (play! (-> (note "c3 e3 g3 b3") (s "sd")))
   (play! (-> (note "c3 e3 g3 b3 _ ") (s "saw-synth")))
 
   (def p (play! (-> (note "c3 e3 g3 b3"))))
+
+  (play! (-> (s "bd bd bd saw-synth")))
 
   p
 
