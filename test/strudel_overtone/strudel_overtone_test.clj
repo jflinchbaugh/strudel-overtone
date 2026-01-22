@@ -87,4 +87,16 @@
       (with-redefs [sut/metro (constantly 0)
                     ov/apply-at (fn [& _] (swap! mock-calls conj :called))]
         (sut/play! :existing {:events []})
-        (is (empty? @mock-calls))))))
+        (is (empty? @mock-calls)))))
+  
+  (testing "sine-synth triggers correctly"
+    (reset! sut/player-state {:playing? false :patterns {} :loops #{}})
+    (let [mock-calls (atom [])]
+      (with-redefs [sut/metro (fn ([] 10.5) ([b] (* b 1000)))
+                    ov/apply-at (fn [ms func args] (swap! mock-calls conj {:func func :args args}))
+                    sut/trigger-event (fn [ev b d] (swap! mock-calls conj {:event ev :sound (get-in ev [:params :sound])}))]
+        (sut/play! :sine (-> (sut/note "c4") (sut/s "sine-synth")))
+        ;; Simulate the loop running one iteration
+        (sut/play-loop :sine 12.0)
+        (let [trigger-call (first (filter :event @mock-calls))]
+          (is (= "sine-synth" (:sound trigger-call))))))))

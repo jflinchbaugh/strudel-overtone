@@ -25,6 +25,15 @@
         filt (rlpf snd cutoff resonance)]
     (out 0 (pan2 (* filt env amp) pan))))
 
+(defsynth sine-synth [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
+                     attack 0.01 decay 0.1 s-level 0.5 release 0.3]
+  (let [env (env-gen (adsr attack decay s-level release)
+                     :gate (line:kr 1 0 sustain)
+                     :action FREE)
+        snd (sin-osc freq)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
 ;; --- Pattern Engine ---
 
 (defrecord Event [time duration params])
@@ -114,6 +123,7 @@
                        "bd" kick
                        "sd" snare
                        "saw-synth" saw-synth
+                       "sine-synth" sine-synth
                        nil)
             freq (if n (resolve-note n) nil)
             args (cond-> [:amp amp]
@@ -123,7 +133,7 @@
         (when synth-fn
           (apply-at (metro beat) synth-fn args))))))
 
-(defn- play-loop [key beat]
+(defn play-loop [key beat]
   (let [state @player-state]
     (if (and (:playing? state)
              (contains? (:loops state) key))
@@ -176,17 +186,25 @@
   (connect-server)
 
   ;; Play a bassline
-  (play! :bass (-> (note "c2 g2") (s "saw-synth")))
+  (play! :bass (-> (note "c2 g2") (s "saw-synth") (gain 0.5)))
 
   ;; Layer drums on top (aligned)
-  (play! :snare (s "sd sd sd sd sd sd sd sd"))
+  (play! :snare
+    (->
+      (s "sd _ sd sd sd sd sd sd sd sd sd sd sd sd sd sd")
+      (gain 2)
+      ))
+
   (play! :bd (s "bd _ bd _"))
 
   ;; Update bassline
-  (play! :bass (-> (note "c2 e2 g2 b2") (s "saw-synth")))
+  (play! :bass (-> (note "c3 e3 g3 b3") (s "sine-synth") (gain 2) (fast 4)))
 
   ;; Stop just the drums
   (stop! :drums)
+  (stop! :snare)
+
+  (stop! :bass)
 
   ;; Stop everything
   (stop!)
