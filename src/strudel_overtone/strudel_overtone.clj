@@ -9,10 +9,10 @@
         snd (sin-osc (line:kr (* 2 freq) freq 0.1))]
     (out 0 (pan2 (* snd env amp) 0))))
 
-(defsynth snare [amp 1 sustain 0.2 freq 200]
+(defsynth snare [amp 1 sustain 0.2 freq 200 cutoff 3000]
   (let [env (env-gen (perc 0.01 sustain) :action FREE)
         ;;tone (sin-osc freq)
-        noise (ov/lpf (white-noise) 3000)
+        noise (ov/lpf (white-noise) cutoff)
         snd (+ (* 0.5 #_tone) (* 0.8 noise))]
     (out 0 (pan2 (* snd env amp) 0))))
 
@@ -191,9 +191,10 @@
   ;; Layer drums on top (aligned)
   (play! :snare
     (->
-      (s "sd _ _ _")
+      (s "sd")
       (fast 16)
       (gain 0.1)
+      (lpf 1000)
       ))
 
   (play! :bd (s "_ bd _ bd"))
@@ -201,7 +202,13 @@
   ;; Update bassline
   (play! :bass (-> (note "c2 _ b2 _") (s "sine-synth") (gain 1)))
 
-  (play! :arp (-> (note "c4 _ d4 _ e4 _ f4 _ g4 _ f4 _ e4 _ d4 _") (s "saw-synth") (fast 2) (gain 0.25)))
+  (play! :arp
+    (->
+      (note "c4 _ d4 _ e4 _ f4 _ g4 _ f4 _ e4 _ d4 _")
+      (s "sine-synth")
+      (fast 2)
+      (gain 0.25)
+      (lpf 100)))
 
   ;; Stop just the drums
   (stop! :drums)
