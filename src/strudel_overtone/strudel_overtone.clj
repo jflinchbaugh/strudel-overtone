@@ -191,20 +191,24 @@
   ;; Layer drums on top (aligned)
   (play! :snare
     (->
-      (s "sd _ sd sd sd sd sd sd sd sd sd sd sd sd sd sd")
-      (gain 2)
+      (s "sd _ _ _")
+      (fast 16)
+      (gain 0.1)
       ))
 
-  (play! :bd (s "bd _ bd _"))
+  (play! :bd (s "_ bd _ bd"))
 
   ;; Update bassline
-  (play! :bass (-> (note "c3 e3 g3 b3") (s "sine-synth") (gain 2) (fast 4)))
+  (play! :bass (-> (note "c2 _ b2 _") (s "sine-synth") (gain 1)))
+
+  (play! :arp (-> (note "c4 _ d4 _ e4 _ f4 _ g4 _ f4 _ e4 _ d4 _") (s "saw-synth") (fast 2) (gain 0.25)))
 
   ;; Stop just the drums
   (stop! :drums)
   (stop! :snare)
 
   (stop! :bass)
+  (stop! :arp)
 
   ;; Stop everything
   (stop!)
