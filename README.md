@@ -12,3 +12,9 @@ My music explorations in Clojure and Overtone.
 ** connect to the running repl
 ** evaluate all of `strudel-overtone/strudel-overtone.clj`
 ** you should be connected and ready to go!
+
+
+## running tests
+
+`$ clj -T:build test`
+

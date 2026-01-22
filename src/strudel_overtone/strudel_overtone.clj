@@ -91,7 +91,7 @@
 ;; --- Player ---
 
 (defonce metro (metronome 120))
-(defonce player-state (atom {:playing? false :pattern nil}))
+(defonce player-state (atom {:playing? false :patterns {} :loops #{}}))
 
 (defn- resolve-note [n]
   (if (number? n) n (ov/midi->hz (ov/note n))))
@@ -121,57 +121,71 @@
         (when synth-fn
           (apply-at (metro beat) synth-fn args))))))
 
-(defn- play-loop [beat]
+(defn- play-loop [key beat]
   (let [state @player-state]
-    (when (:playing? state)
-      (let [pat (:pattern state)
-            cycles (:cycles pat 1) ;; Speed multiplier
-            cycle-dur (/ 4 cycles) ;; Beats per cycle (assuming 4/4)
-            next-beat (+ beat cycle-dur)]
+    (if (and (:playing? state)
+             (contains? (:loops state) key))
+      (let [pat (get-in state [:patterns key])]
+        (if pat
+          (let [cycles (:cycles pat 1) ;; Speed multiplier
+                cycle-dur (/ 4 cycles) ;; Beats per cycle (assuming 4/4)
+                next-beat (+ beat cycle-dur)]
 
-        ;; Schedule events for this cycle
-        (doseq [ev (:events pat)]
-          (let [rel-start (:time ev)
-                rel-dur (:duration ev)
-                ev-beat (+ beat (* rel-start cycle-dur))
-                ev-dur-beats (* rel-dur cycle-dur)]
-            (trigger-event ev ev-beat ev-dur-beats)))
+            ;; Schedule events for this cycle
+            (doseq [ev (:events pat)]
+              (let [rel-start (:time ev)
+                    rel-dur (:duration ev)
+                    ev-beat (+ beat (* rel-start cycle-dur))
+                    ev-dur-beats (* rel-dur cycle-dur)]
+                (trigger-event ev ev-beat ev-dur-beats)))
 
-        (apply-at (metro next-beat) #'play-loop [next-beat])))))
+            (apply-at (metro next-beat) #'play-loop [key next-beat]))
+          ;; Pattern removed, loop dies
+          (swap! player-state update :loops disj key)))
+      ;; Stopped, loop dies
+      (swap! player-state update :loops disj key))))
+(defn play!
+  ([pattern] (play! :main pattern))
+  ([key pattern]
+   (let [start-loop? (not (contains? (:loops @player-state) key))]
+     (swap! player-state (fn [s]
+                           (-> s
+                               (assoc :playing? true)
+                               (assoc-in [:patterns key] pattern)
+                               (update :loops conj key))))
+     (when start-loop?
+       (let [now (metro)
+             start-beat (+ now (- 4 (mod now 4)))]
+         (apply-at (metro start-beat) #'play-loop [key start-beat]))))))
 
-(defn play! [pattern]
-  (reset! player-state {:playing? true :pattern pattern})
-  (let [now (metro)]
-    (play-loop now)))
-
-(defn stop! []
-  (swap! player-state assoc :playing? false))
+(defn stop!
+  ([] (swap! player-state assoc :playing? false))
+  ([key] (swap! player-state update :patterns dissoc key)))
 
 ;; --- Main / Entry ---
 
 (defn -main [& args]
   (connect-server)
-  (println "Strudel-Overtone Ready.")
-  (println "Try: (play! (-> (s \"bd sd bd sd\") (lpf 800)))"))
+  (println "Strudel-Overtone Ready."))
 
 
 (comment
 
   (connect-server)
 
-  (play! (-> (note "c3 e3 g3 b3") (s "bd")))
+  ;; Play a bassline
+  (play! :bass (-> (note "c2 g2") (s "saw-synth")))
 
-  (play! (-> (note "c3 e3 g3 b3") (s "sd")))
-  (play! (-> (note "c3 e3 g3 b3 _ ") (s "saw-synth")))
+  ;; Layer drums on top (aligned)
+  (play! :drums (s "bd sd bd sd"))
 
-  (def p (play! (-> (note "c3 e3 g3 b3"))))
+  ;; Update bassline
+  (play! :bass (-> (note "c2 e2 g2 b2") (s "saw-synth")))
 
-  (play! (-> (s "bd bd bd saw-synth")))
+  ;; Stop just the drums
+  (stop! :drums)
 
-  p
-
+  ;; Stop everything
   (stop!)
-
-  (stop)
 
   .)
