@@ -4,20 +4,23 @@
 
 ;; --- Synths ---
 
-(defsynth kick [amp 1 decay 0.3 freq 60]
-  (let [env (env-gen (perc 0.01 decay) :action FREE)
+(defsynth kick [amp 1 sustain 0.3 freq 60]
+  (let [env (env-gen (perc 0.01 sustain) :action FREE)
         snd (sin-osc (line:kr (* 2 freq) freq 0.1))]
     (out 0 (pan2 (* snd env amp) 0))))
 
-(defsynth snare [amp 1 decay 0.2 freq 200]
-  (let [env (env-gen (perc 0.01 decay) :action FREE)
+(defsynth snare [amp 1 sustain 0.2 freq 200]
+  (let [env (env-gen (perc 0.01 sustain) :action FREE)
         tone (sin-osc freq)
         noise (ov/lpf (white-noise) 3000)
         snd (+ (* 0.5 tone) (* 0.8 noise))]
     (out 0 (pan2 (* snd env amp) 0))))
 
-(defsynth saw-synth [freq 440 amp 1 gate 1 cutoff 2000 resonance 0.1 pan 0]
-  (let [env (env-gen (adsr 0.01 0.1 0.8 0.1) gate :action FREE)
+(defsynth saw-synth [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
+                     attack 0.01 decay 0.1 s-level 0.5 release 0.3]
+  (let [env (env-gen (adsr attack decay s-level release)
+                     :gate (line:kr 1 0 sustain)
+                     :action FREE)
         snd (saw freq)
         filt (rlpf snd cutoff resonance)]
     (out 0 (pan2 (* filt env amp) pan))))
@@ -93,25 +96,28 @@
 (defn- resolve-note [n]
   (if (number? n) n (ov/midi->hz (ov/note n))))
 
-(defn- trigger-event [ev beat]
+(defn- trigger-event [ev beat dur-beats]
   (let [params (:params ev)
         sound (:sound params)
         n (:note params)
         amp (or (:amp params) 1.0)
         cutoff (or (:cutoff params) 2000)
+        ;; Calculate sustain in seconds from beats
+        sustain-sec (* dur-beats (/ 60 (metro-bpm metro)))
         ;; Default sound if only note is provided
         sound (or sound (if n "saw-synth" nil))]
-
+    
     (when sound
       (let [synth-fn (case sound
                        "bd" kick
                        "sd" snare
                        "saw-synth" saw-synth
-                       nil) ;; TODO: Lookup dynamic synths
+                       nil)
             freq (if n (resolve-note n) nil)
             args (cond-> [:amp amp]
                    freq (conj :freq freq)
-                   cutoff (conj :cutoff cutoff))]
+                   cutoff (conj :cutoff cutoff)
+                   sustain-sec (conj :sustain sustain-sec))]
         (when synth-fn
           (apply-at (metro beat) synth-fn args))))))
 
@@ -122,15 +128,16 @@
             cycles (:cycles pat 1) ;; Speed multiplier
             cycle-dur (/ 4 cycles) ;; Beats per cycle (assuming 4/4)
             next-beat (+ beat cycle-dur)]
-
+        
         ;; Schedule events for this cycle
         (doseq [ev (:events pat)]
           (let [rel-start (:time ev)
-                ev-beat (+ beat (* rel-start cycle-dur))]
-            (trigger-event ev ev-beat)))
-
+                rel-dur (:duration ev)
+                ev-beat (+ beat (* rel-start cycle-dur))
+                ev-dur-beats (* rel-dur cycle-dur)]
+            (trigger-event ev ev-beat ev-dur-beats)))
+        
         (apply-at (metro next-beat) #'play-loop [next-beat])))))
-
 (defn play! [pattern]
   (reset! player-state {:playing? true :pattern pattern})
   (let [now (metro)]
@@ -151,9 +158,16 @@
 
   (connect-server)
 
-  (play! (-> (note "c3 e3 g3 b3") (s "saw-synth")))
+  (play! (-> (note "c3 e3 g3 b3") (s "bd")))
+  (play! (-> (note "c3 e3 g3 b3") (s "sd")))
+  (play! (-> (note "c3 e3 g3 b3 _ ") (s "saw-synth")))
+
+  (def p (play! (-> (note "c3 e3 g3 b3"))))
+
+  p
 
   (stop!)
+
   (stop)
 
   .)
