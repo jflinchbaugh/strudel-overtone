@@ -10,5 +10,5 @@ My music explorations in Clojure and Overtone.
 * In Emacs:
 ** Start emacs
 ** connect to the running repl
-** evaluate all of `music/core.clj`
+** evaluate all of `strudel-overtone/strudel-overtone.clj`
 ** you should be connected and ready to go!

@@ -1,23 +1,159 @@
 (ns strudel-overtone.strudel-overtone
-  (:require [overtone.core :refer :all])
-  (:gen-class))
+  (:require [overtone.core :as ov :refer :all :exclude [note lpf]]
+            [clojure.string :as str]))
 
-(connect-server)
+;; --- Synths ---
 
-(defn -main
-  "I don't do a whole lot ... yet."
-  [& args]
-  (demo (sin-osc (midi->hz 70))))
+(defsynth kick [amp 1 decay 0.3 freq 60]
+  (let [env (env-gen (perc 0.01 decay) :action FREE)
+        snd (sin-osc (line:kr (* 2 freq) freq 0.1))]
+    (out 0 (pan2 (* snd env amp) 0))))
+
+(defsynth snare [amp 1 decay 0.2 freq 200]
+  (let [env (env-gen (perc 0.01 decay) :action FREE)
+        tone (sin-osc freq)
+        noise (ov/lpf (white-noise) 3000)
+        snd (+ (* 0.5 tone) (* 0.8 noise))]
+    (out 0 (pan2 (* snd env amp) 0))))
+
+(defsynth saw-synth [freq 440 amp 1 gate 1 cutoff 2000 resonance 0.1 pan 0]
+  (let [env (env-gen (adsr 0.01 0.1 0.8 0.1) gate :action FREE)
+        snd (saw freq)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+;; --- Pattern Engine ---
+
+(defrecord Event [time duration params])
+(defrecord Pattern [events cycles])
+
+(defn make-pattern [events]
+  (->Pattern events 1))
+
+(defn parse-mini
+  "Naively parses a space-separated string into a sequence of events with duration.
+   Returns a list of maps {:value v :start s :duration d}."
+  [s]
+  (let [tokens (str/split (str/trim s) #"\s+")
+        n (count tokens)
+        dur (/ 1.0 n)]
+    (map-indexed (fn [i v]
+                   {:value v
+                    :start (* i dur)
+                    :duration dur})
+                 tokens)))
+
+(defn with-param
+  "Updates pattern events with a specific parameter."
+  [pattern key value]
+  (update pattern :events
+          (fn [evs]
+            (map (fn [e] (assoc-in e [:params key] value)) evs))))
+
+(defn s
+  "Creates a pattern from a sound string (mini-notation), or sets the sound of an existing pattern."
+  ([pat-str]
+   (let [parsed (parse-mini pat-str)
+         events (map (fn [p]
+                       (->Event (:start p)
+                                (:duration p)
+                                {:sound (:value p)}))
+                     parsed)]
+     (make-pattern events)))
+  ([pattern sound-val]
+   (with-param pattern :sound sound-val)))
+
+(defn note
+  "Creates a pattern from a note string (mini-notation), or sets the note of an existing pattern."
+  ([pat-str]
+   (let [parsed (parse-mini pat-str)
+         events (map (fn [p]
+                       (->Event (:start p)
+                                (:duration p)
+                                {:note (:value p)}))
+                     parsed)]
+     (make-pattern events)))
+  ([pattern note-val]
+   (with-param pattern :note note-val)))
+
+(defn gain [pattern val]
+  (with-param pattern :amp val))
+
+(defn lpf [pattern val]
+  (with-param pattern :cutoff val))
+
+(defn fast [pattern amount]
+  (update pattern :cycles #(* % amount)))
+
+;; --- Player ---
+
+(defonce metro (metronome 120))
+(defonce player-state (atom {:playing? false :pattern nil}))
+
+(defn- resolve-note [n]
+  (if (number? n) n (ov/midi->hz (ov/note n))))
+
+(defn- trigger-event [ev beat]
+  (let [params (:params ev)
+        sound (:sound params)
+        n (:note params)
+        amp (or (:amp params) 1.0)
+        cutoff (or (:cutoff params) 2000)
+        ;; Default sound if only note is provided
+        sound (or sound (if n "saw-synth" nil))]
+
+    (when sound
+      (let [synth-fn (case sound
+                       "bd" kick
+                       "sd" snare
+                       "saw-synth" saw-synth
+                       nil) ;; TODO: Lookup dynamic synths
+            freq (if n (resolve-note n) nil)
+            args (cond-> [:amp amp]
+                   freq (conj :freq freq)
+                   cutoff (conj :cutoff cutoff))]
+        (when synth-fn
+          (apply-at (metro beat) synth-fn args))))))
+
+(defn- play-loop [beat]
+  (let [state @player-state]
+    (when (:playing? state)
+      (let [pat (:pattern state)
+            cycles (:cycles pat 1) ;; Speed multiplier
+            cycle-dur (/ 4 cycles) ;; Beats per cycle (assuming 4/4)
+            next-beat (+ beat cycle-dur)]
+
+        ;; Schedule events for this cycle
+        (doseq [ev (:events pat)]
+          (let [rel-start (:time ev)
+                ev-beat (+ beat (* rel-start cycle-dur))]
+            (trigger-event ev ev-beat)))
+
+        (apply-at (metro next-beat) #'play-loop [next-beat])))))
+
+(defn play! [pattern]
+  (reset! player-state {:playing? true :pattern pattern})
+  (let [now (metro)]
+    (play-loop now)))
+
+(defn stop! []
+  (swap! player-state assoc :playing? false))
+
+;; --- Main / Entry ---
+
+(defn -main [& args]
+  (connect-server)
+  (println "Strudel-Overtone Ready.")
+  (println "Try: (play! (-> (s \"bd sd bd sd\") (lpf 800)))"))
+
 
 (comment
 
+  (connect-server)
 
-  (->
-    70
-    midi->hz
-    saw
-    demo)
+  (play! (-> (note "c3 e3 g3 b3") (s "saw-synth")))
 
-
+  (stop!)
+  (stop)
 
   .)
