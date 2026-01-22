@@ -199,8 +199,16 @@
 
   (play! :bd
     (->
-      (s "_ bd _ bd")
+      (s "bd bd _ _ bd _")
+      (fast 2)
       (lpf 100)))
+  (play! :sd
+    (->
+      (s "_ _ _ sd  _ _ _")
+      (fast 2)
+      (gain 0.25)
+      (lpf 5000)))
+
 
   ;; Update bassline
   (play! :bass (-> (note "c2 _ b2 _") (s "sine-synth") (gain 1)))
