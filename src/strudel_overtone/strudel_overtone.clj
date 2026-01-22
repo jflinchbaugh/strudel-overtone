@@ -4,9 +4,9 @@
 
 ;; --- Synths ---
 
-(defsynth kick [amp 1 sustain 0.3 freq 60]
+(defsynth kick [amp 1 sustain 0.3 freq 60 cutoff 3000]
   (let [env (env-gen (perc 0.01 sustain) :action FREE)
-        snd (sin-osc (line:kr (* 2 freq) freq 0.1))]
+        snd (ov/lpf (sin-osc (line:kr (* 2 freq) freq 0.1)) cutoff)]
     (out 0 (pan2 (* snd env amp) 0))))
 
 (defsynth snare [amp 1 sustain 0.2 freq 200 cutoff 3000]
@@ -197,7 +197,10 @@
       (lpf 1000)
       ))
 
-  (play! :bd (s "_ bd _ bd"))
+  (play! :bd
+    (->
+      (s "_ bd _ bd")
+      (lpf 100)))
 
   ;; Update bassline
   (play! :bass (-> (note "c2 _ b2 _") (s "sine-synth") (gain 1)))
