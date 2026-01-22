@@ -1,12 +1,23 @@
 (ns strudel-overtone.strudel-overtone
+  (:require [overtone.core :refer :all])
   (:gen-class))
 
-(defn greet
-  "Callable entry point to the application."
-  [data]
-  (println (str "Hello, " (or (:name data) "World") "!")))
+(connect-server)
 
 (defn -main
   "I don't do a whole lot ... yet."
   [& args]
-  (greet {:name (first args)}))
+  (demo (sin-osc (midi->hz 70))))
+
+(comment
+
+
+  (->
+    70
+    midi->hz
+    saw
+    demo)
+
+
+
+  .)
