@@ -143,6 +143,10 @@
       (let [synth-fn (case sound
                        "bd" kick
                        "sd" snare
+                       "hh" hat
+                       "cp" clap
+                       "square-synth" square-synth
+                       "fm-synth" fm-synth
                        "saw-synth" saw-synth
                        "sine-synth" sine-synth
                        nil)
@@ -224,9 +228,9 @@
 
   (play! :bd
     (->
-      (s "bd bd _ _ bd _")
+      (s "bd _ _ _ bd _")
       (fast 2)
-      (lpf 200)))
+      (lpf 500)))
 
   (play! :sd
     (->
@@ -250,7 +254,30 @@
       (gain 1)
       (lpf 100)))
 
-  (cpm (/ 120 4))
+  ;; --- New Synths ---
+
+  (play! :hh
+    (-> (s "hh hh hh hh")
+        (fast 4)
+        (gain 0.3)))
+
+  (play! :cp
+    (-> (s "_ _ cp _")
+        (fast 2)
+        (gain 0.5)))
+
+  (play! :lead
+    (-> (note "c3 e3 g3 b3")
+        (s "square-synth")
+        (fast 2)
+        (lpf 1200)))
+
+  (play! :metal
+    (-> (note "c2 g2")
+        (s "fm-synth")
+        (fast 0.5)))
+
+  (cpm (/ 100 4))
 
   (cpm)
 
