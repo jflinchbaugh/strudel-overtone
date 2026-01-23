@@ -170,6 +170,7 @@
           (swap! player-state update :loops disj key)))
       ;; Stopped, loop dies
       (swap! player-state update :loops disj key))))
+
 (defn play!
   [& args]
   (let [pairs (if (= 1 (count args))
