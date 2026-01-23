@@ -33,6 +33,33 @@
         filt (rlpf snd cutoff resonance)]
     (out 0 (pan2 (* filt env amp) pan))))
 
+(defsynth hat [amp 1 sustain 0.1 freq 8000 cutoff 6000]
+  (let [env (env-gen (perc 0.001 sustain) :action FREE)
+        snd (hpf (white-noise) cutoff)]
+    (out 0 (pan2 (* snd env amp) 0))))
+
+(defsynth clap [amp 1 sustain 0.1 freq 1200 cutoff 1500 resonance 0.2]
+  (let [env (env-gen (perc 0.005 sustain) :action FREE)
+        snd (bpf (white-noise) freq resonance)]
+    (out 0 (pan2 (* snd env amp) 0))))
+
+(defsynth square-synth [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
+                        attack 0.01 decay 0.1 s-level 0.5 release 0.3 width 0.5]
+  (let [env (env-gen (adsr attack decay s-level release)
+                     :gate (line:kr 1 0 sustain)
+                     :action FREE)
+        snd (pulse freq width)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth fm-synth [freq 440 amp 1 sustain 0.5 carrier-ratio 1 modulator-ratio 2 mod-index 5 pan 0]
+  (let [env (env-gen (adsr 0.01 0.1 0.7 0.3)
+                     :gate (line:kr 1 0 sustain)
+                     :action FREE)
+        modulator (sin-osc (* freq modulator-ratio))
+        carrier (sin-osc (+ (* freq carrier-ratio) (* modulator mod-index (* freq))))]
+    (out 0 (pan2 (* carrier env amp) pan))))
+
 ;; --- Pattern Engine ---
 
 (defrecord Event [time duration params])
