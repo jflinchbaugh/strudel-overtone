@@ -243,9 +243,9 @@
       (lpf 100)))
 
   (play!
-    :bd (-> (s [:bd :bd :bd :bd]) )
-    :snare (-> (s [:sd :_ :sd :_]))
-    :bass (-> (note [:c2 :b2]) (s :sine-synth))
+    :bd (-> (s [:bd :bd :bd :bd]))
+    :snare (-> (s [:- :- :sd :-]))
+    :bass (-> (note [:c2 :b2]) (s :sine-synth) (fast 0.5))
     )
 
   ;; Stop just the drums
