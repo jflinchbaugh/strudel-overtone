@@ -59,6 +59,8 @@
                                 ([] 10.5) ;; Mock current time: 10.5 beats
                                 ([b] (* b 1000))) ;; Mock beat->ms conversion
                     ov/apply-at (fn [ms func args]
+                                  (swap! mock-calls conj {:ms ms :func func :args args}))
+                    ov/apply-by (fn [ms func args]
                                   (swap! mock-calls conj {:ms ms :func func :args args}))]
 
         ;; Call play!
@@ -86,7 +88,8 @@
               (reset! sut/player-state {:playing? false :patterns {} :loops #{}})
               (let [mock-calls (atom [])]
                 (with-redefs [sut/metro (fn ([] 10.5) ([b] (* b 1000)))
-                              ov/apply-at (fn [ms func args] (swap! mock-calls conj {:ms ms :func func :args args}))]
+                              ov/apply-at (fn [ms func args] (swap! mock-calls conj {:ms ms :func func :args args}))
+                              ov/apply-by (fn [ms func args] (swap! mock-calls conj {:ms ms :func func :args args}))]
                   
                   (sut/play! :p1 {:events []} :p2 {:events []})
                   
@@ -112,7 +115,8 @@
                   
                           (with-redefs [sut/metro (fn ([] 10.5) ([b] (* b 1000)))
                   
-                                        ov/apply-at (fn [ms func args] (swap! mock-calls conj {:ms ms :func func :args args}))]
+                                        ov/apply-at (fn [ms func args] (swap! mock-calls conj {:ms ms :func func :args args}))
+                                        ov/apply-by (fn [ms func args] (swap! mock-calls conj {:ms ms :func func :args args}))]
                   
                             
                   

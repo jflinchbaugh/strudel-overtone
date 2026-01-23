@@ -63,12 +63,12 @@
           (fn [evs]
             (map (fn [e] (assoc-in e [:params key] value)) evs))))
 
-(defn- is-rest? [v]
-  (#{"-" "_"} (->name v)))
-
 (defn- ->name
   [v]
   (if (instance? clojure.lang.Named v) (name v) (str v)))
+
+(defn- is-rest? [v]
+  (#{"-" "_"} (->name v)))
 
 (defn s
   "Creates a pattern from a sound string (mini-notation),
@@ -116,6 +116,13 @@
 ;; --- Player ---
 
 (defonce metro (metronome 120))
+
+(defn cpm
+  "Sets or gets the cycles per minute.
+   Assumes 4 beats per cycle."
+  ([] (/ (metro-bpm metro) 4))
+  ([n] (metro :bpm (* n 4)) n))
+
 (defonce player-state (atom {:playing? false :patterns {} :loops #{}}))
 
 (defn- resolve-note [n]
@@ -242,6 +249,10 @@
       (fast 2)
       (gain 1)
       (lpf 100)))
+
+  (cpm (/ 120 4))
+
+  (cpm)
 
   (play!
     :bd (-> (s [:bd :bd :bd :bd]))
