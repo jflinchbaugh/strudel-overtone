@@ -43,12 +43,14 @@
   (->Pattern events 1))
 
 (defn parse-mini
-  "Naively parses a space-separated string into a sequence of events with duration.
+  "Naively parses a space-separated string or a collection into a sequence of events with duration.
    Returns a list of maps {:value v :start s :duration d}."
   [s]
-  (let [tokens (str/split (str/trim s) #"\s+")
+  (let [tokens (if (string? s)
+                 (str/split (str/trim s) #"\s+")
+                 (map name s))
         n (count tokens)
-        dur (/ 1.0 n)]
+        dur (if (pos? n) (/ 1.0 (double n)) 0)]
     (map-indexed (fn [i v]
                    {:value v
                     :start (* i dur)
@@ -62,33 +64,46 @@
           (fn [evs]
             (map (fn [e] (assoc-in e [:params key] value)) evs))))
 
+(defn- is-rest? [v]
+  (or (= v "_") (= v :_) (= v '_)))
+
+(defn- ->name
+  [v]
+  (if (instance? clojure.lang.Named v) (name v) (str v)))
+
 (defn s
-  "Creates a pattern from a sound string (mini-notation), or sets the sound of an existing pattern."
-  ([pat-str]
-   (let [parsed (parse-mini pat-str)
+  "Creates a pattern from a sound string (mini-notation),
+  or sets the sound of an existing pattern."
+  ([pat-str-or-coll]
+   (let [parsed (parse-mini pat-str-or-coll)
          events (keep (fn [p]
-                        (when (not= "_" (:value p))
-                          (->Event (:start p)
-                                   (:duration p)
-                                   {:sound (:value p)})))
+                        (let [v (:value p)]
+                          (when-not (is-rest? v)
+                            (let [sound (->name v)]
+                              (->Event (:start p)
+                                       (:duration p)
+                                       {:sound sound})))))
                       parsed)]
      (make-pattern events)))
   ([pattern sound-val]
-   (with-param pattern :sound sound-val)))
+   (with-param pattern
+     :sound
+     (->name sound-val))))
 
 (defn note
   "Creates a pattern from a note string (mini-notation), or sets the note of an existing pattern."
-  ([pat-str]
-   (let [parsed (parse-mini pat-str)
+  ([pat-str-or-coll]
+   (let [parsed (parse-mini pat-str-or-coll)
          events (keep (fn [p]
-                        (when (not= "_" (:value p))
-                          (->Event (:start p)
-                                   (:duration p)
-                                   {:note (:value p)})))
+                        (let [v (:value p)]
+                          (when-not (is-rest? v)
+                            (->Event (:start p)
+                                     (:duration p)
+                                     {:note v}))))
                       parsed)]
      (make-pattern events)))
   ([pattern note-val]
-   (with-param pattern :note note-val)))
+   (with-param pattern :note (->name note-val))))
 
 (defn gain [pattern val]
   (with-param pattern :amp val))
@@ -171,7 +186,7 @@
          (apply-at (metro start-beat) #'play-loop [key start-beat]))))))
 
 (defn stop!
-  ([] (swap! player-state assoc :playing? false))
+  ([] (swap! player-state assoc :playing? false :patterns {} :loops #{}))
   ([key] (swap! player-state update :patterns dissoc key)))
 
 ;; --- Main / Entry ---
@@ -191,17 +206,18 @@
   ;; Layer drums on top (aligned)
   (play! :snare
     (->
-      (s "sd")
+      (s [:sine-synth])
+      (note :a2)
       (fast 16)
-      (gain 0.1)
-      (lpf 1000)
-      ))
+      (gain 1.0)
+      (lpf 1000)))
 
   (play! :bd
     (->
       (s "bd bd _ _ bd _")
       (fast 2)
-      (lpf 100)))
+      (lpf 200)))
+
   (play! :sd
     (->
       (s "_ _ _ sd  _ _ _")
@@ -209,16 +225,19 @@
       (gain 0.25)
       (lpf 5000)))
 
-
   ;; Update bassline
   (play! :bass (-> (note "c2 _ b2 _") (s "sine-synth") (gain 1)))
+
+
+  (play! :bass (-> (note [:c2 :_ :b2 :_]) (s :saw-synth)))
+
 
   (play! :arp
     (->
       (note "c4 _ d4 _ e4 _ f4 _ g4 _ f4 _ e4 _ d4 _")
       (s "sine-synth")
       (fast 2)
-      (gain 0.25)
+      (gain 1)
       (lpf 100)))
 
   ;; Stop just the drums
@@ -226,6 +245,7 @@
   (stop! :snare)
 
   (stop! :bass)
+
   (stop! :arp)
 
   ;; Stop everything

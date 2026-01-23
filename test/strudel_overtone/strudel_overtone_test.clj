@@ -100,3 +100,38 @@
         (sut/play-loop :sine 12.0)
         (let [trigger-call (first (filter :event @mock-calls))]
           (is (= "sine-synth" (:sound trigger-call))))))))
+
+(deftest s-function-list-test
+  (testing "s function accepts a list of strings"
+    (let [pat (sut/s '("bd" "sd"))]
+      (is (= 2 (count (:events pat))))
+      (is (= "bd" (get-in (first (:events pat)) [:params :sound])))
+      (is (= "sd" (get-in (second (:events pat)) [:params :sound])))))
+
+  (testing "s function accepts a vector of strings"
+    (let [pat (sut/s ["bd" "sd"])]
+      (is (= 2 (count (:events pat))))
+      (is (= "bd" (get-in (first (:events pat)) [:params :sound])))))
+
+  (testing "s function accepts a list of symbols"
+    (let [pat (sut/s '(bd sd))]
+      (is (= 2 (count (:events pat))))
+      (is (= "bd" (get-in (first (:events pat)) [:params :sound])))
+      (is (= "sd" (get-in (second (:events pat)) [:params :sound])))))
+
+  (testing "s function accepts a vector of keywords"
+    (let [pat (sut/s [:bd :sd])]
+      (is (= 2 (count (:events pat))))
+      (is (= "bd" (get-in (first (:events pat)) [:params :sound])))))
+
+  (testing "s function with underscores in list"
+    (let [pat (sut/s [:bd :_ :sd])]
+      (is (= 2 (count (:events pat))))
+      (is (= "bd" (get-in (first (:events pat)) [:params :sound])))
+      (is (= "sd" (get-in (second (:events pat)) [:params :sound])))
+      ;; Check timing for the gap: 3 elements, so sd should be at 2/3
+      (is (approx= 0.666 (:time (second (:events pat))))))))
+
+(deftest note-function-list-test
+  (testing "note function accepts a list of numbers"
+    (is (= (sut/note [:c2 :c3 :c4]) (sut/note "c2 c3 c4")))))
