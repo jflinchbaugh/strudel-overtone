@@ -252,7 +252,7 @@
   (connect-server)
 
   ;; Play a bassline
-  (play! :bass (-> (note "c2 g2") (s "saw-synth") (gain 0.5)))
+  (play! :bass (-> (note [:c2 :g2]) (s :saw-synth) (gain 0.5)))
 
   ;; Layer drums on top (aligned)
   (play! :snare
@@ -265,19 +265,19 @@
 
   (play! :bd
     (->
-      (s "bd _ _ _ bd _")
+      (s [:bd :_ :_ :_ :bd :_])
       (fast 2)
       (lpf 500)))
 
   (play! :sd
     (->
-      (s "_ _ _ sd  _ _ _")
+      (s [:_ :_ :_ :sd :_ :_ :_])
       (fast 2)
       (gain 0.25)
       (lpf 5000)))
 
   ;; Update bassline
-  (play! :bass (-> (note "c2 _ b2 _") (s "sine-synth") (gain 1)))
+  (play! :bass (-> (note [:c2 :_ :b2 :_]) (s :sine-synth) (gain 1)))
 
 
   (play! :bass (-> (note [:c2 :_ :b2 :_]) (s :saw-synth)))
@@ -285,8 +285,8 @@
 
   (play! :arp
     (->
-      (note "c4 _ d4 _ e4 _ f4 _ g4 _ f4 _ e4 _ d4 _")
-      (s "sine-synth")
+      (note [:c4 :_ :d4 :_ :e4 :_ :f4 :_ :g4 :_ :f4 :_ :e4 :_ :d4 :_])
+      (s :sine-synth)
       (fast 2)
       (gain 1)
       (lpf 100)))
@@ -294,31 +294,31 @@
   ;; --- New Synths ---
 
   (play! :hh
-    (-> (s "hh hh hh hh")
-        (fast 2)
+    (-> (s [:hh :hh :hh :hh])
+        (fast 4)
         (gain 0.3)))
 
   (play! :cp
-    (-> (s "_ _ cp _")
+    (-> (s [:_ :_ :cp :_])
         (fast 2)
         (gain 0.5)))
 
   (play! :lead
-    (-> (note "c3 e3 g3 b3")
-        (s "square-synth")
+    (-> (note [:c3 :e3 :g3 :b3])
+        (s :square-synth)
         (fast 2)
         (lpf 1200)))
 
   (play! :soft
-    (-> (note "f4 a4 c5 b#4")
-        (s "tri-synth")
+    (-> (note [:f4 :a4 :c5 :b4])
+        (s :tri-synth)
         (fast 0.5)
         (gain 0.8)))
 
   (play! :metal
-    (-> (note "c2 g2")
-        (s "fm-synth")
-        (fast 2)))
+    (-> (note [:c2 :g2])
+        (s :fm-synth)
+        (fast 0.5)))
 
   (cpm (/ 140 4))
 
