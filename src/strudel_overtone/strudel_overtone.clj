@@ -64,7 +64,7 @@
             (map (fn [e] (assoc-in e [:params key] value)) evs))))
 
 (defn- is-rest? [v]
-  (or (= v "_") (= v :_) (= v '_)))
+  (#{"-" "_"} (->name v)))
 
 (defn- ->name
   [v]
