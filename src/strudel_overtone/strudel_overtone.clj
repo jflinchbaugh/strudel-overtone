@@ -172,18 +172,21 @@
       ;; Stopped, loop dies
       (swap! player-state update :loops disj key))))
 (defn play!
-  ([pattern] (play! :main pattern))
-  ([key pattern]
-   (let [start-loop? (not (contains? (:loops @player-state) key))]
-     (swap! player-state (fn [s]
-                           (-> s
-                               (assoc :playing? true)
-                               (assoc-in [:patterns key] pattern)
-                               (update :loops conj key))))
-     (when start-loop?
-       (let [now (metro)
-             start-beat (+ now (- 4 (mod now 4)))]
-         (apply-at (metro start-beat) #'play-loop [key start-beat]))))))
+  [& args]
+  (let [pairs (if (= 1 (count args))
+                [[:main (first args)]]
+                (partition 2 args))]
+    (doseq [[key pattern] pairs]
+      (let [start-loop? (not (contains? (:loops @player-state) key))]
+        (swap! player-state (fn [s]
+                              (-> s
+                                  (assoc :playing? true)
+                                  (assoc-in [:patterns key] pattern)
+                                  (update :loops conj key))))
+        (when start-loop?
+          (let [now (metro)
+                start-beat (+ now (- 4 (mod now 4)))]
+            (apply-at (metro start-beat) #'play-loop [key start-beat])))))))
 
 (defn stop!
   ([] (swap! player-state assoc :playing? false :patterns {} :loops #{}))
@@ -240,9 +243,15 @@
       (gain 1)
       (lpf 100)))
 
+  (play!
+    :bd (-> (s [:bd :bd :bd]))
+    :snare (-> (s [:sd :_ :_ :_])))
+
   ;; Stop just the drums
   (stop! :drums)
   (stop! :snare)
+
+  (stop! :bd)
 
   (stop! :bass)
 

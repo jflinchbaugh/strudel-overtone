@@ -74,15 +74,63 @@
         ;; 10.5 mod 4 = 2.5. 4 - 2.5 = 1.5. 10.5 + 1.5 = 12.0.
         ;; beat->ms(12.0) -> 12000.
 
-        (is (= 1 (count @mock-calls)))
-        (let [call (first @mock-calls)]
-          (is (= 12000.0 (:ms call)))
-          ;; Check if func is the play-loop var.
-          (is (= #'strudel-overtone.strudel-overtone/play-loop (:func call)))
-          (is (= [:test-pat 12.0] (:args call)))))))
-
-  (testing "play! does not schedule loop if already running"
-    (reset! sut/player-state {:playing? true :patterns {} :loops #{:existing}})
+                  (is (= 1 (count @mock-calls)))
+                (let [call (first @mock-calls)]
+                  (is (= 12000.0 (:ms call)))
+                  ;; Check if func is the play-loop var.
+                  (is (= #'strudel-overtone.strudel-overtone/play-loop (:func call)))
+                  (is (= [:test-pat 12.0] (:args call)))))))
+        
+          (deftest play!-multi-test
+            (testing "play! handles multiple patterns"
+              (reset! sut/player-state {:playing? false :patterns {} :loops #{}})
+              (let [mock-calls (atom [])]
+                (with-redefs [sut/metro (fn ([] 10.5) ([b] (* b 1000)))
+                              ov/apply-at (fn [ms func args] (swap! mock-calls conj {:ms ms :func func :args args}))]
+                  
+                  (sut/play! :p1 {:events []} :p2 {:events []})
+                  
+                  (is (:playing? @sut/player-state))
+                  (is (contains? (:loops @sut/player-state) :p1))
+                  (is (contains? (:loops @sut/player-state) :p2))
+                  (is (= {:events []} (get-in @sut/player-state [:patterns :p1])))
+                  (is (= {:events []} (get-in @sut/player-state [:patterns :p2])))
+                  
+                            ;; Should have 2 calls to schedule loops
+                  
+                            (is (= 2 (count @mock-calls)))))))
+                  
+                  
+                  
+                    (deftest play!-single-arg-test
+                  
+                      (testing "play! with single argument defaults to :main"
+                  
+                        (reset! sut/player-state {:playing? false :patterns {} :loops #{}})
+                  
+                        (let [mock-calls (atom [])]
+                  
+                          (with-redefs [sut/metro (fn ([] 10.5) ([b] (* b 1000)))
+                  
+                                        ov/apply-at (fn [ms func args] (swap! mock-calls conj {:ms ms :func func :args args}))]
+                  
+                            
+                  
+                            (sut/play! {:events []})
+                  
+                            
+                  
+                            (is (:playing? @sut/player-state))
+                  
+                            (is (contains? (:loops @sut/player-state) :main))
+                  
+                            (is (= {:events []} (get-in @sut/player-state [:patterns :main])))
+                  
+                            (is (= 1 (count @mock-calls)))))))
+                  
+                  
+                  
+                    (testing "play! does not schedule loop if already running"    (reset! sut/player-state {:playing? true :patterns {} :loops #{:existing}})
     (let [mock-calls (atom [])]
       (with-redefs [sut/metro (constantly 0)
                     ov/apply-at (fn [& _] (swap! mock-calls conj :called))]
