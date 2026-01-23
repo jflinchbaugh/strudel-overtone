@@ -146,7 +146,7 @@
                    cutoff (conj :cutoff cutoff)
                    sustain-sec (conj :sustain sustain-sec))]
         (when synth-fn
-          (apply-at (metro beat) synth-fn args))))))
+          (apply-by (metro beat) synth-fn args))))))
 
 (defn play-loop [key beat]
   (let [state @player-state]
@@ -166,7 +166,7 @@
                     ev-dur-beats (* rel-dur cycle-dur)]
                 (trigger-event ev ev-beat ev-dur-beats)))
 
-            (apply-at (metro next-beat) #'play-loop [key next-beat]))
+            (apply-by (metro next-beat) #'play-loop [key next-beat]))
           ;; Pattern removed, loop dies
           (swap! player-state update :loops disj key)))
       ;; Stopped, loop dies
@@ -244,8 +244,10 @@
       (lpf 100)))
 
   (play!
-    :bd (-> (s [:bd :bd :bd]))
-    :snare (-> (s [:sd :_ :_ :_])))
+    :bd (-> (s [:bd :bd :bd :bd]) )
+    :snare (-> (s [:sd :_ :sd :_]))
+    :bass (-> (note [:c2 :b2]) (s :sine-synth))
+    )
 
   ;; Stop just the drums
   (stop! :drums)
