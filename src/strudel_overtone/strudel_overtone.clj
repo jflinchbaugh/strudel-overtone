@@ -52,6 +52,15 @@
         filt (rlpf snd cutoff resonance)]
     (out 0 (pan2 (* filt env amp) pan))))
 
+(defsynth tri-synth [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
+                     attack 0.01 decay 0.1 s-level 0.5 release 0.3]
+  (let [env (env-gen (adsr attack decay s-level release)
+                     :gate (line:kr 1 0 sustain)
+                     :action FREE)
+        snd (lf-tri freq)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
 (defsynth fm-synth [freq 440 amp 1 sustain 0.5 carrier-ratio 1 modulator-ratio 2 mod-index 5 pan 0]
   (let [env (env-gen (adsr 0.01 0.1 0.7 0.3)
                      :gate (line:kr 1 0 sustain)
@@ -173,6 +182,7 @@
                        "hh" hat
                        "cp" clap
                        "square-synth" square-synth
+                       "tri-synth" tri-synth
                        "fm-synth" fm-synth
                        "saw-synth" saw-synth
                        "sine-synth" sine-synth
@@ -285,7 +295,7 @@
 
   (play! :hh
     (-> (s "hh hh hh hh")
-        (fast 4)
+        (fast 2)
         (gain 0.3)))
 
   (play! :cp
@@ -299,12 +309,18 @@
         (fast 2)
         (lpf 1200)))
 
+  (play! :soft
+    (-> (note "f4 a4 c5 b#4")
+        (s "tri-synth")
+        (fast 0.5)
+        (gain 0.8)))
+
   (play! :metal
     (-> (note "c2 g2")
         (s "fm-synth")
-        (fast 0.5)))
+        (fast 2)))
 
-  (cpm (/ 100 4))
+  (cpm (/ 140 4))
 
   (cpm)
 
