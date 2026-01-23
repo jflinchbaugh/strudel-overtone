@@ -186,7 +186,7 @@
         (when start-loop?
           (let [now (metro)
                 start-beat (+ now (- 4 (mod now 4)))]
-            (apply-at (metro start-beat) #'play-loop [key start-beat])))))))
+            (apply-by (metro start-beat) #'play-loop [key start-beat])))))))
 
 (defn stop!
   ([] (swap! player-state assoc :playing? false :patterns {} :loops #{}))
