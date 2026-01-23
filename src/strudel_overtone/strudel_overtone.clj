@@ -11,9 +11,8 @@
 
 (defsynth snare [amp 1 sustain 0.2 freq 200 cutoff 3000]
   (let [env (env-gen (perc 0.01 sustain) :action FREE)
-        ;;tone (sin-osc freq)
         noise (ov/lpf (white-noise) cutoff)
-        snd (+ (* 0.5 #_tone) (* 0.8 noise))]
+        snd (+ (* 0.5) (* 0.8 noise))]
     (out 0 (pan2 (* snd env amp) 0))))
 
 (defsynth saw-synth [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
