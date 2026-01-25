@@ -106,45 +106,66 @@
 (defn- is-rest? [v]
   (#{"-" "_"} (->name v)))
 
+(defn- try-parse-number [v]
+  (if (string? v)
+    (try (Double/parseDouble v) (catch Exception _ v))
+    v))
+
+(defn- make-event-list [pat-str-or-coll key transform-fn]
+  (let [parsed (parse-mini pat-str-or-coll)]
+    (keep (fn [p]
+            (let [v (:value p)]
+              (when-not (is-rest? v)
+                (->Event (:start p)
+                         (:duration p)
+                         {key (transform-fn v)}))))
+          parsed)))
+
+(defn- combine-patterns [base-pat new-pat key]
+  (let [base-events (:events base-pat)
+        new-events (:events new-pat)]
+    (assoc base-pat :events
+           (mapv (fn [be]
+                   (let [mid (+ (:time be) (/ (:duration be) 2))
+                         match (some (fn [ne]
+                                       (let [s (:time ne)
+                                             e (+ s (:duration ne))]
+                                         (when (and (<= s mid) (< mid e))
+                                           ne)))
+                                     new-events)]
+                     (if match
+                       (assoc-in be [:params key] (get-in match [:params key]))
+                       be)))
+                 base-events))))
+
 (defn s
   "Creates a pattern from a sound string (mini-notation),
   or sets the sound of an existing pattern."
   ([pat-str-or-coll]
-   (let [parsed (parse-mini pat-str-or-coll)
-         events (keep (fn [p]
-                        (let [v (:value p)]
-                          (when-not (is-rest? v)
-                            (let [sound (->name v)]
-                              (->Event (:start p)
-                                       (:duration p)
-                                       {:sound sound})))))
-                      parsed)]
-     (make-pattern events)))
+   (make-pattern (make-event-list pat-str-or-coll :sound ->name)))
   ([pattern sound-val]
-   (with-param pattern
-     :sound
-     (->name sound-val))))
+   (if (or (string? sound-val) (sequential? sound-val))
+     (combine-patterns pattern (s sound-val) :sound)
+     (with-param pattern :sound (->name sound-val)))))
 
 (defn note
   "Creates a pattern from a note string (mini-notation), or sets the note of an existing pattern."
   ([pat-str-or-coll]
-   (let [parsed (parse-mini pat-str-or-coll)
-         events (keep (fn [p]
-                        (let [v (:value p)]
-                          (when-not (is-rest? v)
-                            (->Event (:start p)
-                                     (:duration p)
-                                     {:note v}))))
-                      parsed)]
-     (make-pattern events)))
+   (make-pattern (make-event-list pat-str-or-coll :note identity)))
   ([pattern note-val]
-   (with-param pattern :note note-val)))
+   (if (or (string? note-val) (sequential? note-val))
+     (combine-patterns pattern (note note-val) :note)
+     (with-param pattern :note note-val))))
 
 (defn gain [pattern val]
-  (with-param pattern :amp val))
+  (if (or (string? val) (sequential? val))
+    (combine-patterns pattern (make-pattern (make-event-list val :amp try-parse-number)) :amp)
+    (with-param pattern :amp val)))
 
 (defn lpf [pattern val]
-  (with-param pattern :cutoff val))
+  (if (or (string? val) (sequential? val))
+    (combine-patterns pattern (make-pattern (make-event-list val :cutoff try-parse-number)) :cutoff)
+    (with-param pattern :cutoff val)))
 
 (defn fast [pattern amount]
   (update pattern :cycles #(* % amount)))
@@ -168,8 +189,10 @@
   (let [params (:params ev)
         sound (:sound params)
         n (:note params)
-        amp (or (:amp params) 1.0)
-        cutoff (or (:cutoff params) 2000)
+        amp (let [a (or (:amp params) 1.0)]
+              (if (string? a) (try (Double/parseDouble a) (catch Exception _ 1.0)) a))
+        cutoff (let [c (or (:cutoff params) 2000)]
+                 (if (string? c) (try (Double/parseDouble c) (catch Exception _ 2000)) c))
         ;; Calculate sustain in seconds from beats
         sustain-sec (* dur-beats (/ 60 (metro-bpm metro)))
         ;; Default sound if only note is provided
@@ -280,7 +303,8 @@
   (play! :bass (-> (note [:c2 :_ :b2 :_]) (s :sine-synth) (gain 1)))
 
 
-  (play! :bass (-> (note [:c2 :_ :b2 :_]) (s :saw-synth)))
+  (play! :bass (-> (note [:c2 :b2 :_])
+                 (s [:sine-synth :tri-synth])))
 
 
   (play! :arp
@@ -320,7 +344,7 @@
         (s :fm-synth)
         (fast 0.5)))
 
-  (cpm (/ 140 4))
+  (cpm (/ 150 4))
 
   (cpm)
 
@@ -328,6 +352,17 @@
     :bd (-> (s [:bd :bd :bd :bd]))
     :snare (-> (s [:- :- :sd :-]))
     :bass (-> (note [:c2 :b2]) (s :sine-synth) (fast 0.5))
+    )
+
+  (play!
+    :bd (-> (s [:bd :bd :- :- :- :- :- :-]) (note [:a1 :c2]))
+    :bass (-> (s [:bd :bd :- :- :- :- :- :-]) (note [:a1 :c2]))
+    )
+
+  (play! :arp (->
+                (note (->> (chord :a2 :minor7) cycle (take 16) shuffle))
+                (s :tri-synth)
+                (gain [0.5 0.7 1.0 0.7 0.5 0.2]))
     )
 
   ;; Stop just the drums
@@ -342,5 +377,7 @@
 
   ;; Stop everything
   (stop!)
+
+  (->> [1 2 3] shuffle (take 2))
 
   .)
