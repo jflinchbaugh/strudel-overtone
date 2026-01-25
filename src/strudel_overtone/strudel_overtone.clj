@@ -83,7 +83,7 @@
   [s]
   (let [tokens (if (string? s)
                  (str/split (str/trim s) #"\s+")
-                 (map name s))
+                 s)
         n (count tokens)
         dur (if (pos? n) (/ 1.0 (double n)) 0)]
     (map-indexed (fn [i v]
@@ -138,7 +138,7 @@
                       parsed)]
      (make-pattern events)))
   ([pattern note-val]
-   (with-param pattern :note (->name note-val))))
+   (with-param pattern :note note-val)))
 
 (defn gain [pattern val]
   (with-param pattern :amp val))
@@ -162,7 +162,7 @@
 (defonce player-state (atom {:playing? false :patterns {} :loops #{}}))
 
 (defn- resolve-note [n]
-  (if (number? n) n (ov/midi->hz (ov/note n))))
+  (ov/midi->hz (ov/note n)))
 
 (defn- trigger-event [ev beat dur-beats]
   (let [params (:params ev)

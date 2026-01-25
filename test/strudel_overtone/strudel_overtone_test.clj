@@ -183,7 +183,3 @@
       (is (= "sd" (get-in (second (:events pat)) [:params :sound])))
       ;; Check timing for the gap: 3 elements, so sd should be at 2/3
       (is (approx= 0.666 (:time (second (:events pat))))))))
-
-(deftest note-function-list-test
-  (testing "note function accepts a list of numbers"
-    (is (= (sut/note [:c2 :c3 :c4]) (sut/note "c2 c3 c4")))))
