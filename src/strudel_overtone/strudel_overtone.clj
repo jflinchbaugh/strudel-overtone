@@ -216,7 +216,9 @@
                    cutoff (conj :cutoff cutoff)
                    sustain-sec (conj :sustain sustain-sec))]
         (when synth-fn
-          (apply-at (metro beat) synth-fn args))))))
+          (do
+            (apply-at (metro beat) println ev)
+            (apply-at (metro beat) synth-fn args)))))))
 
 (defn play-loop [key beat]
   (let [state @player-state]
