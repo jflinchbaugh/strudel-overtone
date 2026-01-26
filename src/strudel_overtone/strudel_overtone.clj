@@ -358,10 +358,20 @@
 
   (play!
    :arp (->
-         (note (->> (chord :b2 :minor7) cycle (take 16) shuffle))
+         (note (->> (chord :c4 :minor7) chosen-from (take 16)))
          (s :tri-synth)
-         (gain (shuffle (map (partial * 1/16) (range 16)))))
+         (gain (take 16 (chosen-from (map (partial * 1/16) (range 16))))))
 
+   :bass (->
+         (note (->> (chord :c1 :minor7) chosen-from (take 4)))
+         (s :square-synth)
+         (fast 1/4)
+         (gain [0.4] #_(take 4 (chosen-from (map (partial * 1/16) (range 16))))))
+
+   :bd (->
+         (s [:bd :-])
+         (note [:a1])
+         (fast 2))
    :hh (->
         (s [:hh :hh :hh :hh])
         (fast 4)
@@ -370,10 +380,7 @@
    :snare (->
            (s [:snare :snare :- :snare])
            (fast 4)
-           (gain 0.1))
-
-   :clap (-> (s []))
-
+           (gain 0.5))
    )
 
 
@@ -392,4 +399,8 @@
 
   (->> [1 2 3] shuffle (take 2))
 
+
+  (take 16 (chosen-from (chord :c4 :minor7)))
+
   .)
+
