@@ -25,7 +25,7 @@
     (out 0 (pan2 (* filt env amp) pan))))
 
 (defsynth sine-synth [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
-                     attack 0.01 decay 0.1 s-level 0.5 release 0.3]
+                      attack 0.01 decay 0.1 s-level 0.5 release 0.3]
   (let [env (env-gen (adsr attack decay s-level release)
                      :gate (line:kr 1 0 sustain)
                      :action FREE)
@@ -269,7 +269,6 @@
   (connect-server)
   (println "Strudel-Overtone Ready."))
 
-
 (comment
 
   (connect-server)
@@ -279,93 +278,104 @@
 
   ;; Layer drums on top (aligned)
   (play! :snare
-    (->
-      (s [:sine-synth])
-      (note :a2)
-      (fast 16)
-      (gain 1.0)
-      (lpf 1000)))
+         (->
+          (s [:sine-synth])
+          (note :a2)
+          (fast 16)
+          (gain 1.0)
+          (lpf 1000)))
 
   (play! :bd
-    (->
-      (s [:bd :_ :_ :_ :bd :_])
-      (fast 2)
-      (lpf 500)))
+         (->
+          (s [:bd :_ :_ :_ :bd :_])
+          (fast 2)
+          (lpf 500)))
 
   (play! :sd
-    (->
-      (s [:_ :_ :_ :sd :_ :_ :_])
-      (fast 2)
-      (gain 0.25)
-      (lpf 5000)))
+         (->
+          (s [:_ :_ :_ :sd :_ :_ :_])
+          (fast 2)
+          (gain 0.25)
+          (lpf 5000)))
 
   ;; Update bassline
   (play! :bass (-> (note [:c2 :_ :b2 :_]) (s :sine-synth) (gain 1)))
 
-
   (play! :bass (-> (note [:c2 :b2 :_])
-                 (s [:sine-synth :tri-synth])))
-
+                   (s [:sine-synth :tri-synth])))
 
   (play! :arp
-    (->
-      (note [:c4 :_ :d4 :_ :e4 :_ :f4 :_ :g4 :_ :f4 :_ :e4 :_ :d4 :_])
-      (s :sine-synth)
-      (fast 2)
-      (gain 1)
-      (lpf 100)))
+         (->
+          (note [:c4 :_ :d4 :_ :e4 :_ :f4 :_ :g4 :_ :f4 :_ :e4 :_ :d4 :_])
+          (s :sine-synth)
+          (fast 2)
+          (gain 1)
+          (lpf 100)))
 
   ;; --- New Synths ---
 
   (play! :hh
-    (-> (s [:hh :hh :hh :hh])
-        (fast 4)
-        (gain 0.3)))
+         (-> (s [:hh :hh :hh :hh])
+             (fast 4)
+             (gain 0.3)))
 
   (play! :cp
-    (-> (s [:_ :_ :cp :_])
-        (fast 2)
-        (gain 0.5)))
+         (-> (s [:_ :_ :cp :_])
+             (fast 2)
+             (gain 0.5)))
 
   (play! :lead
-    (-> (note [:c3 :e3 :g3 :b3])
-        (s :square-synth)
-        (fast 2)
-        (lpf 1200)))
+         (-> (note [:c3 :e3 :g3 :b3])
+             (s :square-synth)
+             (fast 2)
+             (lpf 1200)))
 
   (play! :soft
-    (-> (note [:f4 :a4 :c5 :b4])
-        (s :tri-synth)
-        (fast 0.5)
-        (gain 0.8)))
+         (-> (note [:f4 :a4 :c5 :b4])
+             (s :tri-synth)
+             (fast 0.5)
+             (gain 0.8)))
 
   (play! :metal
-    (-> (note [:c2 :g2])
-        (s :fm-synth)
-        (fast 0.5)))
+         (-> (note [:c2 :g2])
+             (s :fm-synth)
+             (fast 0.5)))
 
   (cpm (/ 150 4))
 
   (cpm)
 
   (play!
-    :bd (-> (s [:bd :bd :bd :bd]))
-    :snare (-> (s [:- :- :sd :-]))
-    :bass (-> (note [:c2 :b2]) (s :sine-synth) (fast 0.5))
-    )
+   :bd (-> (s [:bd :bd :bd :bd]))
+   :snare (-> (s [:- :- :sd :-]))
+   :bass (-> (note [:c2 :b2]) (s :sine-synth) (fast 0.5)))
 
   (play!
-    :bd (-> (s [:bd :bd :- :- :- :- :- :-]) (note [:a1 :c2]))
-    :bass (-> (s [:bd :bd :- :- :- :- :- :-]) (note [:a1 :c2]))
-    )
+   :bd (-> (s [:bd :bd :- :- :- :- :- :-]) (note [:a1 :c2]))
+   :bass (-> (s [:bd :bd :- :- :- :- :- :-]) (note [:a1 :c2])))
 
-  (play! :arp (->
-                (note (->> (chord :a2 :minor7) cycle (take 16) shuffle))
-                (s :tri-synth)
-                (gain [0.5 0.7 1.0 0.7 0.5 0.2]))
-    )
+  (play!
+   :arp (->
+         (note (->> (chord :b2 :minor7) cycle (take 16) shuffle))
+         (s :tri-synth)
+         (gain (shuffle (map (partial * 1/16) (range 16)))))
 
-  ;; Stop just the drums
+   :hh (->
+        (s [:hh :hh :hh :hh])
+        (fast 4)
+        (gain 0.1))
+
+   :snare (->
+           (s [:snare :snare :- :snare])
+           (fast 4)
+           (gain 0.1))
+
+   :clap (-> (s []))
+
+   )
+
+
+;; Stop just the drums
   (stop! :drums)
   (stop! :snare)
 
