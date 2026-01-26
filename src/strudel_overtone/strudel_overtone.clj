@@ -167,6 +167,11 @@
     (combine-patterns pattern (make-pattern (make-event-list val :cutoff try-parse-number)) :cutoff)
     (with-param pattern :cutoff val)))
 
+(defn active [pattern val]
+  (if (or (string? val) (sequential? val))
+    (combine-patterns pattern (make-pattern (make-event-list val :active try-parse-number)) :active)
+    (with-param pattern :active val)))
+
 (defn fast [pattern amount]
   (update pattern :cycles #(* % amount)))
 
@@ -185,40 +190,43 @@
 (defn- resolve-note [n]
   (ov/midi->hz (ov/note n)))
 
-(defn- trigger-event [ev beat dur-beats]
+(defn trigger-event [ev beat dur-beats]
   (let [params (:params ev)
-        sound (:sound params)
-        n (:note params)
-        amp (let [a (or (:amp params) 1.0)]
-              (if (string? a) (try (Double/parseDouble a) (catch Exception _ 1.0)) a))
-        cutoff (let [c (or (:cutoff params) 2000)]
-                 (if (string? c) (try (Double/parseDouble c) (catch Exception _ 2000)) c))
-        ;; Calculate sustain in seconds from beats
-        sustain-sec (* dur-beats (/ 60 (metro-bpm metro)))
-        ;; Default sound if only note is provided
-        sound (or sound (if n "saw-synth" nil))]
+        active (get params :active 1)
+        active? (if (number? active) (not (zero? active)) active)]
+    (when active?
+      (let [sound (:sound params)
+            n (:note params)
+            amp (let [a (or (:amp params) 1.0)]
+                  (if (string? a) (try (Double/parseDouble a) (catch Exception _ 1.0)) a))
+            cutoff (let [c (or (:cutoff params) 2000)]
+                     (if (string? c) (try (Double/parseDouble c) (catch Exception _ 2000)) c))
+            ;; Calculate sustain in seconds from beats
+            sustain-sec (* dur-beats (/ 60 (metro-bpm metro)))
+            ;; Default sound if only note is provided
+            sound (or sound (if n "saw-synth" nil))]
 
-    (when sound
-      (let [synth-fn (case sound
-                       "bd" kick
-                       "sd" snare
-                       "hh" hat
-                       "cp" clap
-                       "square-synth" square-synth
-                       "tri-synth" tri-synth
-                       "fm-synth" fm-synth
-                       "saw-synth" saw-synth
-                       "sine-synth" sine-synth
-                       nil)
-            freq (if n (resolve-note n) nil)
-            args (cond-> [:amp amp]
-                   freq (conj :freq freq)
-                   cutoff (conj :cutoff cutoff)
-                   sustain-sec (conj :sustain sustain-sec))]
-        (when synth-fn
-          (do
-            (apply-at (metro beat) println ev)
-            (apply-at (metro beat) synth-fn args)))))))
+        (when sound
+          (let [synth-fn (case sound
+                           "bd" kick
+                           "sd" snare
+                           "hh" hat
+                           "cp" clap
+                           "square-synth" square-synth
+                           "tri-synth" tri-synth
+                           "fm-synth" fm-synth
+                           "saw-synth" saw-synth
+                           "sine-synth" sine-synth
+                           nil)
+                freq (if n (resolve-note n) nil)
+                args (cond-> [:amp amp]
+                       freq (conj :freq freq)
+                       cutoff (conj :cutoff cutoff)
+                       sustain-sec (conj :sustain sustain-sec))]
+            (when synth-fn
+              (do
+                (apply-at (metro beat) println ev)
+                (apply-at (metro beat) synth-fn args)))))))))
 
 (defn play-loop [key beat]
   (let [state @player-state]
@@ -360,28 +368,32 @@
    :arp (->
          (note (->> (chord :c4 :minor7) chosen-from (take 16)))
          (s :tri-synth)
-         (gain (take 16 (chosen-from (map (partial * 1/16) (range 16))))))
+         (gain (take 16 (chosen-from (map (partial * 1/16) (range 16)))))
+         (active [0 1 0 1]))
 
    :bass (->
          (note (->> (chord :c1 :minor7) chosen-from (take 4)))
          (s :square-synth)
-         (fast 1/4)
-         (gain [0.4] #_(take 4 (chosen-from (map (partial * 1/16) (range 16))))))
+         (fast 1/8)
+         (gain [0.2] #_(take 4 (chosen-from (map (partial * 1/16) (range 16))))))
 
    :bd (->
-         (s [:bd :-])
+         (s [:bd :bd :- :-])
          (note [:a1])
-         (fast 2))
+         (fast 1))
    :hh (->
         (s [:hh :hh :hh :hh])
-        (fast 4)
-        (gain 0.1))
+        (fast 2)
+        (gain 0.1)
+        (active [1]))
 
    :snare (->
            (s [:snare :snare :- :snare])
            (fast 4)
            (gain 0.5))
    )
+
+  (stop!)
 
 
 ;; Stop just the drums

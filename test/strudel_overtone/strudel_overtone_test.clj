@@ -183,3 +183,38 @@
       (is (= "sd" (get-in (second (:events pat)) [:params :sound])))
       ;; Check timing for the gap: 3 elements, so sd should be at 2/3
       (is (approx= 0.666 (:time (second (:events pat))))))))
+
+(deftest active-test
+  (testing "active function marks events as inactive"
+    (let [pat (-> (sut/s "bd sd") (sut/active 0))]
+      (is (= 0 (get-in (first (:events pat)) [:params :active])))
+      (is (= 0 (get-in (second (:events pat)) [:params :active]))))
+
+    (let [pat (-> (sut/s "bd sd") (sut/active "1 0"))]
+      (is (= 1.0 (get-in (first (:events pat)) [:params :active])))
+      (is (= 0.0 (get-in (second (:events pat)) [:params :active])))))
+
+  (testing "trigger-event respects active parameter"
+    (let [mock-calls (atom [])]
+      (with-redefs [ov/apply-at (fn [& _] (swap! mock-calls conj :called))
+                    ov/metro-bpm (constantly 120)
+                    sut/metro (constantly 0)]
+        (testing "active event is triggered"
+          (reset! mock-calls [])
+          (sut/trigger-event (sut/->Event 0 1 {:sound "bd" :active 1}) 0 1)
+          (is (= 2 (count @mock-calls)))) ;; println and synth-fn
+
+        (testing "inactive event is not triggered"
+          (reset! mock-calls [])
+          (sut/trigger-event (sut/->Event 0 1 {:sound "bd" :active 0}) 0 1)
+          (is (empty? @mock-calls)))
+
+        (testing "inactive event with boolean false is not triggered"
+          (reset! mock-calls [])
+          (sut/trigger-event (sut/->Event 0 1 {:sound "bd" :active false}) 0 1)
+          (is (empty? @mock-calls)))
+
+        (testing "event without active param is triggered"
+          (reset! mock-calls [])
+          (sut/trigger-event (sut/->Event 0 1 {:sound "bd"}) 0 1)
+          (is (= 2 (count @mock-calls))))))))
