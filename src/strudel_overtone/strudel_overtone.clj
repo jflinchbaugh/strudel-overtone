@@ -1,5 +1,6 @@
 (ns strudel-overtone.strudel-overtone
   (:require [overtone.core :as ov :refer :all :exclude [note lpf]]
+            [taoensso.telemere :as tel]
             [clojure.string :as str]))
 
 ;; --- Synths ---
@@ -198,9 +199,15 @@
       (let [sound (:sound params)
             n (:note params)
             amp (let [a (or (:amp params) 1.0)]
-                  (if (string? a) (try (Double/parseDouble a) (catch Exception _ 1.0)) a))
+                  (if (string? a)
+                    (try (Double/parseDouble a)
+                         (catch Exception _ 1.0))
+                    a))
             cutoff (let [c (or (:cutoff params) 2000)]
-                     (if (string? c) (try (Double/parseDouble c) (catch Exception _ 2000)) c))
+                     (if (string? c)
+                       (try (Double/parseDouble c)
+                            (catch Exception _ 2000))
+                       c))
             ;; Calculate sustain in seconds from beats
             sustain-sec (* dur-beats (/ 60 (metro-bpm metro)))
             ;; Default sound if only note is provided
@@ -225,7 +232,8 @@
                        sustain-sec (conj :sustain sustain-sec))]
             (when synth-fn
               (do
-                (apply-at (metro beat) println ev)
+                (apply-at (metro beat)
+                  (fn [& e] (tel/log! :info {:event (into {} e)})) ev)
                 (apply-at (metro beat) synth-fn args)))))))))
 
 (defn play-loop [key beat]
@@ -279,12 +287,15 @@
   (connect-server)
   (println "Strudel-Overtone Ready."))
 
+(connect-server)
+
 (comment
 
-  (connect-server)
 
   ;; Play a bassline
   (play! :bass (-> (note [:c2 :g2]) (s :saw-synth) (gain 0.5)))
+
+  (stop!)
 
   ;; Layer drums on top (aligned)
   (play! :snare
@@ -311,7 +322,7 @@
   ;; Update bassline
   (play! :bass (-> (note [:c2 :_ :b2 :_]) (s :sine-synth) (gain 1)))
 
-  (play! :bass (-> (note [:c2 :b2 :_])
+  (play! :bass (-> (note [:c2])
                    (s [:sine-synth :tri-synth])))
 
   (play! :arp
@@ -326,7 +337,7 @@
 
   (play! :hh
          (-> (s [:hh :hh :hh :hh])
-             (fast 4)
+             (fast 1)
              (gain 0.3)))
 
   (play! :cp
@@ -351,7 +362,7 @@
              (s :fm-synth)
              (fast 0.5)))
 
-  (cpm (/ 150 4))
+  (cpm (/ 140 4))
 
   (cpm)
 
@@ -367,13 +378,14 @@
   (play!
    :arp (->
          (note (->> (chord :c4 :minor7) chosen-from (take 16)))
-         (s :tri-synth)
+         (s :sine-synth)
          (gain (take 16 (chosen-from (map (partial * 1/16) (range 16)))))
-         (active [0 1 0 1]))
+         (active [0]))
 
    :bass (->
          (note (->> (chord :c1 :minor7) chosen-from (take 4)))
          (s :square-synth)
+         (lpf 400)
          (fast 1/8)
          (gain [0.2] #_(take 4 (chosen-from (map (partial * 1/16) (range 16))))))
 
@@ -385,7 +397,7 @@
         (s [:hh :hh :hh :hh])
         (fast 2)
         (gain 0.1)
-        (active [1]))
+        (active [0]))
 
    :snare (->
            (s [:snare :snare :- :snare])
