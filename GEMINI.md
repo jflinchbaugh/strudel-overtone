@@ -1,0 +1,1 @@
+- run tests with `clj -T:build test`
