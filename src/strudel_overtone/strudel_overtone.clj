@@ -79,19 +79,21 @@
   (->Pattern events 1))
 
 (defn parse-mini
-  "Naively parses a space-separated string or a collection into a sequence of events with duration.
-   Returns a list of maps {:value v :start s :duration d}."
-  [s]
-  (let [tokens (if (string? s)
-                 (str/split (str/trim s) #"\s+")
-                 s)
-        n (count tokens)
-        dur (if (pos? n) (/ 1.0 (double n)) 0)]
-    (map-indexed (fn [i v]
-                   {:value v
-                    :start (* i dur)
-                    :duration dur})
-                 tokens)))
+  "Naively parses a collection into a sequence of events with duration.
+   Returns a list of maps {:value v :start s :duration d}.
+   Handles nested collections by subdividing the duration."
+  ([tokens] (parse-mini tokens 0.0 1.0))
+  ([tokens start duration]
+   (let [n (count tokens)
+         dur (if (pos? n) (/ duration (double n)) 0)]
+     (mapcat (fn [[i v]]
+               (let [s-time (+ start (* i dur))]
+                 (if (and (sequential? v) (not (string? v)))
+                   (parse-mini v s-time dur)
+                   [{:value v
+                     :start s-time
+                     :duration dur}])))
+             (map-indexed vector tokens)))))
 
 (defn with-param
   "Updates pattern events with a specific parameter."
@@ -112,8 +114,8 @@
     (try (Double/parseDouble v) (catch Exception _ v))
     v))
 
-(defn- make-event-list [pat-str-or-coll key transform-fn]
-  (let [parsed (parse-mini pat-str-or-coll)]
+(defn- make-event-list [pat key transform-fn]
+  (let [parsed (parse-mini pat)]
     (keep (fn [p]
             (let [v (:value p)]
               (when-not (is-rest? v)
@@ -142,8 +144,8 @@
 (defn s
   "Creates a pattern from a sound string (mini-notation),
   or sets the sound of an existing pattern."
-  ([pat-str-or-coll]
-   (make-pattern (make-event-list pat-str-or-coll :sound ->name)))
+  ([pat]
+   (make-pattern (make-event-list pat :sound ->name)))
   ([pattern sound-val]
    (if (or (string? sound-val) (sequential? sound-val))
      (combine-patterns pattern (s sound-val) :sound)
@@ -151,8 +153,8 @@
 
 (defn note
   "Creates a pattern from a note string (mini-notation), or sets the note of an existing pattern."
-  ([pat-str-or-coll]
-   (make-pattern (make-event-list pat-str-or-coll :note identity)))
+  ([pat]
+   (make-pattern (make-event-list pat :note identity)))
   ([pattern note-val]
    (if (or (string? note-val) (sequential? note-val))
      (combine-patterns pattern (note note-val) :note)
@@ -164,7 +166,7 @@
     (with-param pattern :amp val)))
 
 (defn lpf [pattern val]
-  (if (or (string? val) (sequential? val))
+  (if (sequential? val)
     (combine-patterns pattern (make-pattern (make-event-list val :cutoff try-parse-number)) :cutoff)
     (with-param pattern :cutoff val)))
 
@@ -287,10 +289,9 @@
   (connect-server)
   (println "Strudel-Overtone Ready."))
 
-(connect-server)
-
 (comment
 
+  (connect-server)
 
   ;; Play a bassline
   (play! :bass (-> (note [:c2 :g2]) (s :saw-synth) (gain 0.5)))
@@ -358,9 +359,9 @@
              (gain 0.8)))
 
   (play! :metal
-         (-> (note [:c2 :g2])
+    (-> (note [[[:c2 :c3 :b2 :-] :c2] [:g2 :g2 :- :g2]])
              (s :fm-synth)
-             (fast 0.5)))
+             (fast 1)))
 
   (cpm (/ 140 4))
 
