@@ -62,13 +62,22 @@
         filt (rlpf snd cutoff resonance)]
     (out 0 (pan2 (* filt env amp) pan))))
 
-(defsynth fm-synth [freq 440 amp 1 sustain 0.5 carrier-ratio 1 modulator-ratio 2 mod-index 5 pan 0]
+(defsynth fm-synth [freq 440
+                    amp 1
+                    sustain 0.5
+                    carrier-ratio 1
+                    modulator-ratio 2
+                    mod-index 5
+                    cutoff 2000
+                    resonance 0.1
+                    pan 0]
   (let [env (env-gen (adsr 0.01 0.1 0.7 0.3)
                      :gate (line:kr 1 0 sustain)
                      :action FREE)
         modulator (sin-osc (* freq modulator-ratio))
-        carrier (sin-osc (+ (* freq carrier-ratio) (* modulator mod-index (* freq))))]
-    (out 0 (pan2 (* carrier env amp) pan))))
+        carrier (sin-osc (+ (* freq carrier-ratio) (* modulator mod-index (* freq))))
+        filt (rlpf carrier cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
 
 ;; --- Pattern Engine ---
 
@@ -235,7 +244,7 @@
             (when synth-fn
               (do
                 (apply-at (metro beat)
-                  (fn [& e] (tel/log! :info {:event (into {} e)})) ev)
+                          (fn [& e] (tel/log! :info {:event (into {} e)})) ev)
                 (apply-at (metro beat) synth-fn args)))))))))
 
 (defn play-loop [key beat]
@@ -359,9 +368,14 @@
              (gain 0.8)))
 
   (play! :metal
-    (-> (note [[:c3 :b2 :- :-] :f2 [:g2 :g2 :g2 :g2]])
-             (s :fm-synth)
-             (fast 1)))
+         (->
+          (note [:g2 :f2 :g2 :g2 :g2])
+          (gain (concat (range 0.0 1.0 0.05) (range 1.0 0.0 -0.05)))
+          (lpf (map (partial * 10) (concat (range 0.0 1.0 0.05) (range 1.0 0.0 -0.05))))
+          (s :fm-synth)
+          (fast 1)))
+
+  (stop!)
 
   (cpm (/ 140 4))
 
@@ -384,16 +398,16 @@
          (active [0]))
 
    :bass (->
-         (note (->> (chord :c1 :minor7) chosen-from (take 4)))
-         (s :square-synth)
-         (lpf 400)
-         (fast 1/8)
-         (gain [0.2] #_(take 4 (chosen-from (map (partial * 1/16) (range 16))))))
+          (note (->> (chord :c1 :minor7) chosen-from (take 4)))
+          (s :square-synth)
+          (lpf 400)
+          (fast 1/8)
+          (gain [0.2] #_(take 4 (chosen-from (map (partial * 1/16) (range 16))))))
 
    :bd (->
-         (s [:bd :bd :- :-])
-         (note [:a1])
-         (fast 1))
+        (s [:bd :bd :- :-])
+        (note [:a1])
+        (fast 1))
    :hh (->
         (s [:hh :hh :hh :hh])
         (fast 2)
@@ -403,11 +417,9 @@
    :snare (->
            (s [:snare :snare :- :snare])
            (fast 4)
-           (gain 0.5))
-   )
+           (gain 0.5)))
 
   (stop!)
-
 
 ;; Stop just the drums
   (stop! :drums)
@@ -423,7 +435,6 @@
   (stop!)
 
   (->> [1 2 3] shuffle (take 2))
-
 
   (take 16 (chosen-from (chord :c4 :minor7)))
 
