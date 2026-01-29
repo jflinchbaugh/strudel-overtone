@@ -371,7 +371,7 @@
          (->
           (note [:g2 :f2 :g2 :g2 :g2])
           (gain (concat (range 0.0 1.0 0.05) (range 1.0 0.0 -0.05)))
-          (lpf (map (partial * 10) (concat (range 0.0 1.0 0.05) (range 1.0 0.0 -0.05))))
+          (lpf (map (partial * 1000) (concat (range 0.0 1.0 0.05) (range 1.0 0.0 -0.05))))
           (s :fm-synth)
           (fast 1)))
 
