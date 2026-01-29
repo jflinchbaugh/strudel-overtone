@@ -359,7 +359,7 @@
              (gain 0.8)))
 
   (play! :metal
-    (-> (note [[[:c2 :c3 :b2 :-] :c2] [:g2 :g2 :- :g2]])
+    (-> (note [[:c3 :b2 :- :-] :f2 [:g2 :g2 :g2 :g2]])
              (s :fm-synth)
              (fast 1)))
 
