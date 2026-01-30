@@ -459,7 +459,7 @@
     :bass-3 (-> (s [:- :saw-synth]) (note :f2) (gain 0.1) (active 1))
     :arp (->
            (note (chosen-from (chord :c5 :minor7) 16))
-           (s [:sine-synth])
+           (s [:tri-synth :saw-synth])
            (gain 0.1)
            (active (chosen-from [0 1] 16))
            )
