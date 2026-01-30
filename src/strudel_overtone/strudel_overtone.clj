@@ -308,7 +308,7 @@
   (stop!)
 
   ;; Layer drums on top (aligned)
-  (play! :snare
+  (play! :sd
          (->
           (s [:sine-synth])
           (note :a2)
@@ -383,7 +383,7 @@
 
   (play!
    :bd (-> (s [:bd :bd :bd :bd]))
-   :snare (-> (s [:- :- :sd :-]))
+   :sd (-> (s [:- :- :sd :-]))
    :bass (-> (note [:c2 :b2]) (s :sine-synth) (fast 0.5)))
 
   (play!
@@ -414,8 +414,8 @@
         (gain 0.1)
         (active [0]))
 
-   :snare (->
-           (s [:snare :snare :- :snare])
+   :sd (->
+           (s [:sd :sd :- :sd])
            (fast 4)
            (gain 0.5)))
 
@@ -437,6 +437,33 @@
   (->> [1 2 3] shuffle (take 2))
 
   (take 16 (chosen-from (chord :c4 :minor7)))
+
+  (cpm (/ 60 4))
+
+  (play!
+    :hard-style-bd (->
+                     (s [:bd :bd :bd :bd :bd :bd :bd [:bd :bd]])
+                     (lpf [1000 1000])
+                     (gain (range 0.0 2.0 0.1))
+                     (active [1 1 1]))
+    :sd (->
+          (s (take 8 (cycle [:- :sd])))
+          (gain 0.2)
+          (active 1))
+    :clap (->
+            (s (repeat 16 :hh))
+            (gain 0.2)
+            (active (chosen-from [0 1 1 1] 16)))
+    :bass-1 (-> (s [:saw-synth]) (note :c2) (gain 0.2) (active 1))
+    :bass-2 (-> (s [:saw-synth :-]) (note :a1) (gain 0.1) (active 1))
+    :bass-3 (-> (s [:- :saw-synth]) (note :f2) (gain 0.1) (active 1))
+    :arp (->
+           (note (chosen-from (chord :c5 :minor7) 16))
+           (s [:sine-synth])
+           (gain 0.1)
+           (active (chosen-from [0 1] 16))
+           )
+    )
 
   .)
 
