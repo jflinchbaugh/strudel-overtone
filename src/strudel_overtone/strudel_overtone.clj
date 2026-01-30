@@ -241,6 +241,7 @@
 (defn modulator-ratio [pattern val] (set-param pattern :modulator-ratio val))
 (defn mod-index [pattern val] (set-param pattern :mod-index val))
 (defn detune [pattern val] (set-param pattern :detune val))
+(defn add [pattern val] (set-param pattern :add val))
 (defn env
   "Sets the envelope of a pattern. Can be a single value or a sequence/mini-notation."
   ([pat]
@@ -291,6 +292,7 @@
     (when active?
       (let [sound-param (:sound params)
             n (:note params)
+            note-offset (get params :add 0)
             amp (let [a (or (:amp params) 1.0)]
                   (if (string? a)
                     (try (Double/parseDouble a)
@@ -312,8 +314,8 @@
                 synth-var (or
                            (resolve-synth synth-key)
                            (resolve-synth base))
-                freq (if n (resolve-note n) nil)
-                reserved #{:sound :note :active :start :duration :env}
+                freq (if n (resolve-note (+ (if (keyword? n) (ov/note n) n) note-offset)) nil)
+                reserved #{:sound :note :active :start :duration :env :add}
                 handled #{:amp :cutoff :sustain :freq}
                 args (cond-> (reduce-kv (fn [acc k v]
                                           (if (or (reserved k) (handled k))
@@ -567,7 +569,8 @@
              (gain 0.1)
              (active 1))
    :arp (->
-          (note (chosen-from (take 1 (scale :d4 :minor)) 32))
+          (note (chosen-from (take 15 (scale :d4 :minor)) 32))
+          (add [-12 0 12])
           (env (chosen-from [:adsr :perc] 4))
           (s (chosen-from [:fm :sine :fm] 4))
           (gain (chosen-from (range 0.01 0.4 0.05) 16))
