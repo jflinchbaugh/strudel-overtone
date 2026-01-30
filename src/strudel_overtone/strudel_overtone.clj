@@ -194,29 +194,27 @@
                        be)))
                  base-events))))
 
+(defn set-param
+  ([pattern key val] (set-param pattern key val try-parse-number))
+  ([pattern key val transform-fn]
+   (if (sequential? val)
+     (combine-patterns pattern (make-pattern (make-event-list val key transform-fn)) key)
+     (with-param pattern key (transform-fn val)))))
+
 (defn s
   "Creates a pattern from a sound string (mini-notation),
   or sets the sound of an existing pattern."
   ([pat]
    (make-pattern (make-event-list pat :sound ->name)))
   ([pattern sound-val]
-   (if (sequential? sound-val)
-     (combine-patterns pattern (s sound-val) :sound)
-     (with-param pattern :sound (->name sound-val)))))
+   (set-param pattern :sound sound-val ->name)))
 
 (defn note
   "Creates a pattern from a note string (mini-notation), or sets the note of an existing pattern."
   ([pat]
    (make-pattern (make-event-list pat :note identity)))
   ([pattern note-val]
-   (if (sequential? note-val)
-     (combine-patterns pattern (note note-val) :note)
-     (with-param pattern :note note-val))))
-
-(defn set-param [pattern key val]
-  (if (sequential? val)
-    (combine-patterns pattern (make-pattern (make-event-list val key try-parse-number)) key)
-    (with-param pattern key val)))
+   (set-param pattern :note note-val identity)))
 
 (defn gain [pattern val] (set-param pattern :amp val))
 (defn lpf [pattern val] (set-param pattern :cutoff val))
@@ -230,12 +228,15 @@
 (defn carrier-ratio [pattern val] (set-param pattern :carrier-ratio val))
 (defn modulator-ratio [pattern val] (set-param pattern :modulator-ratio val))
 (defn mod-index [pattern val] (set-param pattern :mod-index val))
-(defn env [pattern val] (set-param pattern :env (->name val)))
+(defn env
+  "Sets the envelope of a pattern. Can be a single value or a sequence/mini-notation."
+  ([pat]
+   (make-pattern (make-event-list pat :env ->name)))
+  ([pattern val]
+   (set-param pattern :env val ->name)))
 
 (defn active [pattern val]
-  (if (sequential? val)
-    (combine-patterns pattern (make-pattern (make-event-list val :active try-parse-number)) :active)
-    (with-param pattern :active val)))
+  (set-param pattern :active val try-parse-number))
 
 (defn fast [pattern amount]
   (update pattern :cycles #(* % amount)))
@@ -515,11 +516,12 @@
         (s [:bd :bd :bd :bd :bd :bd :bd [:bd :bd]])
         (gain 1)
         (pan 0.8)
-        (active (chosen-from [0 1] 8)))
+        (active (chosen-from [0 1] 4)))
    :bd-4 (->
           (s [:bd :bd :bd :bd])
           (pan -0.8)
-          (gain 1))
+          (gain 1)
+          (active 0))
    :sd (->
         (s (take 8 (cycle [:- :sd])))
         (gain 0.2)
@@ -528,35 +530,37 @@
           (s (repeat 16 :hh))
           (env :perc)
           (gain 0.2)
-          (active (chosen-from [0 1 0 1] 16)))
+          (active 0 #_(chosen-from [0 1 0 1] 16)))
    :bass-1 (->
-            (s [:fm :fm])
             (note [:c1 :bb0])
-            (carrier-ratio 0.5)
-            #_(modulator-ratio 1)
+            (s [:fm])
+            (carrier-ratio 2)
+            (modulator-ratio 3)
             (release 0)
-            (gain 0.5)
+            (gain 0.1)
             (active 1))
    :bass-2 (->
-            (s [:saw :- :saw :-])
+            (s [:tri :- :tri :-])
             (note (shuffle [:a1 :c2]))
             (attack 2)
             (decay 2)
-            (gain 0.2)
-            (active 0))
+            (gain 0.1)
+            (active 1))
    :bass-3 (->
-            (s [:- :saw :- :saw])
+            (s [:- :- :saw :- :- :saw])
             (note (shuffle [:g2 :b3]))
             (attack 2)
-            (decay 2)
-            (gain 0.2)
-            (active 0))
+            (decay 1)
+            (gain 0.1)
+            (active 1))
    :arp (->
-         (note (chosen-from (chord :a4 :major) 16))
+         (note (chosen-from (take 3 (scale :d5 :minor)) 32))
+         (env (chosen-from [:adsr :perc] 4))
          (s (chosen-from [:fm :sine :fm] 4))
-         (gain 0.2)
-         (pan (chosen-from [-0.80 0.80] 16))
-         (active (chosen-from [0 1] 16))))
+         (gain (chosen-from (range 0.01 0.3 0.05) 16))
+         (pan (chosen-from (range -0.9 0.9 0.2) 16))
+         (active (chosen-from [1 1] 4))
+         (fast 1/2)))
 
   (stop!)
 

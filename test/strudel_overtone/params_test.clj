@@ -51,4 +51,15 @@
             ;; args is a list/vector of keywords and values
             (let [args-map (apply hash-map args)]
               (is (= 0.5 (:pan args-map)))
-              (is (= 0.2 (:resonance args-map))))))))))
+              (is (= 0.2 (:resonance args-map)))))))))
+
+  (testing "env parameter is combinable"
+    (let [pat (-> (sut/s [:bd :sd])
+                  (sut/env [:perc :adsr]))]
+      (is (= "perc" (get-in (first (:events pat)) [:params :env])))
+      (is (= "adsr" (get-in (second (:events pat)) [:params :env])))))
+
+  (testing "active parameter parses strings in single value"
+    (let [pat (-> (sut/s [:bd])
+                  (sut/active "0"))]
+      (is (= 0.0 (get-in (first (:events pat)) [:params :active]))))))
