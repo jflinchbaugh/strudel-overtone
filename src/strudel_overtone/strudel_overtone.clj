@@ -1043,14 +1043,11 @@
    :bd (->
         (s [:bd :bd :bd :bd :bd :bd :bd [:bd :bd]])
         (gain 1)
-        (pan 0.8)
-        (room 1)
-        (active (chosen-from [0 1 1] 8)))
+        (active (chosen-from [0 0 1] 8)))
    :bd-4 (->
           (s [:bd :bd :bd :bd])
           (pan 0)
           (gain 1)
-          (room 1)
           (active 1))
    :sd (->
         (s (take 16 (cycle [:- :sd])))
@@ -1086,9 +1083,9 @@
              (active 0))
    :arp (->
           (note (chosen-from (take 5 (scale :d5 :major)) 8))
-          (vibrato [12 6 0])
-          (crush [0 0.5 1])
-          (gain (chosen-from (range 0.1 0.3 0.05) 16))
+          (vibrato [6 6 6 6])
+          (crush [0 1 0 1])
+          (gain (chosen-from (range 0.05 0.3 0.05) 16))
           (env (chosen-from [:adsr] 4))
           (s (chosen-from [:sine] 2))
           (pan (chosen-from (range -0.9 0.9 0.2) 16))
@@ -1098,11 +1095,6 @@
   (stop!)
 
   (connect-server)
-
-  (recording-start "song.wav")
-
-  (recording-stop)
-  (ov/midiratio (/ 100 100))
 
   .)
 
