@@ -1,5 +1,5 @@
 (ns strudel-overtone.strudel-overtone
-  (:require [overtone.core :as ov :refer :all :exclude [note lpf]]
+  (:require [overtone.core :as ov :refer :all :exclude [note lpf decay]]
             [taoensso.telemere :as tel]
             [clojure.string :as str]))
 
@@ -169,15 +169,23 @@
      (combine-patterns pattern (note note-val) :note)
      (with-param pattern :note note-val))))
 
-(defn gain [pattern val]
+(defn set-param [pattern key val]
   (if (or (string? val) (sequential? val))
-    (combine-patterns pattern (make-pattern (make-event-list val :amp try-parse-number)) :amp)
-    (with-param pattern :amp val)))
+    (combine-patterns pattern (make-pattern (make-event-list val key try-parse-number)) key)
+    (with-param pattern key val)))
 
-(defn lpf [pattern val]
-  (if (sequential? val)
-    (combine-patterns pattern (make-pattern (make-event-list val :cutoff try-parse-number)) :cutoff)
-    (with-param pattern :cutoff val)))
+(defn gain [pattern val] (set-param pattern :amp val))
+(defn lpf [pattern val] (set-param pattern :cutoff val))
+(defn pan [pattern val] (set-param pattern :pan val))
+(defn resonance [pattern val] (set-param pattern :resonance val))
+(defn attack [pattern val] (set-param pattern :attack val))
+(defn decay [pattern val] (set-param pattern :decay val))
+(defn s-level [pattern val] (set-param pattern :s-level val))
+(defn release [pattern val] (set-param pattern :release val))
+(defn width [pattern val] (set-param pattern :width val))
+(defn carrier-ratio [pattern val] (set-param pattern :carrier-ratio val))
+(defn modulator-ratio [pattern val] (set-param pattern :modulator-ratio val))
+(defn mod-index [pattern val] (set-param pattern :mod-index val))
 
 (defn active [pattern val]
   (if (or (string? val) (sequential? val))
@@ -237,7 +245,15 @@
                            "sine-synth" sine-synth
                            nil)
                 freq (if n (resolve-note n) nil)
-                args (cond-> [:amp amp]
+                reserved #{:sound :note :active :start :duration}
+                handled #{:amp :cutoff :sustain :freq}
+                args (cond-> (reduce-kv (fn [acc k v]
+                                          (if (or (reserved k) (handled k))
+                                            acc
+                                            (conj acc k v)))
+                                        []
+                                        params)
+                       true (conj :amp amp)
                        freq (conj :freq freq)
                        cutoff (conj :cutoff cutoff)
                        sustain-sec (conj :sustain sustain-sec))]
@@ -443,9 +459,9 @@
   (play!
     :hard-style-bd (->
                      (s [:bd :bd :bd :bd :bd :bd :bd [:bd :bd]])
-                     (lpf [1000 1000])
+                     (lpf [1000 100])
                      (gain 1)
-                     (active (chosen-from [0 1] 8)))
+                     (active (chosen-from [0 0 0 1] 8)))
     :sd (->
           (s (take 8 (cycle [:- :sd])))
           (gain 0.2)
@@ -454,14 +470,31 @@
             (s (repeat 16 :hh))
             (gain 0.2)
             (active (chosen-from [0 1 0 1] 16)))
-    :bass-1 (-> (s [:tri-synth]) (note :c1) (gain 0.2) (active 1))
-    :bass-2 (-> (s [:saw-synth :- :saw-syntth :-]) (note :a1) (gain 0.1) (active 1))
-    :bass-3 (-> (s [:- :saw-synth :- :saw-synth]) (note :g2) (gain 0.1) (active 1))
+    :bass-1 (->
+                 (s [:tri-synth])
+                 (note :c1)
+                 (gain 0.2)
+                 (active 1))
+    :bass-2 (->
+              (s [:saw-synth :- :saw-syntth :-])
+              (note [:a1 :c2])
+              (attack 2)
+              (decay 2)
+              (gain 0.2)
+              (active 1))
+    :bass-3 (->
+              (s [:- :saw-synth :- :saw-synth])
+              (note [:g2 :b3])
+              (attack 2)
+              (decay 2)
+              (gain 0.2)
+              (active 1))
     :arp (->
-           (note (chosen-from (chord :a4 :minor7) 16))
+           (note (chosen-from (chord :a4 :major) 16))
            (s (shuffle [:tri-synth :saw-synth :square-synth]))
-           (gain 0.1)
-           (active (chosen-from [1 0 1] 16))
+           (gain 0.2)
+           (pan (chosen-from [-0.5 0.5] 16))
+           (active (chosen-from [0 1 0 1] 16))
            )
     )
 
