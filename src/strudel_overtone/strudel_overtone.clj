@@ -457,11 +457,14 @@
   (cpm (/ 80 4))
 
   (play!
-    :hard-style-bd (->
+    :bd (->
                      (s [:bd :bd :bd :bd :bd :bd :bd [:bd :bd]])
                      (lpf [1000 100])
                      (gain 1)
                      (active (chosen-from [0 0 0 1] 8)))
+    :bd-4 (->
+                     (s [:bd :bd :bd :bd])
+                     (gain 1))
     :sd (->
           (s (take 8 (cycle [:- :sd])))
           (gain 0.2)
@@ -477,30 +480,37 @@
                  (active 1))
     :bass-2 (->
               (s [:saw-synth :- :saw-syntth :-])
-              (note [:a1 :c2])
+              (note (shuffle [:a1 :c2]))
               (attack 2)
               (decay 2)
               (gain 0.2)
               (active 1))
     :bass-3 (->
               (s [:- :saw-synth :- :saw-synth])
-              (note [:g2 :b3])
+              (note (shuffle [:g2 :b3]))
               (attack 2)
               (decay 2)
               (gain 0.2)
               (active 1))
     :arp (->
            (note (chosen-from (chord :a4 :major) 16))
-           (s (shuffle [:tri-synth :saw-synth :square-synth]))
+           (s (chosen-from [:tri-synth :saw-synth :square-synth] 4))
+           (attack 0.01)
+           (decay 0.55)
+           (s-level 0.1)
            (gain 0.2)
-           (pan (chosen-from [-0.5 0.5] 16))
-           (active (chosen-from [0 1 0 1] 16))
+           (pan (chosen-from [-0.75 0.75] 16))
+           (active (chosen-from [0 1 1] 16))
            )
     )
 
   (stop!)
 
   (connect-server)
+
+  (recording-start "song.wav")
+
+  (recording-stop)
 
   .)
 
