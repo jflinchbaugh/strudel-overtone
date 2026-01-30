@@ -570,12 +570,12 @@
              (active 1))
    :arp (->
           (note (chosen-from (take 15 (scale :d4 :minor)) 32))
-          (add [-12 0 12])
+          (add (chosen-from [-12 0 12] 4))
           (env (chosen-from [:adsr :perc] 4))
           (s (chosen-from [:fm :sine :fm] 4))
           (gain (chosen-from (range 0.01 0.4 0.05) 16))
           (pan (chosen-from (range -0.9 0.9 0.2) 16))
-          (active (chosen-from [0 1] 4))
+          (active (chosen-from [0 1] 16))
           (fast 1/2)))
 
   (stop!)
