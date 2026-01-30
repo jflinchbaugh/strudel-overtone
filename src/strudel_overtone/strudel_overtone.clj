@@ -135,6 +135,183 @@
         filt (rlpf snd cutoff resonance)]
     (out 0 (pan2 (* filt env amp) pan))))
 
+;; --- Noise Synths ---
+
+(defsynth white-adsr [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
+                      attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0]
+  (let [env (env-gen (adsr attack decay s-level release)
+                     :gate (line:kr 1 0 sustain)
+                     :action FREE)
+        snd (white-noise)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth white-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01 detune 0]
+  (let [env (env-gen (perc attack sustain) :action FREE)
+        snd (white-noise)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth pink-adsr [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
+                     attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0]
+  (let [env (env-gen (adsr attack decay s-level release)
+                     :gate (line:kr 1 0 sustain)
+                     :action FREE)
+        snd (pink-noise)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth pink-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01 detune 0]
+  (let [env (env-gen (perc attack sustain) :action FREE)
+        snd (pink-noise)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth brown-adsr [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
+                      attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0]
+  (let [env (env-gen (adsr attack decay s-level release)
+                     :gate (line:kr 1 0 sustain)
+                     :action FREE)
+        snd (brown-noise)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth brown-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01 detune 0]
+  (let [env (env-gen (perc attack sustain) :action FREE)
+        snd (brown-noise)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth gray-adsr [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
+                     attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0]
+  (let [env (env-gen (adsr attack decay s-level release)
+                     :gate (line:kr 1 0 sustain)
+                     :action FREE)
+        snd (gray-noise)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth gray-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01 detune 0]
+  (let [env (env-gen (perc attack sustain) :action FREE)
+        snd (gray-noise)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth clip-adsr [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
+                     attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0]
+  (let [env (env-gen (adsr attack decay s-level release)
+                     :gate (line:kr 1 0 sustain)
+                     :action FREE)
+        snd (clip-noise)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth clip-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01 detune 0]
+  (let [env (env-gen (perc attack sustain) :action FREE)
+        snd (clip-noise)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth crackle-adsr [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
+                        attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0 chaos 1.5]
+  (let [env (env-gen (adsr attack decay s-level release)
+                     :gate (line:kr 1 0 sustain)
+                     :action FREE)
+        snd (crackle chaos)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth crackle-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01 detune 0 chaos 1.5]
+  (let [env (env-gen (perc attack sustain) :action FREE)
+        snd (crackle chaos)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth dust-adsr [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
+                     attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0]
+  (let [env (env-gen (adsr attack decay s-level release)
+                     :gate (line:kr 1 0 sustain)
+                     :action FREE)
+        f (* freq (ov/midiratio (/ detune 100)))
+        snd (dust f)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth dust-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01 detune 0]
+  (let [env (env-gen (perc attack sustain) :action FREE)
+        f (* freq (ov/midiratio (/ detune 100)))
+        snd (dust f)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth dust2-adsr [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
+                      attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0]
+  (let [env (env-gen (adsr attack decay s-level release)
+                     :gate (line:kr 1 0 sustain)
+                     :action FREE)
+        f (* freq (ov/midiratio (/ detune 100)))
+        snd (dust2 f)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth dust2-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01 detune 0]
+  (let [env (env-gen (perc attack sustain) :action FREE)
+        f (* freq (ov/midiratio (/ detune 100)))
+        snd (dust2 f)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth lf-noise0-adsr [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
+                          attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0]
+  (let [env (env-gen (adsr attack decay s-level release)
+                     :gate (line:kr 1 0 sustain)
+                     :action FREE)
+        f (* freq (ov/midiratio (/ detune 100)))
+        snd (lf-noise0 f)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth lf-noise0-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01 detune 0]
+  (let [env (env-gen (perc attack sustain) :action FREE)
+        f (* freq (ov/midiratio (/ detune 100)))
+        snd (lf-noise0 f)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth lf-noise1-adsr [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
+                          attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0]
+  (let [env (env-gen (adsr attack decay s-level release)
+                     :gate (line:kr 1 0 sustain)
+                     :action FREE)
+        f (* freq (ov/midiratio (/ detune 100)))
+        snd (lf-noise1 f)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth lf-noise1-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01 detune 0]
+  (let [env (env-gen (perc attack sustain) :action FREE)
+        f (* freq (ov/midiratio (/ detune 100)))
+        snd (lf-noise1 f)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth lf-noise2-adsr [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
+                          attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0]
+  (let [env (env-gen (adsr attack decay s-level release)
+                     :gate (line:kr 1 0 sustain)
+                     :action FREE)
+        f (* freq (ov/midiratio (/ detune 100)))
+        snd (lf-noise2 f)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth lf-noise2-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01 detune 0]
+  (let [env (env-gen (perc attack sustain) :action FREE)
+        f (* freq (ov/midiratio (/ detune 100)))
+        snd (lf-noise2 f)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
 ;; --- Pattern Engine ---
 
 (defrecord Event [time duration params])
@@ -242,6 +419,7 @@
 (defn mod-index [pattern val] (set-param pattern :mod-index val))
 (defn detune [pattern val] (set-param pattern :detune val))
 (defn add [pattern val] (set-param pattern :add val))
+(defn chaos [pattern val] (set-param pattern :chaos val))
 (defn env
   "Sets the envelope of a pattern. Can be a single value or a sequence/mini-notation."
   ([pat]
@@ -531,16 +709,16 @@
         (s [:bd :bd :bd :bd :bd :bd :bd [:bd :bd]])
         (gain 1)
         (pan 0.8)
-        (active (chosen-from [0 1] 4)))
+        (active 0 #_(chosen-from [0 1 1] 8)))
    :bd-4 (->
           (s [:bd :bd :bd :bd])
           (pan -0.8)
           (gain 1)
-          (active 0))
+          (active 1))
    :sd (->
-        (s (take 8 (cycle [:- :sd])))
+        (s (take 16 (cycle [:- :sd])))
         (gain 0.2)
-        (active 1))
+        (active 0))
    :clap (->
           (s (repeat 16 :hh))
           (env :perc)
@@ -553,30 +731,31 @@
             (modulator-ratio 3)
             (release 0)
             (gain 0.1)
-            (active 1))
+            (active 0))
    :bass-2 (->
              (s [:tri :- :tri :-])
              (note (shuffle [:a1 :c2]))
              (attack 2)
              (decay 2)
              (gain 0.1)
-             (active 1))
+             (active 0))
    :bass-3 (->
              (s [:- :- :saw :- :- :saw])
              (note (shuffle [:g2 :b3]))
              (attack 2)
              (decay 1)
              (gain 0.1)
-             (active 1))
+             (active 0))
    :arp (->
-          (note (chosen-from (take 15 (scale :d4 :minor)) 32))
-          (add (chosen-from [-12 0 12] 4))
-          (env (chosen-from [:adsr :perc] 4))
-          (s (chosen-from [:fm :sine :fm] 4))
-          (gain (chosen-from (range 0.01 0.4 0.05) 16))
+          (note (chosen-from (take 15 (scale :d4 :minor)) 8))
+          (chaos 1.5)
+          (env (chosen-from [:perc] 4))
+          (s (chosen-from [:crackle] 2))
+          (lpf (chosen-from [50 100 200 400 800] 8))
+          (gain (chosen-from (range 0.5 1.6 0.05) 16))
           (pan (chosen-from (range -0.9 0.9 0.2) 16))
-          (active (chosen-from [0 1] 16))
-          (fast 1/2)))
+          (active (chosen-from [1] 8))
+          (fast 1)))
 
   (stop!)
 
