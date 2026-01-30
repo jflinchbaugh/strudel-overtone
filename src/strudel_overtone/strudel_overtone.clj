@@ -16,6 +16,16 @@
         snd (+ (* 0.5) (* 0.8 noise))]
     (out 0 (pan2 (* snd env amp) 0))))
 
+(defsynth hat [amp 1 sustain 0.1 freq 8000 cutoff 6000]
+  (let [env (env-gen (perc 0.001 sustain) :action FREE)
+        snd (hpf (white-noise) cutoff)]
+    (out 0 (pan2 (* snd env amp) 0))))
+
+(defsynth clap [amp 1 sustain 0.1 freq 1200 cutoff 1500 resonance 0.2]
+  (let [env (env-gen (perc 0.005 sustain) :action FREE)
+        snd (bpf (white-noise) freq resonance)]
+    (out 0 (pan2 (* snd env amp) 0))))
+
 (defsynth saw-adsr [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
                     attack 0.01 decay 0.1 s-level 0.5 release 0.3]
   (let [env (env-gen (adsr attack decay s-level release)
@@ -33,16 +43,6 @@
         snd (sin-osc freq)
         filt (rlpf snd cutoff resonance)]
     (out 0 (pan2 (* filt env amp) pan))))
-
-(defsynth hat [amp 1 sustain 0.1 freq 8000 cutoff 6000]
-  (let [env (env-gen (perc 0.001 sustain) :action FREE)
-        snd (hpf (white-noise) cutoff)]
-    (out 0 (pan2 (* snd env amp) 0))))
-
-(defsynth clap [amp 1 sustain 0.1 freq 1200 cutoff 1500 resonance 0.2]
-  (let [env (env-gen (perc 0.005 sustain) :action FREE)
-        snd (bpf (white-noise) freq resonance)]
-    (out 0 (pan2 (* snd env amp) 0))))
 
 (defsynth square-adsr [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
                        attack 0.01 decay 0.1 s-level 0.5 release 0.3 width 0.5]
@@ -70,10 +70,30 @@
                    mod-index 5
                    cutoff 2000
                    resonance 0.1
-                   pan 0]
-  (let [env (env-gen (adsr 0.01 0.1 0.7 0.3)
+                   pan 0
+                   attack 0.01
+                   decay 0.1
+                   s-level 0.7
+                   release 0.3]
+  (let [env (env-gen (adsr attack decay s-level release)
                      :gate (line:kr 1 0 sustain)
                      :action FREE)
+        modulator (sin-osc (* freq modulator-ratio))
+        carrier (sin-osc (+ (* freq carrier-ratio) (* modulator mod-index (* freq))))
+        filt (rlpf carrier cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth fm-perc [freq 440
+                   amp 1
+                   sustain 0.2
+                   carrier-ratio 1
+                   modulator-ratio 2
+                   mod-index 5
+                   cutoff 2000
+                   resonance 0.1
+                   pan 0
+                   attack 0.01]
+  (let [env (env-gen (perc attack sustain) :action FREE)
         modulator (sin-osc (* freq modulator-ratio))
         carrier (sin-osc (+ (* freq carrier-ratio) (* modulator mod-index (* freq))))
         filt (rlpf carrier cutoff resonance)]
@@ -529,11 +549,10 @@
             (active 1))
    :arp (->
          (note (chosen-from (chord :a4 :major) 16))
-         (s (chosen-from [:tri :saw :square] 4))
-         (env :perc)
+         (s (chosen-from [:sine :fm] 4))
          (gain 0.2)
          (pan (chosen-from [-0.75 0.75] 16))
-         (active (chosen-from [0 0 0 0 1] 16))))
+         (active (chosen-from [1] 16))))
 
   (stop!)
 
