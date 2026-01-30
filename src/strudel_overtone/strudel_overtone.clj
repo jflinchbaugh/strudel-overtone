@@ -16,8 +16,8 @@
         snd (+ (* 0.5) (* 0.8 noise))]
     (out 0 (pan2 (* snd env amp) 0))))
 
-(defsynth saw-synth [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
-                     attack 0.01 decay 0.1 s-level 0.5 release 0.3]
+(defsynth saw-adsr [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
+                    attack 0.01 decay 0.1 s-level 0.5 release 0.3]
   (let [env (env-gen (adsr attack decay s-level release)
                      :gate (line:kr 1 0 sustain)
                      :action FREE)
@@ -25,8 +25,8 @@
         filt (rlpf snd cutoff resonance)]
     (out 0 (pan2 (* filt env amp) pan))))
 
-(defsynth sine-synth [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
-                      attack 0.01 decay 0.1 s-level 0.5 release 0.3]
+(defsynth sine-adsr [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
+                     attack 0.01 decay 0.1 s-level 0.5 release 0.3]
   (let [env (env-gen (adsr attack decay s-level release)
                      :gate (line:kr 1 0 sustain)
                      :action FREE)
@@ -44,8 +44,8 @@
         snd (bpf (white-noise) freq resonance)]
     (out 0 (pan2 (* snd env amp) 0))))
 
-(defsynth square-synth [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
-                        attack 0.01 decay 0.1 s-level 0.5 release 0.3 width 0.5]
+(defsynth square-adsr [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
+                       attack 0.01 decay 0.1 s-level 0.5 release 0.3 width 0.5]
   (let [env (env-gen (adsr attack decay s-level release)
                      :gate (line:kr 1 0 sustain)
                      :action FREE)
@@ -53,8 +53,8 @@
         filt (rlpf snd cutoff resonance)]
     (out 0 (pan2 (* filt env amp) pan))))
 
-(defsynth tri-synth [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
-                     attack 0.01 decay 0.1 s-level 0.5 release 0.3]
+(defsynth tri-adsr [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
+                    attack 0.01 decay 0.1 s-level 0.5 release 0.3]
   (let [env (env-gen (adsr attack decay s-level release)
                      :gate (line:kr 1 0 sustain)
                      :action FREE)
@@ -62,21 +62,45 @@
         filt (rlpf snd cutoff resonance)]
     (out 0 (pan2 (* filt env amp) pan))))
 
-(defsynth fm-synth [freq 440
-                    amp 1
-                    sustain 0.5
-                    carrier-ratio 1
-                    modulator-ratio 2
-                    mod-index 5
-                    cutoff 2000
-                    resonance 0.1
-                    pan 0]
+(defsynth fm-adsr [freq 440
+                   amp 1
+                   sustain 0.5
+                   carrier-ratio 1
+                   modulator-ratio 2
+                   mod-index 5
+                   cutoff 2000
+                   resonance 0.1
+                   pan 0]
   (let [env (env-gen (adsr 0.01 0.1 0.7 0.3)
                      :gate (line:kr 1 0 sustain)
                      :action FREE)
         modulator (sin-osc (* freq modulator-ratio))
         carrier (sin-osc (+ (* freq carrier-ratio) (* modulator mod-index (* freq))))
         filt (rlpf carrier cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth saw-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01]
+  (let [env (env-gen (perc attack sustain) :action FREE)
+        snd (saw freq)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth sine-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01]
+  (let [env (env-gen (perc attack sustain) :action FREE)
+        snd (sin-osc freq)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth square-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01 width 0.5]
+  (let [env (env-gen (perc attack sustain) :action FREE)
+        snd (pulse freq width)
+        filt (rlpf snd cutoff resonance)]
+    (out 0 (pan2 (* filt env amp) pan))))
+
+(defsynth tri-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01]
+  (let [env (env-gen (perc attack sustain) :action FREE)
+        snd (lf-tri freq)
+        filt (rlpf snd cutoff resonance)]
     (out 0 (pan2 (* filt env amp) pan))))
 
 ;; --- Pattern Engine ---
@@ -156,7 +180,7 @@
   ([pat]
    (make-pattern (make-event-list pat :sound ->name)))
   ([pattern sound-val]
-   (if (or (string? sound-val) (sequential? sound-val))
+   (if (sequential? sound-val)
      (combine-patterns pattern (s sound-val) :sound)
      (with-param pattern :sound (->name sound-val)))))
 
@@ -165,12 +189,12 @@
   ([pat]
    (make-pattern (make-event-list pat :note identity)))
   ([pattern note-val]
-   (if (or (string? note-val) (sequential? note-val))
+   (if (sequential? note-val)
      (combine-patterns pattern (note note-val) :note)
      (with-param pattern :note note-val))))
 
 (defn set-param [pattern key val]
-  (if (or (string? val) (sequential? val))
+  (if (sequential? val)
     (combine-patterns pattern (make-pattern (make-event-list val key try-parse-number)) key)
     (with-param pattern key val)))
 
@@ -186,9 +210,10 @@
 (defn carrier-ratio [pattern val] (set-param pattern :carrier-ratio val))
 (defn modulator-ratio [pattern val] (set-param pattern :modulator-ratio val))
 (defn mod-index [pattern val] (set-param pattern :mod-index val))
+(defn env [pattern val] (set-param pattern :env (->name val)))
 
 (defn active [pattern val]
-  (if (or (string? val) (sequential? val))
+  (if (sequential? val)
     (combine-patterns pattern (make-pattern (make-event-list val :active try-parse-number)) :active)
     (with-param pattern :active val)))
 
@@ -210,12 +235,27 @@
 (defn- resolve-note [n]
   (ov/midi->hz (ov/note n)))
 
+(def ^:private synth-aliases
+  {"bd" "kick"
+   "sd" "snare"
+   "hh" "hat"
+   "cp" "clap"})
+
+(defn- get-synth-name [sound params]
+  (let [env (get params :env "adsr")]
+    (str sound "-" env)))
+
+(defn- resolve-synth [name]
+  (if-let [ns (find-ns 'strudel-overtone.strudel-overtone)]
+    (ns-resolve ns (symbol name))
+    nil))
+
 (defn trigger-event [ev beat dur-beats]
   (let [params (:params ev)
         active (get params :active 1)
         active? (if (number? active) (not (zero? active)) active)]
     (when active?
-      (let [sound (:sound params)
+      (let [sound-param (:sound params)
             n (:note params)
             amp (let [a (or (:amp params) 1.0)]
                   (if (string? a)
@@ -230,22 +270,16 @@
             ;; Calculate sustain in seconds from beats
             sustain-sec (* dur-beats (/ 60 (metro-bpm metro)))
             ;; Default sound if only note is provided
-            sound (or sound (if n "saw-synth" nil))]
+            sound-name (or sound-param (if n "saw" nil))]
 
-        (when sound
-          (let [synth-fn (case sound
-                           "bd" kick
-                           "sd" snare
-                           "hh" hat
-                           "cp" clap
-                           "square-synth" square-synth
-                           "tri-synth" tri-synth
-                           "fm-synth" fm-synth
-                           "saw-synth" saw-synth
-                           "sine-synth" sine-synth
-                           nil)
+        (when sound-name
+          (let [base (get synth-aliases sound-name sound-name)
+                synth-key (get-synth-name base params)
+                synth-var (or
+                           (resolve-synth synth-key)
+                           (resolve-synth base))
                 freq (if n (resolve-note n) nil)
-                reserved #{:sound :note :active :start :duration}
+                reserved #{:sound :note :active :start :duration :env}
                 handled #{:amp :cutoff :sustain :freq}
                 args (cond-> (reduce-kv (fn [acc k v]
                                           (if (or (reserved k) (handled k))
@@ -257,11 +291,11 @@
                        freq (conj :freq freq)
                        cutoff (conj :cutoff cutoff)
                        sustain-sec (conj :sustain sustain-sec))]
-            (when synth-fn
+            (when synth-var
               (do
                 (apply-at (metro beat)
                           (fn [& e] (tel/log! :info {:event (into {} e)})) ev)
-                (apply-at (metro beat) synth-fn args)))))))))
+                (apply-at (metro beat) synth-var args)))))))))
 
 (defn play-loop [key beat]
   (let [state @player-state]
@@ -319,14 +353,14 @@
   (connect-server)
 
   ;; Play a bassline
-  (play! :bass (-> (note [:c2 :g2]) (s :saw-synth) (gain 0.5)))
+  (play! :bass (-> (note [:c2 :g2]) (s :saw) (gain 0.5)))
 
   (stop!)
 
   ;; Layer drums on top (aligned)
   (play! :sd
          (->
-          (s [:sine-synth])
+          (s [:sine])
           (note :a2)
           (fast 16)
           (gain 1.0)
@@ -346,15 +380,15 @@
           (lpf 5000)))
 
   ;; Update bassline
-  (play! :bass (-> (note [:c2 :_ :b2 :_]) (s :sine-synth) (gain 1)))
+  (play! :bass (-> (note [:c2 :_ :b2 :_]) (s :sine) (gain 1)))
 
   (play! :bass (-> (note [:c2])
-                   (s [:sine-synth :tri-synth])))
+                   (s [:sine :tri])))
 
   (play! :arp
          (->
           (note [:c4 :_ :d4 :_ :e4 :_ :f4 :_ :g4 :_ :f4 :_ :e4 :_ :d4 :_])
-          (s :sine-synth)
+          (s :sine)
           (fast 2)
           (gain 1)
           (lpf 100)))
@@ -373,13 +407,13 @@
 
   (play! :lead
          (-> (note [:c3 :e3 :g3 :b3])
-             (s :square-synth)
+             (s :square)
              (fast 2)
              (lpf 1200)))
 
   (play! :soft
          (-> (note [:f4 :a4 :c5 :b4])
-             (s :tri-synth)
+             (s :tri)
              (fast 0.5)
              (gain 0.8)))
 
@@ -388,7 +422,7 @@
           (note [:g2 :f2 :g2 :g2 :g2])
           (gain (concat (range 0.0 1.0 0.05) (range 1.0 0.0 -0.05)))
           (lpf (map (partial * 1000) (concat (range 0.0 1.0 0.05) (range 1.0 0.0 -0.05))))
-          (s :fm-synth)
+          (s :fm)
           (fast 1)))
 
   (stop!)
@@ -400,7 +434,7 @@
   (play!
    :bd (-> (s [:bd :bd :bd :bd]))
    :sd (-> (s [:- :- :sd :-]))
-   :bass (-> (note [:c2 :b2]) (s :sine-synth) (fast 0.5)))
+   :bass (-> (note [:c2 :b2]) (s :sine) (fast 0.5)))
 
   (play!
    :bd (-> (s [:bd :bd :- :- :- :- :- :-]) (note [:a1 :c2]))
@@ -409,13 +443,13 @@
   (play!
    :arp (->
          (note (->> (chord :c4 :minor7) chosen-from (take 16)))
-         (s :sine-synth)
+         (s :sine)
          (gain (take 16 (chosen-from (map (partial * 1/16) (range 16)))))
          (active [0]))
 
    :bass (->
           (note (->> (chord :c1 :minor7) chosen-from (take 4)))
-          (s :square-synth)
+          (s :square)
           (lpf 400)
           (fast 1/8)
           (gain [0.2] #_(take 4 (chosen-from (map (partial * 1/16) (range 16))))))
@@ -431,9 +465,9 @@
         (active [0]))
 
    :sd (->
-           (s [:sd :sd :- :sd])
-           (fast 4)
-           (gain 0.5)))
+        (s [:sd :sd :- :sd])
+        (fast 4)
+        (gain 0.5)))
 
   (stop!)
 
@@ -457,52 +491,49 @@
   (cpm (/ 80 4))
 
   (play!
-    :bd (->
-                     (s [:bd :bd :bd :bd :bd :bd :bd [:bd :bd]])
-                     (lpf [1000 100])
-                     (gain 1)
-                     (active (chosen-from [0 0 0 1] 8)))
-    :bd-4 (->
-                     (s [:bd :bd :bd :bd])
-                     (gain 1))
-    :sd (->
-          (s (take 8 (cycle [:- :sd])))
+   :bd (->
+        (s [:bd :bd :bd :bd :bd :bd :bd [:bd :bd]])
+        (lpf [1000 100])
+        (gain 1)
+        (env :adsr)
+        (active (chosen-from [0 0 0 1] 8)))
+   :bd-4 (->
+          (s [:bd :bd :bd :bd])
+          (env :perc)
+          (gain 1))
+   :sd (->
+        (s (take 8 (cycle [:- :sd])))
+        (gain 0.2)
+        (active 1))
+   :clap (->
+          (s (repeat 16 :hh))
+          (env :perc)
           (gain 0.2)
-          (active 1))
-    :clap (->
-            (s (repeat 16 :hh))
+          (active (chosen-from [0 1 0 1] 16)))
+   :bass-1 (->
+            (s [:tri])
+            (note :c1)
             (gain 0.2)
-            (active (chosen-from [0 1 0 1] 16)))
-    :bass-1 (->
-                 (s [:tri-synth])
-                 (note :c1)
-                 (gain 0.2)
-                 (active 1))
-    :bass-2 (->
-              (s [:saw-synth :- :saw-syntth :-])
-              (note (shuffle [:a1 :c2]))
-              (attack 2)
-              (decay 2)
-              (gain 0.2)
-              (active 1))
-    :bass-3 (->
-              (s [:- :saw-synth :- :saw-synth])
-              (note (shuffle [:g2 :b3]))
-              (attack 2)
-              (decay 2)
-              (gain 0.2)
-              (active 1))
-    :arp (->
-           (note (chosen-from (chord :a4 :major) 16))
-           (s (chosen-from [:tri-synth :saw-synth :square-synth] 4))
-           (attack 0.01)
-           (decay 0.55)
-           (s-level 0.1)
-           (gain 0.2)
-           (pan (chosen-from [-0.75 0.75] 16))
-           (active (chosen-from [0 1 1] 16))
-           )
-    )
+            (active 1))
+   :bass-2 (->
+            (s [:saw :- :saw :-])
+            (note (shuffle [:a1 :c2]))
+            (attack 2)
+            (decay 2)
+            (gain 0.2)
+            (active 1))
+   :bass-3 (->
+            (s [:- :saw :- :saw])
+            (note (shuffle [:g2 :b3]))
+            (gain 0.2)
+            (active 1))
+   :arp (->
+         (note (chosen-from (chord :a4 :major) 16))
+         (s (chosen-from [:tri :saw :square] 4))
+         (env :perc)
+         (gain 0.2)
+         (pan (chosen-from [-0.75 0.75] 16))
+         (active (chosen-from [0 0 0 0 1] 16))))
 
   (stop!)
 
