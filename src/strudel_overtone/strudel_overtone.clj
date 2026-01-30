@@ -516,7 +516,7 @@
         (lpf [1000 100])
         (gain 1)
         (env :adsr)
-        (active (chosen-from [0 0 0 1] 8)))
+        (active (chosen-from [0 1] 8)))
    :bd-4 (->
           (s [:bd :bd :bd :bd])
           (env :perc)
@@ -552,7 +552,7 @@
          (s (chosen-from [:sine :fm] 4))
          (gain 0.2)
          (pan (chosen-from [-0.75 0.75] 16))
-         (active (chosen-from [1] 16))))
+         (active (chosen-from [0 1] 16))))
 
   (stop!)
 
