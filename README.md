@@ -17,5 +17,6 @@ making it look a little like Strudel.
 
 ## Running tests
 
-`$ clj -T:build test`
+- All: `$ clj -T:build test`
+- An individual test: `$ clj -T:build test -n strudel-evertone.params-test`
 
