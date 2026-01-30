@@ -10,11 +10,10 @@ making it look a little like Strudel.
 * The script will try to wire supernova to a system output in pipewire,
   but sometimes it needs to be checked in `qpwgraph`
 * In Emacs:
- * Start emacs
- * _connect_ to the running repl
- * evaluate all of `strudel-overtone/strudel-overtone.clj`
- * you should be connected and ready to go!
-
+  * Start emacs
+  * _connect_ to the running repl
+  * evaluate all of `strudel-overtone/strudel-overtone.clj`
+  * you should be connected and ready to go!
 
 ## Running tests
 
