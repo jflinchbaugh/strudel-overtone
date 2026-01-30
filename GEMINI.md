@@ -1,1 +1,2 @@
 - run tests with `clj -T:build test`
+- leave git operations to me
