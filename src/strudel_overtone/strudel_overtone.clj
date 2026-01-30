@@ -438,14 +438,14 @@
 
   (take 16 (chosen-from (chord :c4 :minor7)))
 
-  (cpm (/ 60 4))
+  (cpm (/ 80 4))
 
   (play!
     :hard-style-bd (->
                      (s [:bd :bd :bd :bd :bd :bd :bd [:bd :bd]])
                      (lpf [1000 1000])
-                     (gain (range 0.0 2.0 0.1))
-                     (active [1 1 1]))
+                     (gain 1)
+                     (active (chosen-from [0 1] 8)))
     :sd (->
           (s (take 8 (cycle [:- :sd])))
           (gain 0.2)
@@ -453,17 +453,21 @@
     :clap (->
             (s (repeat 16 :hh))
             (gain 0.2)
-            (active (chosen-from [0 1 1 1] 16)))
-    :bass-1 (-> (s [:saw-synth]) (note :c2) (gain 0.2) (active 1))
-    :bass-2 (-> (s [:saw-synth :-]) (note :a1) (gain 0.1) (active 1))
-    :bass-3 (-> (s [:- :saw-synth]) (note :f2) (gain 0.1) (active 1))
+            (active (chosen-from [0 1 0 1] 16)))
+    :bass-1 (-> (s [:tri-synth]) (note :c1) (gain 0.2) (active 1))
+    :bass-2 (-> (s [:saw-synth :- :saw-syntth :-]) (note :a1) (gain 0.1) (active 1))
+    :bass-3 (-> (s [:- :saw-synth :- :saw-synth]) (note :g2) (gain 0.1) (active 1))
     :arp (->
-           (note (chosen-from (chord :c5 :minor7) 16))
-           (s [:tri-synth :saw-synth])
+           (note (chosen-from (chord :a4 :minor7) 16))
+           (s (shuffle [:tri-synth :saw-synth :square-synth]))
            (gain 0.1)
-           (active (chosen-from [0 1] 16))
+           (active (chosen-from [1 0 1] 16))
            )
     )
+
+  (stop!)
+
+  (connect-server)
 
   .)
 
