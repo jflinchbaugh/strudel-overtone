@@ -513,13 +513,12 @@
   (play!
    :bd (->
         (s [:bd :bd :bd :bd :bd :bd :bd [:bd :bd]])
-        (lpf [1000 100])
         (gain 1)
-        (env :adsr)
+        (pan 0.8)
         (active (chosen-from [0 1] 8)))
    :bd-4 (->
           (s [:bd :bd :bd :bd])
-          (env :perc)
+          (pan -0.8)
           (gain 1))
    :sd (->
         (s (take 8 (cycle [:- :sd])))
@@ -531,9 +530,12 @@
           (gain 0.2)
           (active (chosen-from [0 1 0 1] 16)))
    :bass-1 (->
-            (s [:tri])
-            (note :c1)
-            (gain 0.2)
+            (s [:fm :fm])
+            (note [:c1 :bb0])
+            (carrier-ratio 0.5)
+            #_(modulator-ratio 1)
+            (release 0)
+            (gain 0.5)
             (active 1))
    :bass-2 (->
             (s [:saw :- :saw :-])
@@ -541,17 +543,19 @@
             (attack 2)
             (decay 2)
             (gain 0.2)
-            (active 1))
+            (active 0))
    :bass-3 (->
             (s [:- :saw :- :saw])
             (note (shuffle [:g2 :b3]))
+            (attack 2)
+            (decay 2)
             (gain 0.2)
-            (active 1))
+            (active 0))
    :arp (->
          (note (chosen-from (chord :a4 :major) 16))
-         (s (chosen-from [:sine :fm] 4))
+         (s (chosen-from [:fm :sine :fm] 4))
          (gain 0.2)
-         (pan (chosen-from [-0.75 0.75] 16))
+         (pan (chosen-from [-0.80 0.80] 16))
          (active (chosen-from [0 1] 16))))
 
   (stop!)
