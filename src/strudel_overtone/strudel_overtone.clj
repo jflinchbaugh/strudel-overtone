@@ -27,38 +27,42 @@
     (out 0 (pan2 (* snd env amp) 0))))
 
 (defsynth saw-adsr [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
-                    attack 0.01 decay 0.1 s-level 0.5 release 0.3]
+                    attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0]
   (let [env (env-gen (adsr attack decay s-level release)
                      :gate (line:kr 1 0 sustain)
                      :action FREE)
-        snd (saw freq)
+        f (* freq (ov/midiratio (/ detune 100)))
+        snd (saw f)
         filt (rlpf snd cutoff resonance)]
     (out 0 (pan2 (* filt env amp) pan))))
 
 (defsynth sine-adsr [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
-                     attack 0.01 decay 0.1 s-level 0.5 release 0.3]
+                     attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0]
   (let [env (env-gen (adsr attack decay s-level release)
                      :gate (line:kr 1 0 sustain)
                      :action FREE)
-        snd (sin-osc freq)
+        f (* freq (ov/midiratio (/ detune 100)))
+        snd (sin-osc f)
         filt (rlpf snd cutoff resonance)]
     (out 0 (pan2 (* filt env amp) pan))))
 
 (defsynth square-adsr [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
-                       attack 0.01 decay 0.1 s-level 0.5 release 0.3 width 0.5]
+                       attack 0.01 decay 0.1 s-level 0.5 release 0.3 width 0.5 detune 0]
   (let [env (env-gen (adsr attack decay s-level release)
                      :gate (line:kr 1 0 sustain)
                      :action FREE)
-        snd (pulse freq width)
+        f (* freq (ov/midiratio (/ detune 100)))
+        snd (pulse f width)
         filt (rlpf snd cutoff resonance)]
     (out 0 (pan2 (* filt env amp) pan))))
 
 (defsynth tri-adsr [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0
-                    attack 0.01 decay 0.1 s-level 0.5 release 0.3]
+                    attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0]
   (let [env (env-gen (adsr attack decay s-level release)
                      :gate (line:kr 1 0 sustain)
                      :action FREE)
-        snd (lf-tri freq)
+        f (* freq (ov/midiratio (/ detune 100)))
+        snd (lf-tri f)
         filt (rlpf snd cutoff resonance)]
     (out 0 (pan2 (* filt env amp) pan))))
 
@@ -74,12 +78,14 @@
                    attack 0.01
                    decay 0.1
                    s-level 0.7
-                   release 0.3]
+                   release 0.3
+                   detune 0]
   (let [env (env-gen (adsr attack decay s-level release)
                      :gate (line:kr 1 0 sustain)
                      :action FREE)
-        modulator (sin-osc (* freq modulator-ratio))
-        carrier (sin-osc (+ (* freq carrier-ratio) (* modulator mod-index (* freq))))
+        f (* freq (ov/midiratio (/ detune 100)))
+        modulator (sin-osc (* f modulator-ratio))
+        carrier (sin-osc (+ (* f carrier-ratio) (* modulator mod-index (* f))))
         filt (rlpf carrier cutoff resonance)]
     (out 0 (pan2 (* filt env amp) pan))))
 
@@ -92,34 +98,40 @@
                    cutoff 2000
                    resonance 0.1
                    pan 0
-                   attack 0.01]
+                   attack 0.01
+                   detune 0]
   (let [env (env-gen (perc attack sustain) :action FREE)
-        modulator (sin-osc (* freq modulator-ratio))
-        carrier (sin-osc (+ (* freq carrier-ratio) (* modulator mod-index (* freq))))
+        f (* freq (ov/midiratio (/ detune 100)))
+        modulator (sin-osc (* f modulator-ratio))
+        carrier (sin-osc (+ (* f carrier-ratio) (* modulator mod-index (* f))))
         filt (rlpf carrier cutoff resonance)]
     (out 0 (pan2 (* filt env amp) pan))))
 
-(defsynth saw-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01]
+(defsynth saw-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01 detune 0]
   (let [env (env-gen (perc attack sustain) :action FREE)
-        snd (saw freq)
+        f (* freq (ov/midiratio (/ detune 100)))
+        snd (saw f)
         filt (rlpf snd cutoff resonance)]
     (out 0 (pan2 (* filt env amp) pan))))
 
-(defsynth sine-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01]
+(defsynth sine-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01 detune 0]
   (let [env (env-gen (perc attack sustain) :action FREE)
-        snd (sin-osc freq)
+        f (* freq (ov/midiratio (/ detune 100)))
+        snd (sin-osc f)
         filt (rlpf snd cutoff resonance)]
     (out 0 (pan2 (* filt env amp) pan))))
 
-(defsynth square-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01 width 0.5]
+(defsynth square-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01 width 0.5 detune 0]
   (let [env (env-gen (perc attack sustain) :action FREE)
-        snd (pulse freq width)
+        f (* freq (ov/midiratio (/ detune 100)))
+        snd (pulse f width)
         filt (rlpf snd cutoff resonance)]
     (out 0 (pan2 (* filt env amp) pan))))
 
-(defsynth tri-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01]
+(defsynth tri-perc [freq 440 amp 1 sustain 0.2 cutoff 2000 resonance 0.1 pan 0 attack 0.01 detune 0]
   (let [env (env-gen (perc attack sustain) :action FREE)
-        snd (lf-tri freq)
+        f (* freq (ov/midiratio (/ detune 100)))
+        snd (lf-tri f)
         filt (rlpf snd cutoff resonance)]
     (out 0 (pan2 (* filt env amp) pan))))
 
@@ -228,6 +240,7 @@
 (defn carrier-ratio [pattern val] (set-param pattern :carrier-ratio val))
 (defn modulator-ratio [pattern val] (set-param pattern :modulator-ratio val))
 (defn mod-index [pattern val] (set-param pattern :mod-index val))
+(defn detune [pattern val] (set-param pattern :detune val))
 (defn env
   "Sets the envelope of a pattern. Can be a single value or a sequence/mini-notation."
   ([pat]
@@ -540,27 +553,27 @@
             (gain 0.1)
             (active 1))
    :bass-2 (->
-            (s [:tri :- :tri :-])
-            (note (shuffle [:a1 :c2]))
-            (attack 2)
-            (decay 2)
-            (gain 0.1)
-            (active 1))
+             (s [:tri :- :tri :-])
+             (note (shuffle [:a1 :c2]))
+             (attack 2)
+             (decay 2)
+             (gain 0.1)
+             (active 1))
    :bass-3 (->
-            (s [:- :- :saw :- :- :saw])
-            (note (shuffle [:g2 :b3]))
-            (attack 2)
-            (decay 1)
-            (gain 0.1)
-            (active 1))
+             (s [:- :- :saw :- :- :saw])
+             (note (shuffle [:g2 :b3]))
+             (attack 2)
+             (decay 1)
+             (gain 0.1)
+             (active 1))
    :arp (->
-         (note (chosen-from (take 3 (scale :d5 :minor)) 32))
-         (env (chosen-from [:adsr :perc] 4))
-         (s (chosen-from [:fm :sine :fm] 4))
-         (gain (chosen-from (range 0.01 0.3 0.05) 16))
-         (pan (chosen-from (range -0.9 0.9 0.2) 16))
-         (active (chosen-from [1 1] 4))
-         (fast 1/2)))
+          (note (chosen-from (take 1 (scale :d4 :minor)) 32))
+          (env (chosen-from [:adsr :perc] 4))
+          (s (chosen-from [:fm :sine :fm] 4))
+          (gain (chosen-from (range 0.01 0.4 0.05) 16))
+          (pan (chosen-from (range -0.9 0.9 0.2) 16))
+          (active (chosen-from [0 1] 4))
+          (fast 1/2)))
 
   (stop!)
 
@@ -569,6 +582,7 @@
   (recording-start "song.wav")
 
   (recording-stop)
+  (ov/midiratio (/ 100 100))
 
   .)
 
