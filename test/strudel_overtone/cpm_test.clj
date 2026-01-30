@@ -10,13 +10,10 @@
                                 (when (= :bpm (first args))
                                   (reset! bpm-atom (second args))))
                     ov/metro-bpm (fn [_] @bpm-atom)]
-        
         ;; Test setting CPM
         (sut/cpm 30)
         (is (= 120 @bpm-atom))
-        
         (sut/cpm 60)
         (is (= 240 @bpm-atom))
-        
         ;; Test getting CPM
         (is (= 60.0 (double (sut/cpm))))))))

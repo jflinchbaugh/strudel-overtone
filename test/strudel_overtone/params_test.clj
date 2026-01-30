@@ -5,8 +5,8 @@
 
 (deftest param-functions-test
   (testing "new parameter functions exist and work on patterns"
-    (let [pat (-> (sut/note [:c4]) 
-                  (sut/s [:saw-synth])
+    (let [pat (-> (sut/note [:c4])
+                  (sut/s [:saw])
                   (sut/pan 0.5)
                   (sut/resonance 0.2)
                   (sut/attack 0.05)
@@ -28,22 +28,22 @@
         (is (= 2 (get-in ev [:params :carrier-ratio])))
         (is (= 3 (get-in ev [:params :modulator-ratio])))
         (is (= 10 (get-in ev [:params :mod-index]))))))
-  
+
   (testing "trigger-event passes parameters to synth"
      (let [mock-calls (atom [])]
       (with-redefs [ov/metro-bpm (constantly 120)
                     sut/metro (constantly 0)
                     ov/apply-at (fn [ms func args] (swap! mock-calls conj {:func func :args args}))
-                    sut/saw-synth (fn [& args] args)] ;; Mock synth
-        
-        (let [pat (-> (sut/note [:c4]) 
-                      (sut/s [:saw-synth])
+                    sut/saw-adsr (fn [& args] args)] ;; Mock synth
+
+        (let [pat (-> (sut/note [:c4])
+                      (sut/s [:saw])
                       (sut/pan 0.5)
                       (sut/resonance 0.2))
               ev (first (:events pat))]
-          
+
           (sut/trigger-event ev 0 1)
-          
+
           ;; Filter for the synth call (ignore log call)
           (let [synth-call (second @mock-calls) ;; first is log, second is synth
                 args (:args synth-call)]
