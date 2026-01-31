@@ -1247,14 +1247,8 @@
             (gain 0.1)
             (active 0))
    :arp (->
-          (s [
-              #{:sine :bd}
-              #{:sine :bd}
-              #{:sine :bd}
-              :-
-              ])
-          (echo-delay 0.2)
-          (echo-repeats [2 2 12 2])
+         (note [#{:a4 :b4 :c5}])
+         (s [#{:fm :bd}])
          (gain (chosen-from (range 0.05 0.3 0.05) 16))
          (env (chosen-from [:adsr] 4))
          (pan (chosen-from (range -0.9 0.9 0.2) 16))
