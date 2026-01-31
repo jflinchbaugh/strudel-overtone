@@ -85,3 +85,28 @@
             middle-evs (filter #(approx= 0.333 (:time %)) evs)]
         (is (= 2 (count middle-evs)))
         (is (= #{:e4 :g4} (set (map #(get-in % [:params :note]) middle-evs))))))))
+
+(deftest cartesian-product-test
+  (testing "Combining sets of notes and instruments creates Cartesian product"
+    (let [pat (-> (sut/note [:c4])
+                  (sut/s [#{:piano :violin}]))]
+      ;; Note c4 (0-1). Sound #{:piano :violin} (0-1).
+      ;; Expect 2 events: c4 on piano, c4 on violin.
+      (is (= 2 (count (:events pat))))
+      (let [evs (:events pat)
+            sounds (set (map #(get-in % [:params :sound]) evs))]
+        (is (= #{"piano" "violin"} sounds))
+        (is (every? #(= :c4 (get-in % [:params :note])) evs)))))
+
+  (testing "Complex Cartesian product"
+    (let [pat (-> (sut/note [#{:c4 :e4}])
+                  (sut/s [#{:piano :violin}]))]
+      ;; Notes: C4, E4. Sounds: Piano, Violin.
+      ;; Expect 2x2 = 4 events.
+      (is (= 4 (count (:events pat))))
+      (let [evs (:events pat)
+            combos (set (map (fn [e] [(get-in e [:params :note]) (get-in e [:params :sound])]) evs))]
+        (is (contains? combos [:c4 "piano"]))
+        (is (contains? combos [:c4 "violin"]))
+        (is (contains? combos [:e4 "piano"]))
+        (is (contains? combos [:e4 "violin"]))))))

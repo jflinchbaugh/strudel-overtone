@@ -763,18 +763,19 @@
   (let [base-events (:events base-pat)
         new-events (:events new-pat)]
     (assoc base-pat :events
-           (mapv (fn [be]
-                   (let [mid (+ (:time be) (/ (:duration be) 2))
-                         match (some (fn [ne]
-                                       (let [s (:time ne)
-                                             e (+ s (:duration ne))]
-                                         (when (and (<= s mid) (< mid e))
-                                           ne)))
-                                     new-events)]
-                     (if match
-                       (assoc-in be [:params key] (get-in match [:params key]))
-                       be)))
-                 base-events))))
+           (mapcat (fn [be]
+                     (let [mid (+ (:time be) (/ (:duration be) 2))
+                           matches (filter (fn [ne]
+                                             (let [s (:time ne)
+                                                   e (+ s (:duration ne))]
+                                               (and (<= s mid) (< mid e))))
+                                           new-events)]
+                       (if (seq matches)
+                         (map (fn [match]
+                                (assoc-in be [:params key] (get-in match [:params key])))
+                              matches)
+                         [be])))
+                   base-events))))
 
 (defn set-param
   ([pattern key val] (set-param pattern key val try-parse-number))
@@ -1223,7 +1224,8 @@
           (env :perc)
           (gain 0.5)
           (echo-repeats 50)
-          #_(room 0.5))
+          (room 0.5)
+          (active 0))
    :bass-1 (->
             (note [:c1 :bb0])
             (s [:fm])
@@ -1247,12 +1249,16 @@
             (gain 0.1)
             (active 0))
    :arp (->
-         (note [#{:a4 :b4 :c5}])
-         (s [#{:fm :bd}])
+          (note [(set (chord :a3 :minor)) (set (chord :a3 :minor))])
+         (s [#{:tri}])
          (gain (chosen-from (range 0.05 0.3 0.05) 16))
          (env (chosen-from [:adsr] 4))
+         (s-level 1)
+         (attack 0.5)
+         (decay 1.5)
+         (release 1.5)
          (pan (chosen-from (range -0.9 0.9 0.2) 16))
-         (active (chosen-from [1 1 1] 8))
+         (active (chosen-from [0 1 1] 2))
          (fast 1)))
 
   (stop!)
