@@ -1257,7 +1257,54 @@
 
   (stop!)
 
-  (connect-server)
+  (cpm (/ 174 4))
+
+  (play!
+    :kick (->
+            (s [[:kick] :_ [:- :kick] :_])
+            #_(s [:kick :kick :kick :kick])
+            (note :g1)
+            (distort 1)
+            (gain 0.2)
+            (lpf 50)
+            (active 1))
+    :snare (->
+             (s [:- :- [:snare :- :-] :- :- :- [:snare :-] :-])
+             (lpf 10000)
+             (gain 0.4)
+             (active (chosen-from [0 1 1 1] 2)))
+    :hat   (->
+             (s (repeat 8 :hat))
+             (gain 0.05))
+    :shaker   (->
+             (s (repeat 16 :clap))
+             (gain 0.15)
+             (active (chosen-from [0 0 1] 4)))
+    :bass (->
+            (note [(set (take 2 (chord :d0 :minor)))
+                   (set (take 2 (chord :d0 :minor)))
+                   (set (take 2 (chord :c0 :major)))
+                   (set (take 2 (chord :c0 :major)))])
+            (s [:fm])
+            (carrier-ratio 3)
+            (vibrato 1.5)
+            (crush 0.9)
+            (room 0.2)
+            (attack 0.7)
+            (distort [0.5 0.2])
+            (gain [0.1 0.2])
+            (pan (chosen-from (range -0.5 0.5 0.1) 4))
+            (fast 1/4))
+    :lead (->
+            (note (chosen-from (scale :d5 :major) 32))
+            (s [:square])
+            (env :perc)
+            (gain 0.1)
+            (fast 1/4)
+            (active 1))
+    )
+
+  (stop!)
 
   .)
 
