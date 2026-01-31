@@ -1,7 +1,13 @@
 (ns strudel-overtone.strudel-overtone
-  (:require [overtone.core :as ov :refer :all :exclude [note lpf decay distort hpf bpf vibrato]]
+  (:require [overtone.core :as ov :refer :all
+             :exclude [note lpf decay distort hpf bpf vibrato defsynth]]
             [taoensso.telemere :as tel]
             [clojure.string :as str]))
+
+(defmacro defsynth [name args & body]
+  `(ov/defsynth ~name ~args
+     (line:kr 0 0 60 FREE)
+     ~@body))
 
 ;; --- Synths ---
 
@@ -15,7 +21,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -25,13 +31,13 @@
                  hpf 0 bpf -1 room 0 delay 0 repeats 4]
   (let [env (env-gen (perc 0.01 sustain) :action NO-ACTION)
         noise (ov/lpf (white-noise) cutoff)
-        snd (+ (* 0.5) (* 0.8 noise))
+        snd (+ (* 0.5 (sin-osc freq)) (* 0.8 noise))
         filt (ov/hpf snd (max 20 hpf))
         filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -46,7 +52,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -61,7 +67,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -82,7 +88,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -103,7 +109,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -124,7 +130,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -145,7 +151,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -180,7 +186,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -210,7 +216,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -228,7 +234,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -246,7 +252,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -264,7 +270,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -282,7 +288,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -303,7 +309,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -319,7 +325,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -338,7 +344,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -354,7 +360,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -373,7 +379,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -389,7 +395,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -408,7 +414,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -424,7 +430,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -443,7 +449,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -459,7 +465,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -478,7 +484,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -494,7 +500,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -515,7 +521,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -533,7 +539,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -554,7 +560,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -572,7 +578,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -593,7 +599,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -611,7 +617,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -632,7 +638,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -650,7 +656,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -671,7 +677,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -689,7 +695,7 @@
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 2.0 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -1249,7 +1255,7 @@
             (gain 0.1)
             (active 0))
    :arp (->
-          (note [(set (chord :a3 :major)) (set (chord :a3 :minor))])
+         (note [(set (chord :a3 :major)) (set (chord :a3 :minor))])
          (s [#{:sine :tri}])
          (gain 0.2)
          (env [#{:adsr :perc}])
@@ -1260,49 +1266,59 @@
   (cpm (/ 174 4))
 
   (play!
-    :kick (->
-            (s [[:kick] :_ [:- :kick] :_])
-            #_(s [:kick :kick :kick :kick])
-            (note :g1)
-            (distort 1)
-            (gain 0.2)
-            (lpf 50)
-            (active 1))
-    :snare (->
-             (s [:- :- [:snare :- :-] :- :- :- [:snare :-] :-])
-             (lpf 10000)
-             (gain 0.4)
-             (active (chosen-from [0 1 1 1] 2)))
-    :hat   (->
-             (s (repeat 8 :hat))
-             (gain 0.05))
-    :shaker   (->
-             (s (repeat 16 :clap))
-             (gain 0.15)
-             (active (chosen-from [0 0 1] 4)))
-    :bass (->
-            (note [(set (take 2 (chord :d0 :minor)))
-                   (set (take 2 (chord :d0 :minor)))
-                   (set (take 2 (chord :c0 :major)))
-                   (set (take 2 (chord :c0 :major)))])
-            (s [:fm])
-            (carrier-ratio 3)
-            (vibrato 1.5)
-            (crush 0.9)
-            (room 0.2)
-            (attack 0.7)
-            (distort [0.5 0.2])
-            (gain [0.1 0.2])
-            (pan (chosen-from (range -0.5 0.5 0.1) 4))
-            (fast 1/4))
-    :lead (->
-            (note (chosen-from (scale :d5 :major) 32))
-            (s [:square])
-            (env :perc)
-            (gain 0.1)
-            (fast 1/4)
-            (active 1))
-    )
+   :kick (->
+          (s [[:kick] :_ [:- :kick] :_])
+          #_(s [[:sine] :_ [:- :sine] :_])
+          #_(s [:kick :- :kick :-])
+          (note :d1)
+          (env :perc)
+          (room 0.5)
+          (distort 0.5)
+          (gain 0.35)
+          (lpf (chosen-from [100 200 400 800] 2))
+          #_(active 0))
+   :snare (->
+           (s [:- :- [:snare :- :-] :- :- :- [:snare :-] :-])
+           (lpf 10000)
+           (gain 0.4)
+           (active (chosen-from [1 1 1 1] 2))
+           #_(active 0))
+   :hat   (->
+           (s (repeat 8 :hat))
+           (gain 0.05)
+           (active (chosen-from [0 1 1] 8))
+           #_(active 0))
+   :shaker   (->
+              (s (repeat 16 :clap))
+              (gain 0.20)
+              (active (chosen-from [0 1 1] 4))
+              #_(active 0))
+   :bass (->
+          (note [(set (take 2 (chord :f0 :minor)))
+                 (set (take 2 (chord :bb0 :minor)))
+                 (set (take 2 (chord :c0 :major)))
+                 (set (take 2 (chord :d0 :major)))])
+          (s [:tri])
+          (carrier-ratio (chosen-from [2 3] 4))
+          (modulator-ratio (chosen-from [2 3] 4))
+          (vibrato 1)
+          (crush 0.8)
+          (room 0.5)
+          (attack 0.5)
+          (distort [0.3 0.15])
+          (gain [0.6 0.7])
+          (pan (chosen-from (range -0.5 0.5 0.1) 4))
+          (fast 1/4)
+          #_(active 0))
+   :lead (->
+          (note (chosen-from (take 4 (scale :f5 :major)) 32))
+          (s [:saw])
+          (env (chosen-from [:perc :adsr] 4))
+          (gain 0.1)
+          (pan (chosen-from (range -0.75 0.75 0.05) 4))
+          (fast 1/4)
+          (active (chosen-from [0 0 1] 8))
+          #_(active 0)))
 
   (stop!)
 
