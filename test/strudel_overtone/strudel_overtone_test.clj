@@ -15,7 +15,7 @@
       (with-redefs [sut/metro (fn
                                 ([] 10.5) ;; Mock current time: 10.5 beats
                                 ([b] (* b 1000))) ;; Mock beat->ms conversion
-                    ov/apply-at (fn [ms func args]
+                    ov/apply-at (fn [ms func & args]
                                   (swap! mock-calls conj {:ms ms :func func :args args}))
                     ov/apply-by (fn [ms func args]
                                   (swap! mock-calls conj {:ms ms :func func :args args}))]
@@ -45,7 +45,7 @@
     (reset! sut/player-state {:playing? false :patterns {} :loops #{}})
     (let [mock-calls (atom [])]
       (with-redefs [sut/metro (fn ([] 10.5) ([b] (* b 1000)))
-                    ov/apply-at (fn [ms func args] (swap! mock-calls conj {:ms ms :func func :args args}))
+                    ov/apply-at (fn [ms func & args] (swap! mock-calls conj {:ms ms :func func :args args}))
                     ov/apply-by (fn [ms func args] (swap! mock-calls conj {:ms ms :func func :args args}))]
         
         (sut/play! :p1 {:events []} :p2 {:events []})
@@ -64,7 +64,7 @@
     (reset! sut/player-state {:playing? false :patterns {} :loops #{}})
     (let [mock-calls (atom [])]
       (with-redefs [sut/metro (fn ([] 10.5) ([b] (* b 1000)))
-                    ov/apply-at (fn [ms func args] (swap! mock-calls conj {:ms ms :func func :args args}))
+                    ov/apply-at (fn [ms func & args] (swap! mock-calls conj {:ms ms :func func :args args}))
                     ov/apply-by (fn [ms func args] (swap! mock-calls conj {:ms ms :func func :args args}))]
         
         (sut/play! {:events []})
@@ -87,7 +87,7 @@
     (reset! sut/player-state {:playing? false :patterns {} :loops #{}})
     (let [mock-calls (atom [])]
       (with-redefs [sut/metro (fn ([] 10.5) ([b] (* b 1000)))
-                    ov/apply-at (fn [ms func args] (swap! mock-calls conj {:func func :args args}))
+                    ov/apply-at (fn [ms func & args] (swap! mock-calls conj {:func func :args args}))
                     ov/apply-by (fn [& _] nil)
                     sut/trigger-event (fn [ev b d] (swap! mock-calls conj {:event ev :sound (get-in ev [:params :sound])}))]
         (sut/play! :sine (-> (sut/note [:c4]) (sut/s [:sine-synth])))

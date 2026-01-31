@@ -16,7 +16,8 @@
                   (sut/width 0.6)
                   (sut/carrier-ratio 2)
                   (sut/modulator-ratio 3)
-                  (sut/mod-index 10))]
+                  (sut/mod-index 10)
+                  (sut/echo-repeats 8))]
       (let [ev (first (:events pat))]
         (is (= 0.5 (get-in ev [:params :pan])))
         (is (= 0.2 (get-in ev [:params :resonance])))
@@ -27,13 +28,14 @@
         (is (= 0.6 (get-in ev [:params :width])))
         (is (= 2 (get-in ev [:params :carrier-ratio])))
         (is (= 3 (get-in ev [:params :modulator-ratio])))
-        (is (= 10 (get-in ev [:params :mod-index]))))))
+        (is (= 10 (get-in ev [:params :mod-index])))
+        (is (= 8 (get-in ev [:params :repeats]))))))
 
   (testing "trigger-event passes parameters to synth"
      (let [mock-calls (atom [])]
       (with-redefs [ov/metro-bpm (constantly 120)
                     sut/metro (constantly 0)
-                    ov/apply-at (fn [ms func args] (swap! mock-calls conj {:func func :args args}))
+                    ov/apply-at (fn [ms func & args] (swap! mock-calls conj {:func func :args args}))
                     sut/saw-adsr (fn [& args] args)] ;; Mock synth
 
         (let [pat (-> (sut/note [:c4])
@@ -49,7 +51,7 @@
                 args (:args synth-call)]
             ;; Check if args contains :pan 0.5 and :resonance 0.2
             ;; args is a list/vector of keywords and values
-            (let [args-map (apply hash-map args)]
+            (let [args-map (apply hash-map (first args))]
               (is (= 0.5 (:pan args-map)))
               (is (= 0.2 (:resonance args-map)))))))))
 
