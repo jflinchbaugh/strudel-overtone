@@ -50,3 +50,38 @@
         (is (= "d" (get-in e4 [:params :sound])))
         (is (approx= 0.875 (:time e4)))
         (is (approx= 0.125 (:duration e4)))))))
+
+(deftest chord-test
+  (testing "Sets create simultaneous events (chords)"
+    (let [pat (sut/note [:c4 #{:e4 :g4} :b4])]
+      ;; :c4 -> 0.0, dur 0.33
+      ;; #{:e4 :g4} -> 0.33, dur 0.33
+      ;;    :e4 -> 0.33, dur 0.33
+      ;;    :g4 -> 0.33, dur 0.33
+      ;; :b4 -> 0.66, dur 0.33
+      
+      (is (= 4 (count (:events pat))))
+      
+      (let [evs (:events pat)
+            sorted-evs (sort-by :time evs)
+            e1 (first sorted-evs)
+            middle-evs (filter #(approx= 0.333 (:time %)) evs)
+            e4 (last sorted-evs)]
+            
+        (is (= :c4 (get-in e1 [:params :note])))
+        (is (approx= 0.333 (:duration e1)))
+        
+        (is (= 2 (count middle-evs)))
+        (is (= #{:e4 :g4} (set (map #(get-in % [:params :note]) middle-evs))))
+        (is (every? #(approx= 0.333 (:duration %)) middle-evs))
+        
+        (is (= :b4 (get-in e4 [:params :note])))
+        (is (approx= 0.666 (:time e4))))))
+
+  (testing "simul helper works"
+    (let [pat (sut/note [:c4 (sut/simul [:e4 :g4]) :b4])]
+      (is (= 4 (count (:events pat))))
+      (let [evs (:events pat)
+            middle-evs (filter #(approx= 0.333 (:time %)) evs)]
+        (is (= 2 (count middle-evs)))
+        (is (= #{:e4 :g4} (set (map #(get-in % [:params :note]) middle-evs))))))))

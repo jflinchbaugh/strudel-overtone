@@ -705,15 +705,26 @@
 (defn parse-mini
   "Naively parses a collection into a sequence of events with duration.
    Returns a list of maps {:value v :start s :duration d}.
-   Handles nested collections by subdividing the duration."
+   Handles nested collections by subdividing the duration.
+   Handles sets by creating simultaneous events with the same duration."
   ([tokens] (parse-mini tokens 0.0 1.0))
   ([tokens start duration]
    (let [n (count tokens)
          dur (if (pos? n) (/ duration (double n)) 0)]
      (mapcat (fn [[i v]]
                (let [s-time (+ start (* i dur))]
-                 (if (and (sequential? v) (not (string? v)))
+                 (cond
+                   (set? v)
+                   (map (fn [val]
+                          {:value val
+                           :start s-time
+                           :duration dur})
+                        v)
+
+                   (and (sequential? v) (not (string? v)))
                    (parse-mini v s-time dur)
+
+                   :else
                    [{:value v
                      :start s-time
                      :duration dur}])))
@@ -779,6 +790,13 @@
    (make-pattern (make-event-list pat :sound ->name)))
   ([pattern sound-val]
    (set-param pattern :sound sound-val ->name)))
+
+(defn simul
+  "Creates a simultaneous collection (chord) from a sequence of values.
+   Use inside a pattern vector.
+   Example: (note [:c4 (simul [:e4 :g4])])"
+  [vals]
+  (set vals))
 
 (defn note
   "Creates a pattern from a note string (mini-notation), or sets the note of an existing pattern."
@@ -1204,7 +1222,6 @@
           (s (cons :fm (repeat 7 :-)))
           (env :perc)
           (gain 0.5)
-          (echo-delay 0.05)
           (echo-repeats 50)
           #_(room 0.5))
    :bass-1 (->
@@ -1230,14 +1247,18 @@
             (gain 0.1)
             (active 0))
    :arp (->
-         (note (chosen-from (take 5 (scale :d5 :major)) 8))
-         (vibrato [6 6 6 6])
-         (crush [0 0.5 0 0.5])
+          (s [
+              #{:sine :bd}
+              #{:sine :bd}
+              #{:sine :bd}
+              :-
+              ])
+          (echo-delay 0.2)
+          (echo-repeats [2 2 12 2])
          (gain (chosen-from (range 0.05 0.3 0.05) 16))
          (env (chosen-from [:adsr] 4))
-         (s (chosen-from [:sine] 2))
          (pan (chosen-from (range -0.9 0.9 0.2) 16))
-         (active 0 #_(chosen-from [1 1 1] 8))
+         (active (chosen-from [1 1 1] 8))
          (fast 1)))
 
   (stop!)
