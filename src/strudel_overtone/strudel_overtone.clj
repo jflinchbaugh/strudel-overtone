@@ -4,6 +4,9 @@
             [taoensso.telemere :as tel]
             [clojure.string :as str]))
 
+(defmacro s-max [min-val val]
+  `(ov/clip ~val ~min-val 20000))
+
 (defmacro defsynth [name args & body]
   `(ov/defsynth ~name ~args
      (line:kr 0 0 60 FREE)
@@ -11,17 +14,49 @@
 
 ;; --- Synths ---
 
+(defmacro def-strudel-synth [name extra-args & body]
+  (let [common-args '[amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
+                      crush 0 distort 0
+                      hpf 0 bpf -1 room 0 delay 0 repeats 4]
+        adsr-args   '[attack 0.01 decay 0.1 s-level 0.5 release 0.3]
+        perc-args   '[attack 0.01]
+        ;; Helper to build the synth definition
+        make-synth (fn [suffix env-gen-form args]
+                     `(ov/defsynth ~(symbol (str name suffix))
+                        ~(into (vec (concat extra-args common-args)) args)
+                        (let [~'env ~env-gen-form
+                              ~'snd (do ~@body)
+                              ;; Effect Chain
+                              ~'filt (ov/hpf ~'snd (~'s-max 20 ~'hpf))
+                              ~'filt (select (~' > ~'bpf 0) [~'filt (ov/bpf ~'filt (~'s-max 20 ~'bpf) 1)])
+                              ~'dst (ov/distort (~' * ~'filt (ov/dbamp (~' * ~'distort 24))))
+                              ~'crs (decimator ~'dst (ov/lin-lin ~'crush 0 1 44100 2000) (ov/lin-lin ~'crush 0 1 24 4))
+                              ~'gated (~' * ~'crs ~'env)
+                              ~'dly (select (~' > ~'delay 0) [~'gated (~' + ~'gated (comb-n ~'gated 0.5 (~'s-max 0.0001 ~'delay) (~' * ~'delay ~'repeats)))])
+                              ~'verbed (free-verb ~'dly ~'room 0.5 0.5)
+                              _# (detect-silence ~'verbed :amp 0.0001 :time 0.2 :action FREE)]
+                          (out 0 (pan2 (~' * ~'verbed ~'amp) ~'pan)))))]
+    `(do
+       ~(make-synth "-adsr"
+                    `(env-gen (adsr ~'attack ~'decay ~'s-level ~'release)
+                              :gate (line:kr 1 0 ~'sustain)
+                              :action NO-ACTION)
+                    adsr-args)
+       ~(make-synth "-perc"
+                    `(env-gen (perc ~'attack ~'sustain) :action NO-ACTION)
+                    perc-args))))
+
 (defsynth kick [amp 1 sustain 0.3 freq 60 lpf 3000 pan 0
                 crush 0 distort 0
                 hpf 0 bpf -1 room 0 delay 0 repeats 4]
   (let [env (env-gen (perc 0.01 sustain) :action NO-ACTION)
         snd (ov/lpf (sin-osc (line:kr (* 2 freq) freq 0.1)) lpf)
-        filt (ov/hpf snd (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
+        filt (ov/hpf snd (s-max 20 hpf))
+        filt (select (> bpf 0) [filt (ov/bpf filt (s-max 20 bpf) 1)])
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (s-max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -32,12 +67,12 @@
   (let [env (env-gen (perc 0.01 sustain) :action NO-ACTION)
         noise (ov/lpf (white-noise) lpf)
         snd (+ (* 0.5 (sin-osc freq)) (* 0.8 noise))
-        filt (ov/hpf snd (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
+        filt (ov/hpf snd (s-max 20 hpf))
+        filt (select (> bpf 0) [filt (ov/bpf filt (s-max 20 bpf) 1)])
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (s-max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -47,12 +82,12 @@
                hpf 0 bpf -1 room 0 delay 0 repeats 4]
   (let [env (env-gen (perc 0.001 sustain) :action NO-ACTION)
         snd (ov/hpf (white-noise) lpf)
-        filt (ov/hpf snd (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
+        filt (ov/hpf snd (s-max 20 hpf))
+        filt (select (> bpf 0) [filt (ov/bpf filt (s-max 20 bpf) 1)])
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (s-max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -62,702 +97,89 @@
                 hpf 0 bpf -1 room 0 delay 0 repeats 4]
   (let [env (env-gen (perc 0.005 sustain) :action NO-ACTION)
         snd (ov/bpf (white-noise) freq resonance)
-        filt (ov/hpf snd (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
+        filt (ov/hpf snd (s-max 20 hpf))
+        filt (select (> bpf 0) [filt (ov/bpf filt (s-max 20 bpf) 1)])
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (s-max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
 
-(defsynth saw-adsr [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                    attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0
-                    crush 0 distort 0
-                    hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (adsr attack decay s-level release)
-                     :gate (line:kr 1 0 sustain)
-                     :action NO-ACTION)
-        f-raw (* freq (ov/midiratio (/ detune 100)))
-        f-vib (select:kr (> vibrato 0) [f-raw (ov/vibrato:kr f-raw vibrato 0.02)])
-        snd (saw f-vib)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
+(def-strudel-synth saw [freq 440 detune 0 vibrato 0]
+  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))
+        f-vib (ov/vibrato:kr f-raw vibrato 0.02)
+        snd (saw f-vib)]
+    (rlpf snd lpf resonance)))
 
-(defsynth sine-adsr [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                     attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0
-                     crush 0 distort 0
-                     hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (adsr attack decay s-level release)
-                     :gate (line:kr 1 0 sustain)
-                     :action NO-ACTION)
-        f-raw (* freq (ov/midiratio (/ detune 100)))
-        f-vib (select:kr (> vibrato 0) [f-raw (ov/vibrato:kr f-raw vibrato 0.02)])
-        snd (sin-osc f-vib)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
+(def-strudel-synth sine [freq 440 detune 0 vibrato 0]
+  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))
+        f-vib (ov/vibrato:kr f-raw vibrato 0.02)
+        snd (sin-osc f-vib)]
+    (rlpf snd lpf resonance)))
 
-(defsynth square-adsr [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                       attack 0.01 decay 0.1 s-level 0.5 release 0.3 width 0.5 detune 0
-                       crush 0 distort 0
-                       hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (adsr attack decay s-level release)
-                     :gate (line:kr 1 0 sustain)
-                     :action NO-ACTION)
-        f-raw (* freq (ov/midiratio (/ detune 100)))
-        f-vib (select:kr (> vibrato 0) [f-raw (ov/vibrato:kr f-raw vibrato 0.02)])
-        snd (pulse f-vib width)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
+(def-strudel-synth square [freq 440 detune 0 vibrato 0 width 0.5]
+  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))
+        f-vib (ov/vibrato:kr f-raw vibrato 0.02)
+        snd (pulse f-vib width)]
+    (rlpf snd lpf resonance)))
 
-(defsynth tri-adsr [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                    attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0
-                    crush 0 distort 0
-                    hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (adsr attack decay s-level release)
-                     :gate (line:kr 1 0 sustain)
-                     :action NO-ACTION)
-        f-raw (* freq (ov/midiratio (/ detune 100)))
-        f-vib (select:kr (> vibrato 0) [f-raw (ov/vibrato:kr f-raw vibrato 0.02)])
-        snd (lf-tri f-vib)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
+(def-strudel-synth tri [freq 440 detune 0 vibrato 0]
+  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))
+        f-vib (ov/vibrato:kr f-raw vibrato 0.02)
+        snd (lf-tri f-vib)]
+    (rlpf snd lpf resonance)))
 
-(defsynth fm-adsr [freq 440
-                   amp 1
-                   sustain 0.5
-                   carrier-ratio 1
-                   modulator-ratio 2
-                   mod-index 5
-                   lpf 2000
-                   resonance 0.1
-                   pan 0
-                   attack 0.01
-                   decay 0.1
-                   s-level 0.7
-                   release 0.3
-                   detune 0
-                   crush 0
-                   distort 0
-                   hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (adsr attack decay s-level release)
-                     :gate (line:kr 1 0 sustain)
-                     :action NO-ACTION)
-        f-raw (* freq (ov/midiratio (/ detune 100)))
-        f-vib (select:kr (> vibrato 0) [f-raw (ov/vibrato:kr f-raw vibrato 0.02)])
+(def-strudel-synth fm [freq 440 detune 0 vibrato 0 carrier-ratio 1 modulator-ratio 2 mod-index 5]
+  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))
+        f-vib (ov/vibrato:kr f-raw vibrato 0.02)
         modulator (sin-osc (* f-vib modulator-ratio))
-        carrier (sin-osc (+ (* f-vib carrier-ratio) (* modulator mod-index (* f-vib))))
-        filt (rlpf carrier lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth fm-perc [freq 440
-                   amp 1
-                   sustain 0.2
-                   carrier-ratio 1
-                   modulator-ratio 2
-                   mod-index 5
-                   lpf 2000
-                   resonance 0.1
-                   pan 0
-                   attack 0.01
-                   detune 0
-                   crush 0
-                   distort 0
-                   hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (perc attack sustain) :action NO-ACTION)
-        f-vib (* freq (ov/midiratio (/ detune 100))
-                 (select:kr (> vibrato 0) [1 (+ 1 (* 0.02 (sin-osc:kr vibrato 0)))]))
-        modulator (sin-osc (* f-vib modulator-ratio))
-        carrier (sin-osc (+ (* f-vib carrier-ratio) (* modulator mod-index (* f-vib))))
-        filt (rlpf carrier lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth saw-perc [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0 attack 0.01 detune 0
-                    crush 0 distort 0
-                    hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (perc attack sustain) :action NO-ACTION)
-        f-vib (* freq (ov/midiratio (/ detune 100))
-                 (select:kr (> vibrato 0) [1 (+ 1 (* 0.02 (sin-osc:kr vibrato 0)))]))
-        snd (saw f-vib)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth sine-perc [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0 attack 0.01 detune 0
-                     crush 0 distort 0
-                     hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (perc attack sustain) :action NO-ACTION)
-        f-vib (* freq (ov/midiratio (/ detune 100))
-                 (select:kr (> vibrato 0) [1 (+ 1 (* 0.02 (sin-osc:kr vibrato 0)))]))
-        snd (sin-osc f-vib)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth square-perc [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0 attack 0.01 width 0.5 detune 0
-                       crush 0 distort 0
-                       hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (perc attack sustain) :action NO-ACTION)
-        f-vib (* freq (ov/midiratio (/ detune 100))
-                 (select:kr (> vibrato 0) [1 (+ 1 (* 0.02 (sin-osc:kr vibrato 0)))]))
-        snd (pulse f-vib width)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth tri-perc [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0 attack 0.01 detune 0
-                    crush 0 distort 0
-                    hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (perc attack sustain) :action NO-ACTION)
-        f-vib (* freq (ov/midiratio (/ detune 100))
-                 (select:kr (> vibrato 0) [1 (+ 1 (* 0.02 (sin-osc:kr vibrato 0)))]))
-        snd (lf-tri f-vib)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
+        carrier (sin-osc (+ (* f-vib carrier-ratio) (* modulator mod-index f-vib)))]
+    (rlpf carrier lpf resonance)))
 
 ;; --- Noise Synths ---
 
-(defsynth white-adsr [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                      attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0
-                      crush 0 distort 0
-                      hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (adsr attack decay s-level release)
-                     :gate (line:kr 1 0 sustain)
-                     :action NO-ACTION)
-        snd (white-noise)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
+(def-strudel-synth white [freq 440] (rlpf (white-noise) lpf resonance))
+(def-strudel-synth pink [freq 440] (rlpf (pink-noise) lpf resonance))
+(def-strudel-synth brown [freq 440] (rlpf (brown-noise) lpf resonance))
+(def-strudel-synth gray [freq 440] (rlpf (gray-noise) lpf resonance))
+(def-strudel-synth clip [freq 440] (rlpf (clip-noise) lpf resonance))
 
-(defsynth white-perc [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0 attack 0.01 detune 0
-                      crush 0 distort 0
-                      hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (perc attack sustain) :action NO-ACTION)
-        snd (white-noise)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
+(def-strudel-synth crackle [freq 440 chaos 1.5] (rlpf (crackle chaos) lpf resonance))
 
-(defsynth pink-adsr [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                     attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0
-                     crush 0 distort 0
-                     hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (adsr attack decay s-level release)
-                     :gate (line:kr 1 0 sustain)
-                     :action NO-ACTION)
-        snd (pink-noise)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
+(def-strudel-synth dust [freq 440 detune 0]
+  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
+    (rlpf (dust f-raw) lpf resonance)))
 
-(defsynth pink-perc [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0 attack 0.01 detune 0
-                     crush 0 distort 0
-                     hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (perc attack sustain) :action NO-ACTION)
-        snd (pink-noise)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
+(def-strudel-synth dust2 [freq 440 detune 0]
+  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
+    (rlpf (dust2 f-raw) lpf resonance)))
 
-(defsynth brown-adsr [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                      attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0
-                      crush 0 distort 0
-                      hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (adsr attack decay s-level release)
-                     :gate (line:kr 1 0 sustain)
-                     :action NO-ACTION)
-        snd (brown-noise)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
+(def-strudel-synth lf-noise0 [freq 440 detune 0]
+  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
+    (rlpf (lf-noise0 f-raw) lpf resonance)))
 
-(defsynth brown-perc [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0 attack 0.01 detune 0
-                      crush 0 distort 0
-                      hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (perc attack sustain) :action NO-ACTION)
-        snd (brown-noise)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
+(def-strudel-synth lf-noise1 [freq 440 detune 0]
+  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
+    (rlpf (lf-noise1 f-raw) lpf resonance)))
 
-(defsynth gray-adsr [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                     attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0
-                     crush 0 distort 0
-                     hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (adsr attack decay s-level release)
-                     :gate (line:kr 1 0 sustain)
-                     :action NO-ACTION)
-        snd (gray-noise)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
+(def-strudel-synth lf-noise2 [freq 440 detune 0]
+  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
+    (rlpf (lf-noise2 f-raw) lpf resonance)))
 
-(defsynth gray-perc [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0 attack 0.01 detune 0
-                     crush 0 distort 0
-                     hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (perc attack sustain) :action NO-ACTION)
-        snd (gray-noise)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth clip-adsr [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                     attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0
-                     crush 0 distort 0
-                     hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (adsr attack decay s-level release)
-                     :gate (line:kr 1 0 sustain)
-                     :action NO-ACTION)
-        snd (clip-noise)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth clip-perc [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0 attack 0.01 detune 0
-                     crush 0 distort 0
-                     hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (perc attack sustain) :action NO-ACTION)
-        snd (clip-noise)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth crackle-adsr [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                        attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0 chaos 1.5
-                        crush 0 distort 0
-                        hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (adsr attack decay s-level release)
-                     :gate (line:kr 1 0 sustain)
-                     :action NO-ACTION)
-        snd (crackle chaos)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth crackle-perc [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0 attack 0.01 detune 0 chaos 1.5
-                        crush 0 distort 0
-                        hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (perc attack sustain) :action NO-ACTION)
-        snd (crackle chaos)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth dust-adsr [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                     attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0
-                     crush 0 distort 0
-                     hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (adsr attack decay s-level release)
-                     :gate (line:kr 1 0 sustain)
-                     :action NO-ACTION)
-        f-raw (* freq (ov/midiratio (/ detune 100)))
-        f-vib (select:kr (> vibrato 0) [f-raw (ov/vibrato:kr f-raw vibrato 0.02)])
-        snd (dust f-vib)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth dust-perc [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0 attack 0.01 detune 0
-                     crush 0 distort 0
-                     hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (perc attack sustain) :action NO-ACTION)
-        f-raw (* freq (ov/midiratio (/ detune 100)))
-        f-vib (select:kr (> vibrato 0) [f-raw (ov/vibrato:kr f-raw vibrato 0.02)])
-        snd (dust f-vib)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth dust2-adsr [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                      attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0
-                      crush 0 distort 0
-                      hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (adsr attack decay s-level release)
-                     :gate (line:kr 1 0 sustain)
-                     :action NO-ACTION)
-        f-raw (* freq (ov/midiratio (/ detune 100)))
-        f-vib (select:kr (> vibrato 0) [f-raw (ov/vibrato:kr f-raw vibrato 0.02)])
-        snd (dust2 f-vib)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth dust2-perc [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0 attack 0.01 detune 0
-                      crush 0 distort 0
-                      hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (perc attack sustain) :action NO-ACTION)
-        f-raw (* freq (ov/midiratio (/ detune 100)))
-        f-vib (select:kr (> vibrato 0) [f-raw (ov/vibrato:kr f-raw vibrato 0.02)])
-        snd (dust2 f-vib)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth lf-noise0-adsr [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                          attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0
-                          crush 0 distort 0
-                          hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (adsr attack decay s-level release)
-                     :gate (line:kr 1 0 sustain)
-                     :action NO-ACTION)
-        f-raw (* freq (ov/midiratio (/ detune 100)))
-        f-vib (select:kr (> vibrato 0) [f-raw (ov/vibrato:kr f-raw vibrato 0.02)])
-        snd (lf-noise0 f-vib)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth lf-noise0-perc [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0 attack 0.01 detune 0
-                          crush 0 distort 0
-                          hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (perc attack sustain) :action NO-ACTION)
-        f-raw (* freq (ov/midiratio (/ detune 100)))
-        f-vib (select:kr (> vibrato 0) [f-raw (ov/vibrato:kr f-raw vibrato 0.02)])
-        snd (lf-noise0 f-vib)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth lf-noise1-adsr [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                          attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0
-                          crush 0 distort 0
-                          hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (adsr attack decay s-level release)
-                     :gate (line:kr 1 0 sustain)
-                     :action NO-ACTION)
-        f-raw (* freq (ov/midiratio (/ detune 100)))
-        f-vib (select:kr (> vibrato 0) [f-raw (ov/vibrato:kr f-raw vibrato 0.02)])
-        snd (lf-noise1 f-vib)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth lf-noise1-perc [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0 attack 0.01 detune 0
-                          crush 0 distort 0
-                          hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (perc attack sustain) :action NO-ACTION)
-        f-raw (* freq (ov/midiratio (/ detune 100)))
-        f-vib (select:kr (> vibrato 0) [f-raw (ov/vibrato:kr f-raw vibrato 0.02)])
-        snd (lf-noise1 f-vib)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth lf-noise2-adsr [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                          attack 0.01 decay 0.1 s-level 0.5 release 0.3 detune 0
-                          crush 0 distort 0
-                          hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (adsr attack decay s-level release)
-                     :gate (line:kr 1 0 sustain)
-                     :action NO-ACTION)
-        f-raw (* freq (ov/midiratio (/ detune 100)))
-        f-vib (select:kr (> vibrato 0) [f-raw (ov/vibrato:kr f-raw vibrato 0.02)])
-        snd (lf-noise2 f-vib)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth lf-noise2-perc [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0 attack 0.01 detune 0
-                          crush 0 distort 0
-                          hpf 0 bpf -1 room 0 vibrato 0 delay 0 repeats 4]
-  (let [env (env-gen (perc attack sustain) :action NO-ACTION)
-        f-raw (* freq (ov/midiratio (/ detune 100)))
-        f-vib (select:kr (> vibrato 0) [f-raw (ov/vibrato:kr f-raw vibrato 0.02)])
-        snd (lf-noise2 f-vib)
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth tb303-adsr [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                      attack 0.01 decay 0.1 s-level 0.6 release 0.01
-                      wave 1 env-amount 1000
-                      crush 0 distort 0
-                      hpf 0 bpf -1 room 0 delay 0 repeats 4]
-  (let [env (env-gen (adsr attack decay s-level release)
-                     :gate (line:kr 1 0 sustain)
-                     :action NO-ACTION)
-        freqs [freq (* 1.01 freq)]
-        waves [(saw freqs)
-               (pulse freqs 0.5)
-               (lf-tri freqs)]
-        selector (select wave waves)
-        fil-env (env-gen (perc attack decay))
-        fil-lpf (max 20 (+ lpf (* env-amount fil-env)))
-        filt (rlpf selector fil-lpf (lin-lin resonance 0 1 0.9 0.05))
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth tb303-perc [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                      attack 0.01
-                      wave 1 env-amount 1000
-                      crush 0 distort 0
-                      hpf 0 bpf -1 room 0 delay 0 repeats 4]
-  (let [env (env-gen (perc attack sustain) :action NO-ACTION)
-        freqs [freq (* 1.01 freq)]
+(def-strudel-synth tb303 [freq 440 wave 1 env-amount 1000]
+  (let [freqs [freq (* 1.01 freq)]
         waves [(saw freqs)
                (pulse freqs 0.5)
                (lf-tri freqs)]
         selector (select wave waves)
         fil-env (env-gen (perc attack sustain))
-        fil-lpf (max 20 (+ lpf (* env-amount fil-env)))
-        filt (rlpf selector fil-lpf (lin-lin resonance 0 1 0.9 0.05))
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
+        fil-lpf (s-max 20 (+ lpf (* env-amount fil-env)))]
+    (rlpf selector fil-lpf (lin-lin resonance 0 1 0.9 0.05))))
 
-(defsynth supersaw-adsr [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                         attack 0.01 decay 0.1 s-level 0.5 release 0.3
-                         crush 0 distort 0
-                         hpf 0 bpf -1 room 0 delay 0 repeats 4]
-  (let [env (env-gen (adsr attack decay s-level release)
-                     :gate (line:kr 1 0 sustain)
-                     :action NO-ACTION)
-        input (lf-saw freq)
+(def-strudel-synth supersaw [freq 440]
+  (let [input (lf-saw freq)
         shift1 (lf-saw 4)
         shift2 (lf-saw 7)
         shift3 (lf-saw 5)
@@ -766,140 +188,22 @@
         comp2 (> input shift2)
         comp3 (> input shift3)
         comp4 (> input shift4)
-        output (+ (- input comp1) (- input comp2) (- input comp3) (- input comp4))
-        output (leak-dc:ar (* (- output input) 0.25))
-        snd output
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
+        output (leak-dc:ar (* (- (+ (- input comp1) (- input comp2) (- input comp3) (- input comp4)) input) 0.25))]
+    (rlpf output lpf resonance)))
 
-(defsynth supersaw-perc [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                         attack 0.01
-                         crush 0 distort 0
-                         hpf 0 bpf -1 room 0 delay 0 repeats 4]
-  (let [env (env-gen (perc attack sustain) :action NO-ACTION)
-        input (lf-saw freq)
-        shift1 (lf-saw 4)
-        shift2 (lf-saw 7)
-        shift3 (lf-saw 5)
-        shift4 (lf-saw 2)
-        comp1 (> input shift1)
-        comp2 (> input shift2)
-        comp3 (> input shift3)
-        comp4 (> input shift4)
-        output (+ (- input comp1) (- input comp2) (- input comp3) (- input comp4))
-        output (leak-dc:ar (* (- output input) 0.25))
-        snd output
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth mooger-adsr [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                       attack 0.01 decay 0.3 s-level 0.9 release 0.3
-                       osc1 0 osc2 1 osc1-level 0.5 osc2-level 0.5
-                       crush 0 distort 0
-                       hpf 0 bpf -1 room 0 delay 0 repeats 4]
-  (let [env (env-gen (adsr attack decay s-level release)
-                     :gate (line:kr 1 0 sustain)
-                     :action NO-ACTION)
-        osc-bank-1 [(saw freq) (sin-osc freq) (pulse freq)]
+(def-strudel-synth mooger [freq 440 osc1 0 osc2 1 osc1-level 0.5 osc2-level 0.5]
+  (let [osc-bank-1 [(saw freq) (sin-osc freq) (pulse freq)]
         osc-bank-2 [(saw freq) (sin-osc freq) (pulse freq)]
         s1 (* osc1-level (select osc1 osc-bank-1))
-        s2 (* osc2-level (select osc2 osc-bank-2))
-        snd (moog-ff (+ s1 s2) lpf (lin-lin resonance 0 1 3 0))
-        filt (ov/hpf snd (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
+        s2 (* osc2-level (select osc2 osc-bank-2))]
+    (moog-ff (+ s1 s2) lpf (lin-lin resonance 0 1 3 0))))
 
-(defsynth mooger-perc [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                       attack 0.01
-                       osc1 0 osc2 1 osc1-level 0.5 osc2-level 0.5
-                       crush 0 distort 0
-                       hpf 0 bpf -1 room 0 delay 0 repeats 4]
-  (let [env (env-gen (perc attack sustain) :action NO-ACTION)
-        osc-bank-1 [(saw freq) (sin-osc freq) (pulse freq)]
-        osc-bank-2 [(saw freq) (sin-osc freq) (pulse freq)]
-        s1 (* osc1-level (select osc1 osc-bank-1))
-        s2 (* osc2-level (select osc2 osc-bank-2))
-        snd (moog-ff (+ s1 s2) lpf (lin-lin resonance 0 1 3 0))
-        filt (ov/hpf snd (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth ks-stringer-adsr [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                            attack 0.01 decay 0.1 s-level 0.5 release 0.3
-                            coef 0.5
-                            crush 0 distort 0
-                            hpf 0 bpf -1 room 0 delay 0 repeats 4]
-  (let [env (env-gen (adsr attack decay s-level release)
-                     :gate (line:kr 1 0 sustain)
-                     :action NO-ACTION)
-        noize (* 0.8 (white-noise))
-        trig (dust 6) ;; internal trigger, maybe not ideal for strict sequencing but part of the sound
-        ;; actually ks-stringer usually is triggered once.
-        ;; Let's make it triggered by the start of the synth.
+(def-strudel-synth ks-stringer [freq 440 coef 0.5]
+  (let [noize (* 0.8 (white-noise))
         trig (impulse:kr 0)
         delay-time (/ 1.0 freq)
-        plk (pluck noize trig delay-time delay-time 10 coef)
-        snd plk
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
-
-(defsynth ks-stringer-perc [freq 440 amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                            attack 0.01
-                            coef 0.5
-                            crush 0 distort 0
-                            hpf 0 bpf -1 room 0 delay 0 repeats 4]
-  (let [env (env-gen (perc attack sustain) :action NO-ACTION)
-        noize (* 0.8 (white-noise))
-        trig (impulse:kr 0)
-        delay-time (/ 1.0 freq)
-        plk (pluck noize trig delay-time delay-time 10 coef)
-        snd plk
-        filt (rlpf snd lpf resonance)
-        filt (ov/hpf filt (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
+        plk (pluck noize trig delay-time delay-time 10 coef)]
+    (rlpf plk lpf resonance)))
 
 (defsynth dub-kick [freq 80 amp 1 sustain 0.3 lpf 2000 pan 0
                     crush 0 distort 0
@@ -911,12 +215,12 @@
         snd (ov/lpf (sin-osc (+ (env-gen:kr osc-env) 20)) 200)
         mixed (* (+ noiz snd) (env-gen amp-env :action NO-ACTION))
         ;; Standard chain
-        filt (ov/hpf mixed (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
+        filt (ov/hpf mixed (s-max 20 hpf))
+        filt (select (> bpf 0) [filt (ov/bpf filt (s-max 20 bpf) 1)])
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated crs ;; env already applied
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (s-max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -931,12 +235,12 @@
         mixed (+ snd (* 0.3 click))
         gated (* mixed env)
         ;; Standard chain
-        filt (ov/hpf gated (max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (max 20 bpf) 1)])
+        filt (ov/hpf gated (s-max 20 hpf))
+        filt (select (> bpf 0) [filt (ov/bpf filt (s-max 20 bpf) 1)])
         dst (ov/distort (* filt (ov/dbamp (* distort 24))))
         crs (decimator dst (ov/lin-lin crush 0 1 44100 2000) (ov/lin-lin crush 0 1 24 4))
         gated crs
-        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (max 0.0001 delay) (* delay repeats)))])
+        dly (select (> delay 0) [gated (+ gated (comb-n gated 0.5 (s-max 0.0001 delay) (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
     (out 0 (pan2 (* verbed amp) pan))))
@@ -1140,7 +444,7 @@
 
 (defn crush
   "Sets the bitcrushing amount.
-   Values: 0.0 (clean) to 1.0 (max destruction: 4-bit, 2kHz sample rate)."
+   Values: 0.0 (clean) to 1.0 (s-max destruction: 4-bit, 2kHz sample rate)."
   [pattern val] (set-param pattern :crush val))
 
 (defn distort
@@ -1524,7 +828,6 @@
   (play!
    :kick (->
           (s [[:kick] :_ [:- :kick] :_])
-          #_(s [[:sine] :_ [:- :sine] :_])
           #_(s [:kick :- :kick :-])
           (note :d1)
           (env :perc)
@@ -1550,22 +853,17 @@
               (active (chosen-from [0 1 1] 4))
               #_(active 0))
    :bass (->
-          (note [(set (take 2 (chord :f0 :minor)))
-                 (set (take 2 (chord :bb0 :minor)))
-                 (set (take 2 (chord :c0 :major)))
-                 (set (take 2 (chord :d0 :major)))])
-          (s [:tri])
-          (carrier-ratio (chosen-from [2 3] 4))
-          (modulator-ratio (chosen-from [2 3] 4))
+          (note [(set (take 3 (chord :f0 :minor)))
+                 (set (take 3 (chord :bb0 :minor)))
+                 (set (take 3 (chord :c0 :major)))
+                 (set (take 3 (chord :d0 :major)))])
+          (s [:supersaw])
           (vibrato 1)
-          (crush 0.8)
-          (room 0.5)
           (attack 0.5)
-          (distort [0.3 0.15])
           (gain [0.6 0.7])
           (pan (chosen-from (range -0.5 0.5 0.1) 4))
           (fast 1/4)
-          #_(active 0))
+          (active 0))
    :lead (->
           (note (chosen-from (take 5 (scale :f4 :major)) 32))
           (s [:supersaw])
@@ -1627,11 +925,8 @@
 
    :plucks (->
              (note (chosen-from (scale :c4 :minor) 4))
-            (s :supersaw)
-            (env :adsr)
-            (attack 0.8)
-            (decay 0.8)
-            (s-level 0.0)
+            (s :tb303)
+            (env :perc)
             (fast 1)
             (gain 0.5))
     )
