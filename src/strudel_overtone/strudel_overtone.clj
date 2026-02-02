@@ -20,7 +20,7 @@
   (let [common-args '[amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
                       crush 0 distort 0
                       hpf 0 bpf -1 room 0 delay 0 repeats 4
-                      duck 0 duck-trigger 0]
+                      duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2]
         adsr-args   '[attack 0.01 decay 0.1 s-level 0.5 release 0.3]
         perc-args   '[attack 0.01]
         ;; Helper to build the synth definition
@@ -29,7 +29,7 @@
                         ~(into (vec (concat extra-args common-args)) args)
                         (let [~'env ~env-gen-form
                               ;; Trigger Sidechain
-                              _# (let [trig-env# (env-gen (perc 0.001 0.2) :level-scale ~'duck-trigger)]
+                              _# (let [trig-env# (env-gen (perc ~'duck-attack ~'duck-release) :level-scale ~'duck-trigger)]
                                    (out:kr duck-bus trig-env#))
                               ;; Read Sidechain
                               ~'duck-env (in:kr duck-bus)
@@ -73,10 +73,10 @@
 (defsynth kick [amp 1 sustain 0.3 freq 60 lpf 3000 pan 0
                 crush 0 distort 0
                 hpf 0 bpf -1 room 0 delay 0 repeats 4
-                duck 0 duck-trigger 0]
+                duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2]
   (let [env (env-gen (perc 0.01 sustain) :action NO-ACTION)
         ;; Trigger Sidechain
-        _ (let [trig-env (env-gen (perc 0.001 0.2) :level-scale duck-trigger)]
+        _ (let [trig-env (env-gen (perc duck-attack duck-release) :level-scale duck-trigger)]
             (out:kr duck-bus trig-env))
         ;; Read Sidechain
         duck-env (in:kr duck-bus)
@@ -106,10 +106,10 @@
 (defsynth snare [amp 1 sustain 0.2 freq 200 lpf 3000 pan 0
                  crush 0 distort 0
                  hpf 0 bpf -1 room 0 delay 0 repeats 4
-                 duck 0 duck-trigger 0]
+                 duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2]
   (let [env (env-gen (perc 0.01 sustain) :action NO-ACTION)
         ;; Trigger Sidechain
-        _ (let [trig-env (env-gen (perc 0.001 0.2) :level-scale duck-trigger)]
+        _ (let [trig-env (env-gen (perc duck-attack duck-release) :level-scale duck-trigger)]
             (out:kr duck-bus trig-env))
         ;; Read Sidechain
         duck-env (in:kr duck-bus)
@@ -140,10 +140,10 @@
 (defsynth hat [amp 1 sustain 0.1 freq 8000 lpf 6000 pan 0
                crush 0 distort 0
                hpf 0 bpf -1 room 0 delay 0 repeats 4
-               duck 0 duck-trigger 0]
+               duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2]
   (let [env (env-gen (perc 0.001 sustain) :action NO-ACTION)
         ;; Trigger Sidechain
-        _ (let [trig-env (env-gen (perc 0.001 0.2) :level-scale duck-trigger)]
+        _ (let [trig-env (env-gen (perc duck-attack duck-release) :level-scale duck-trigger)]
             (out:kr duck-bus trig-env))
         ;; Read Sidechain
         duck-env (in:kr duck-bus)
@@ -174,10 +174,10 @@
 (defsynth clap [amp 1 sustain 0.1 freq 1200 lpf 1500 resonance 0.2 pan 0
                 crush 0 distort 0
                 hpf 0 bpf -1 room 0 delay 0 repeats 4
-                duck 0 duck-trigger 0]
+                duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2]
   (let [env (env-gen (perc 0.005 sustain) :action NO-ACTION)
         ;; Trigger Sidechain
-        _ (let [trig-env (env-gen (perc 0.001 0.2) :level-scale duck-trigger)]
+        _ (let [trig-env (env-gen (perc duck-attack duck-release) :level-scale duck-trigger)]
             (out:kr duck-bus trig-env))
         ;; Read Sidechain
         duck-env (in:kr duck-bus)
@@ -324,10 +324,10 @@
 (defsynth dub-kick [freq 80 amp 1 sustain 0.3 lpf 2000 pan 0
                     crush 0 distort 0
                     hpf 0 bpf -1 room 0 delay 0 repeats 4
-                    duck 0 duck-trigger 0]
+                    duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2]
   (let [lpf-env (perc 0.001 1 freq -20)
         ;; Trigger Sidechain
-        _ (let [trig-env (env-gen (perc 0.001 0.2) :level-scale duck-trigger)]
+        _ (let [trig-env (env-gen (perc duck-attack duck-release) :level-scale duck-trigger)]
             (out:kr duck-bus trig-env))
         ;; Read Sidechain
         duck-env (in:kr duck-bus)
@@ -360,10 +360,10 @@
 (defsynth dance-kick [freq 80 amp 1 sustain 0.3 lpf 2000 pan 0
                       crush 0 distort 0
                       hpf 0 bpf -1 room 0 delay 0 repeats 4
-                      duck 0 duck-trigger 0]
+                      duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2]
   (let [env (env-gen (perc 0.001 1) :action NO-ACTION)
         ;; Trigger Sidechain
-        _ (let [trig-env (env-gen (perc 0.001 0.2) :level-scale duck-trigger)]
+        _ (let [trig-env (env-gen (perc duck-attack duck-release) :level-scale duck-trigger)]
             (out:kr duck-bus trig-env))
         ;; Read Sidechain
         duck-env (in:kr duck-bus)
@@ -525,6 +525,16 @@
   "Sets the ducking trigger amount (how much this sound triggers the sidechain).
    Values: 0.0 (none) to 1.0 (full trigger)."
   [pattern val] (set-param pattern :duck-trigger val))
+
+(defn duck-attack
+  "Sets the sidechain trigger attack time in seconds.
+   Default: 0.001 (1ms)."
+  [pattern val] (set-param pattern :duck-attack val))
+
+(defn duck-release
+  "Sets the sidechain trigger release time in seconds.
+   Default: 0.2 (200ms)."
+  [pattern val] (set-param pattern :duck-release val))
 
 (defn lpf
   "Sets the Low Pass Filter lpf frequency.
@@ -1119,13 +1129,17 @@
 
   (play!
     :kick (->
-            (s [:kick :kick])
-            (gain 0)
+            (s [:kick :- :kick :-])
+            (gain 1)
+            (duck-trigger 1)
+            (duck-attack 0.01)
+            (duck-release 0.4)
             )
     :pad (->
-           (s [:saw :saw])
-           (gain 0.5)
-           (duck 10)))
+           (s [:supersaw])
+           (gain 0.4)
+           (s-level 1)
+           (duck 0.8)))
 
   .)
 
