@@ -705,6 +705,27 @@
   ([] (/ (metro-bpm metro) 4))
   ([n] (metro :bpm (* n 4)) n))
 
+(defn fade-cpm
+  "Smoothly transitions the CPM to a new value over a duration (in cycles).
+   Default resolution is 1 step per cycle."
+  ([target-cpm dur-cycles]
+   (fade-cpm target-cpm dur-cycles 1))
+  ([target-cpm dur-cycles steps-per-cycle]
+   (let [dur-beats (* dur-cycles 4)
+         start-cpm (cpm)
+         total-steps (int (* dur-cycles steps-per-cycle))
+         total-steps (max 1 total-steps)
+         step-size (/ (- target-cpm start-cpm) total-steps)
+         step-dur-beats (/ dur-beats total-steps)
+         now (metro)]
+     (dotimes [i total-steps]
+       (let [beat-offset (* (inc i) step-dur-beats)
+             target-val (+ start-cpm (* (inc i) step-size))]
+         (apply-at (metro (+ now beat-offset))
+                   (fn []
+                     (tel/log! :info {:cpm target-val})
+                     (cpm target-val))))))))
+
 (defonce player-state (atom {:playing? false :patterns {} :loops #{}}))
 
 (defn- resolve-note [n]
@@ -1140,12 +1161,16 @@
   (play!
 
    :plucks (->
-             (note (chosen-from (scale :c4 :minor) 4))
+             (note (chosen-from (chord :c4 :minor) 4))
             (s :tb303)
             (env :perc)
             (fast 1)
             (gain 0.5))
     )
+
+  (cpm)
+
+  (fade-cpm 60 8 2)
 
   (stop!)
 
@@ -1177,6 +1202,7 @@
            (duck 0.8)))
 
   (stop!)
+
 
   .)
 
