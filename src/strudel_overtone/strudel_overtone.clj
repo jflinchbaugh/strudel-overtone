@@ -14,10 +14,13 @@
 
 ;; --- Synths ---
 
+(defonce duck-bus (control-bus))
+
 (defmacro def-strudel-synth [name extra-args & body]
   (let [common-args '[amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
                       crush 0 distort 0
-                      hpf 0 bpf -1 room 0 delay 0 repeats 4]
+                      hpf 0 bpf -1 room 0 delay 0 repeats 4
+                      duck 0 duck-trigger 0]
         adsr-args   '[attack 0.01 decay 0.1 s-level 0.5 release 0.3]
         perc-args   '[attack 0.01]
         ;; Helper to build the synth definition
@@ -25,6 +28,12 @@
                      `(ov/defsynth ~(symbol (str name suffix))
                         ~(into (vec (concat extra-args common-args)) args)
                         (let [~'env ~env-gen-form
+                              ;; Trigger Sidechain
+                              _# (let [trig-env# (env-gen (perc 0.001 0.2) :level-scale ~'duck-trigger)]
+                                   (out:kr duck-bus trig-env#))
+                              ;; Read Sidechain
+                              ~'duck-env (in:kr duck-bus)
+                              ~'amp-mult (ov/clip (~'- 1 (~'* ~'duck ~'duck-env)) 0 1)
                               ~'snd (do ~@body)
                               ;; Effect Chain
                               ~'filt (ov/hpf ~'snd (~'s-max 20 ~'hpf))
@@ -50,7 +59,7 @@
                                    :amp 0.0001
                                    :time 0.2
                                    :action FREE)]
-                          (out 0 (pan2 (~' * ~'verbed ~'amp) ~'pan)))))]
+                          (out 0 (pan2 (~' * ~'verbed ~'amp ~'amp-mult) ~'pan)))))]
     `(do
        ~(make-synth "-adsr"
                     `(env-gen (adsr ~'attack ~'decay ~'s-level ~'release)
@@ -63,8 +72,16 @@
 
 (defsynth kick [amp 1 sustain 0.3 freq 60 lpf 3000 pan 0
                 crush 0 distort 0
-                hpf 0 bpf -1 room 0 delay 0 repeats 4]
+                hpf 0 bpf -1 room 0 delay 0 repeats 4
+                duck 0 duck-trigger 0]
   (let [env (env-gen (perc 0.01 sustain) :action NO-ACTION)
+        ;; Trigger Sidechain
+        _ (let [trig-env (env-gen (perc 0.001 0.2) :level-scale duck-trigger)]
+            (out:kr duck-bus trig-env))
+        ;; Read Sidechain
+        duck-env (in:kr duck-bus)
+        amp-mult (ov/clip (- 1 (* duck duck-env)) 0 1)
+
         snd (ov/lpf (sin-osc (line:kr (* 2 freq) freq 0.1)) lpf)
         filt (ov/hpf snd (s-max 20 hpf))
         filt (select (> bpf 0) [filt (ov/bpf filt (s-max 20 bpf) 1)])
@@ -84,12 +101,20 @@
                    (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
+    (out 0 (pan2 (* verbed amp amp-mult) pan))))
 
 (defsynth snare [amp 1 sustain 0.2 freq 200 lpf 3000 pan 0
                  crush 0 distort 0
-                 hpf 0 bpf -1 room 0 delay 0 repeats 4]
+                 hpf 0 bpf -1 room 0 delay 0 repeats 4
+                 duck 0 duck-trigger 0]
   (let [env (env-gen (perc 0.01 sustain) :action NO-ACTION)
+        ;; Trigger Sidechain
+        _ (let [trig-env (env-gen (perc 0.001 0.2) :level-scale duck-trigger)]
+            (out:kr duck-bus trig-env))
+        ;; Read Sidechain
+        duck-env (in:kr duck-bus)
+        amp-mult (ov/clip (- 1 (* duck duck-env)) 0 1)
+
         noise (ov/lpf (white-noise) lpf)
         snd (+ (* 0.5 (sin-osc freq)) (* 0.8 noise))
         filt (ov/hpf snd (s-max 20 hpf))
@@ -110,12 +135,20 @@
                    (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
+    (out 0 (pan2 (* verbed amp amp-mult) pan))))
 
 (defsynth hat [amp 1 sustain 0.1 freq 8000 lpf 6000 pan 0
                crush 0 distort 0
-               hpf 0 bpf -1 room 0 delay 0 repeats 4]
+               hpf 0 bpf -1 room 0 delay 0 repeats 4
+               duck 0 duck-trigger 0]
   (let [env (env-gen (perc 0.001 sustain) :action NO-ACTION)
+        ;; Trigger Sidechain
+        _ (let [trig-env (env-gen (perc 0.001 0.2) :level-scale duck-trigger)]
+            (out:kr duck-bus trig-env))
+        ;; Read Sidechain
+        duck-env (in:kr duck-bus)
+        amp-mult (ov/clip (- 1 (* duck duck-env)) 0 1)
+
         snd (ov/hpf (white-noise) lpf)
         filt (ov/hpf snd (s-max 20 hpf))
         filt (select (> bpf 0) [filt (ov/bpf filt (s-max 20 bpf) 1)])
@@ -136,12 +169,20 @@
                    (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
+    (out 0 (pan2 (* verbed amp amp-mult) pan))))
 
 (defsynth clap [amp 1 sustain 0.1 freq 1200 lpf 1500 resonance 0.2 pan 0
                 crush 0 distort 0
-                hpf 0 bpf -1 room 0 delay 0 repeats 4]
+                hpf 0 bpf -1 room 0 delay 0 repeats 4
+                duck 0 duck-trigger 0]
   (let [env (env-gen (perc 0.005 sustain) :action NO-ACTION)
+        ;; Trigger Sidechain
+        _ (let [trig-env (env-gen (perc 0.001 0.2) :level-scale duck-trigger)]
+            (out:kr duck-bus trig-env))
+        ;; Read Sidechain
+        duck-env (in:kr duck-bus)
+        amp-mult (ov/clip (- 1 (* duck duck-env)) 0 1)
+
         snd (ov/bpf (white-noise) freq resonance)
         filt (ov/hpf snd (s-max 20 hpf))
         filt (select (> bpf 0) [filt (ov/bpf filt (s-max 20 bpf) 1)])
@@ -161,7 +202,7 @@
                    (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
+    (out 0 (pan2 (* verbed amp amp-mult) pan))))
 
 (def-strudel-synth saw [freq 440 detune 0 vibrato 0]
   (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))
@@ -282,8 +323,16 @@
 
 (defsynth dub-kick [freq 80 amp 1 sustain 0.3 lpf 2000 pan 0
                     crush 0 distort 0
-                    hpf 0 bpf -1 room 0 delay 0 repeats 4]
+                    hpf 0 bpf -1 room 0 delay 0 repeats 4
+                    duck 0 duck-trigger 0]
   (let [lpf-env (perc 0.001 1 freq -20)
+        ;; Trigger Sidechain
+        _ (let [trig-env (env-gen (perc 0.001 0.2) :level-scale duck-trigger)]
+            (out:kr duck-bus trig-env))
+        ;; Read Sidechain
+        duck-env (in:kr duck-bus)
+        amp-mult (ov/clip (- 1 (* duck duck-env)) 0 1)
+
         amp-env (perc 0.001 1 1 -8)
         osc-env (perc 0.001 1 freq -8)
         noiz (ov/lpf (white-noise) (+ (env-gen:kr lpf-env) 20))
@@ -306,12 +355,20 @@
                    (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
+    (out 0 (pan2 (* verbed amp amp-mult) pan))))
 
 (defsynth dance-kick [freq 80 amp 1 sustain 0.3 lpf 2000 pan 0
                       crush 0 distort 0
-                      hpf 0 bpf -1 room 0 delay 0 repeats 4]
+                      hpf 0 bpf -1 room 0 delay 0 repeats 4
+                      duck 0 duck-trigger 0]
   (let [env (env-gen (perc 0.001 1) :action NO-ACTION)
+        ;; Trigger Sidechain
+        _ (let [trig-env (env-gen (perc 0.001 0.2) :level-scale duck-trigger)]
+            (out:kr duck-bus trig-env))
+        ;; Read Sidechain
+        duck-env (in:kr duck-bus)
+        amp-mult (ov/clip (- 1 (* duck duck-env)) 0 1)
+
         freq-env (env-gen (perc 0.001 0.1))
         snd (sin-osc (+ freq (* freq-env 200)))
         click (ov/lpf (white-noise) (+ 500 (* freq-env 2000)))
@@ -333,7 +390,7 @@
                    (* delay repeats)))])
         verbed (free-verb dly room 0.5 0.5)
         _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp) pan))))
+    (out 0 (pan2 (* verbed amp amp-mult) pan))))
 
 ;; --- Pattern Engine ---
 
@@ -458,6 +515,16 @@
   "Sets the gain (amplitude/volume) of the pattern.
    Values: 0.0 (silent) to 1.0 (default) or higher."
   [pattern val] (set-param pattern :amp val))
+
+(defn duck
+  "Sets the ducking amount (how much this sound is ducked by the sidechain).
+   Values: 0.0 (none) to 1.0 (full duck)."
+  [pattern val] (set-param pattern :duck val))
+
+(defn duck-trigger
+  "Sets the ducking trigger amount (how much this sound triggers the sidechain).
+   Values: 0.0 (none) to 1.0 (full trigger)."
+  [pattern val] (set-param pattern :duck-trigger val))
 
 (defn lpf
   "Sets the Low Pass Filter lpf frequency.
@@ -945,23 +1012,27 @@
           (room 0.5)
           (distort 0.5)
           (gain 0.35)
+          (duck 1)
           (lpf (chosen-from [100 200 400 800] 2))
           #_(active 0))
    :snare (->
            (s [:- :- [:snare :- :-] :- :- :- [:snare :-] :-])
            (lpf 10000)
            (gain 0.4)
+           (duck 1)
            (active (chosen-from [1 1 1 1] 2))
            #_(active 0))
    :hat   (->
            (s (repeat 8 :hat))
            (gain 0.05)
            (active (chosen-from [0 1 1] 8))
+           (duck 1)
            #_(active 0))
    :shaker   (->
               (s (repeat 16 :clap))
               (gain 0.20)
               (active (chosen-from [0 1 1] 4))
+              (duck 1)
               #_(active 0))
    :bass (->
           (note [(set (take 3 (chord :f0 :minor)))
@@ -974,6 +1045,7 @@
           (gain [0.6 0.7])
           (pan (chosen-from (range -0.5 0.5 0.1) 4))
           (fast 1/4)
+          (duck-trigger 1)
           (active 0))
    :lead (->
           (note (chosen-from (take 5 (scale :f4 :major)) 32))
@@ -982,6 +1054,7 @@
           (gain 0.1)
           (pan (chosen-from (range -0.75 0.75 0.05) 4))
           (fast 1/4)
+          (duck-trigger 1)
           (active (chosen-from [0 0 1] 8))
           #_(active 0)))
 
@@ -1043,6 +1116,16 @@
     )
 
   (stop!)
+
+  (play!
+    :kick (->
+            (s [:kick :kick])
+            (gain 0)
+            )
+    :pad (->
+           (s [:saw :saw])
+           (gain 0.5)
+           (duck 10)))
 
   .)
 
