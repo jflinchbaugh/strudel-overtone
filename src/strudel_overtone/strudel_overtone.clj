@@ -20,7 +20,8 @@
   (let [common-args '[amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
                       crush 0 distort 0
                       hpf 0 bpf -1 room 0 delay 0 repeats 4
-                      duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2]
+                      duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2
+                      room-size 0.5 damp 0.5]
         adsr-args   '[attack 0.01 decay 0.1 s-level 0.5 release 0.3]
         perc-args   '[attack 0.01]
         ;; Helper to build the synth definition
@@ -53,13 +54,13 @@
                                         (comb-n ~'gated 0.5
                                           (~'s-max 0.0001 ~'delay)
                                           (~' * ~'delay ~'repeats)))])
-                              ~'verbed (free-verb ~'dly ~'room 0.5 0.5)
+                              ~'reverbed (free-verb ~'dly ~'room ~'room-size ~'damp)
                               _# (detect-silence
-                                   ~'verbed
+                                   ~'reverbed
                                    :amp 0.0001
                                    :time 0.2
                                    :action FREE)]
-                          (out 0 (pan2 (~' * ~'verbed ~'amp ~'amp-duck) ~'pan)))))]
+                          (out 0 (pan2 (~' * ~'reverbed ~'amp ~'amp-duck) ~'pan)))))]
     `(do
        ~(make-synth "-adsr"
                     `(env-gen (adsr ~'attack ~'decay ~'s-level ~'release)
@@ -73,7 +74,8 @@
 (defsynth kick [amp 1 sustain 0.3 freq 60 lpf 3000 pan 0
                 crush 0 distort 0
                 hpf 0 bpf -1 room 0 delay 0 repeats 4
-                duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2]
+                duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2
+                room-size 0.5 damp 0.5]
   (let [env (env-gen (perc 0.01 sustain) :action NO-ACTION)
         ;; Trigger Sidechain
         _ (let [trig-env (env-gen (perc duck-attack duck-release) :level-scale duck-trigger)]
@@ -99,14 +101,15 @@
                    0.5
                    (s-max 0.0001 delay)
                    (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp amp-duck) pan))))
+        reverbed (free-verb dly room room-size damp)
+        _ (detect-silence reverbed :amp 0.0001 :time 0.2 :action FREE)]
+    (out 0 (pan2 (* reverbed amp amp-duck) pan))))
 
 (defsynth snare [amp 1 sustain 0.2 freq 200 lpf 3000 pan 0
                  crush 0 distort 0
                  hpf 0 bpf -1 room 0 delay 0 repeats 4
-                 duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2]
+                 duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2
+                 room-size 0.5 damp 0.5]
   (let [env (env-gen (perc 0.01 sustain) :action NO-ACTION)
         ;; Trigger Sidechain
         _ (let [trig-env (env-gen (perc duck-attack duck-release) :level-scale duck-trigger)]
@@ -133,14 +136,15 @@
                    0.5
                    (s-max 0.0001 delay)
                    (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp amp-duck) pan))))
+        reverbed (free-verb dly room room-size damp)
+        _ (detect-silence reverbed :amp 0.0001 :time 0.2 :action FREE)]
+    (out 0 (pan2 (* reverbed amp amp-duck) pan))))
 
 (defsynth hat [amp 1 sustain 0.1 freq 8000 lpf 6000 pan 0
                crush 0 distort 0
                hpf 0 bpf -1 room 0 delay 0 repeats 4
-               duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2]
+               duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2
+               room-size 0.5 damp 0.5]
   (let [env (env-gen (perc 0.001 sustain) :action NO-ACTION)
         ;; Trigger Sidechain
         _ (let [trig-env (env-gen (perc duck-attack duck-release) :level-scale duck-trigger)]
@@ -167,14 +171,15 @@
                    0.5
                    (s-max 0.0001 delay)
                    (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp amp-duck) pan))))
+        reverbed (free-verb dly room room-size damp)
+        _ (detect-silence reverbed :amp 0.0001 :time 0.2 :action FREE)]
+    (out 0 (pan2 (* reverbed amp amp-duck) pan))))
 
 (defsynth clap [amp 1 sustain 0.1 freq 1200 lpf 1500 resonance 0.2 pan 0
                 crush 0 distort 0
                 hpf 0 bpf -1 room 0 delay 0 repeats 4
-                duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2]
+                duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2
+                room-size 0.5 damp 0.5]
   (let [env (env-gen (perc 0.005 sustain) :action NO-ACTION)
         ;; Trigger Sidechain
         _ (let [trig-env (env-gen (perc duck-attack duck-release) :level-scale duck-trigger)]
@@ -200,9 +205,9 @@
                    0.5
                    (s-max 0.0001 delay)
                    (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp amp-duck) pan))))
+        reverbed (free-verb dly room room-size damp)
+        _ (detect-silence reverbed :amp 0.0001 :time 0.2 :action FREE)]
+    (out 0 (pan2 (* reverbed amp amp-duck) pan))))
 
 (def-strudel-synth saw [freq 440 detune 0 vibrato 0]
   (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))
@@ -324,7 +329,8 @@
 (defsynth dub-kick [freq 80 amp 1 sustain 0.3 lpf 2000 pan 0
                     crush 0 distort 0
                     hpf 0 bpf -1 room 0 delay 0 repeats 4
-                    duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2]
+                    duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2
+                    room-size 0.5 damp 0.5]
   (let [lpf-env (perc 0.001 1 freq -20)
         ;; Trigger Sidechain
         _ (let [trig-env (env-gen (perc duck-attack duck-release) :level-scale duck-trigger)]
@@ -353,14 +359,15 @@
                  (comb-n gated 0.5
                    (s-max 0.0001 delay)
                    (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp amp-duck) pan))))
+        reverbed (free-verb dly room room-size damp)
+        _ (detect-silence reverbed :amp 0.0001 :time 0.2 :action FREE)]
+    (out 0 (pan2 (* reverbed amp amp-duck) pan))))
 
 (defsynth dance-kick [freq 80 amp 1 sustain 0.3 lpf 2000 pan 0
                       crush 0 distort 0
                       hpf 0 bpf -1 room 0 delay 0 repeats 4
-                      duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2]
+                      duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2
+                      room-size 0.5 damp 0.5]
   (let [env (env-gen (perc 0.001 1) :action NO-ACTION)
         ;; Trigger Sidechain
         _ (let [trig-env (env-gen (perc duck-attack duck-release) :level-scale duck-trigger)]
@@ -388,9 +395,9 @@
                  (comb-n gated 0.5
                    (s-max 0.0001 delay)
                    (* delay repeats)))])
-        verbed (free-verb dly room 0.5 0.5)
-        _ (detect-silence verbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* verbed amp amp-duck) pan))))
+        reverbed (free-verb dly room room-size damp)
+        _ (detect-silence reverbed :amp 0.0001 :time 0.2 :action FREE)]
+    (out 0 (pan2 (* reverbed amp amp-duck) pan))))
 
 ;; --- Pattern Engine ---
 
@@ -639,9 +646,24 @@
   [pattern val] (set-param pattern :bpf val))
 
 (defn room
-  "Sets the reverb mix amount.
-   Values: 0.0 (dry) to 1.0 (wet)."
+  "Sets the reverb mix amount (dry/wet).
+   Values: 0.0 (completely dry) to 1.0 (completely wet).
+   Default: 0.0 (no reverb)."
   [pattern val] (set-param pattern :room val))
+
+(defn room-size
+  "Sets the perceived size of the reverberant space.
+   Values: 0.0 (small room) to 1.0 (massive hall).
+   Affects decay time and reflection density.
+   Default: 0.5."
+  [pattern val] (set-param pattern :room-size val))
+
+(defn damp
+  "Sets the high-frequency damping of the reverb.
+   Values: 0.0 (bright, reflective) to 1.0 (dark, absorbed).
+   Controls how quickly high frequencies decay.
+   Default: 0.5."
+  [pattern val] (set-param pattern :damp val))
 
 (defn vibrato
   "Sets the vibrato rate.
@@ -1149,7 +1171,7 @@
            (add [-24])
            (attack 0.2)
            (release 1)
-           (s [:mooger])
+           (s [#{:mooger}])
            (gain 0.5)
            (s-level 1)
            (duck 0.8)))
