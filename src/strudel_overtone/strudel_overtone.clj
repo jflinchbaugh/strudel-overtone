@@ -2,7 +2,9 @@
   (:require [overtone.core :as ov :refer :all
              :exclude [note lpf decay distort hpf bpf vibrato defsynth]]
             [taoensso.telemere :as tel]
-            [clojure.string :as str]))
+            [clojure.string :as str])
+  (:import [java.time ZoneId]
+           [java.time.format DateTimeFormatter]))
 
 (defmacro s-max [min-val val]
   `(ov/clip ~val ~min-val 20000))
@@ -70,6 +72,21 @@
        ~(make-synth "-perc"
                     `(env-gen (perc ~'attack ~'sustain) :action NO-ACTION)
                     perc-args))))
+
+;; --- Logging ---
+
+(def ^:private time-formatter
+  (-> (DateTimeFormatter/ofPattern "HH:mm:ss.SSS")
+      (.withZone (ZoneId/systemDefault))))
+
+(tel/stop-handlers!)
+(tel/add-handler! :console (tel/handler:console
+                             {:output-fn
+                              (fn [signal]
+                                (let [{:keys [inst msg_ data]} signal]
+                                  (str (.format time-formatter inst) " "
+                                       (or (force msg_) data)
+                                       "\n")))}))
 
 (defsynth kick [amp 1 sustain 0.3 freq 60 lpf 3000 pan 0
                 crush 0 distort 0
@@ -1185,11 +1202,11 @@
   (play!
 
    :plucks (->
-             (note (chosen-from (chord :c4 :minor) 8))
+             (note (chosen-from (chord :c4 :minor) 4))
             (s :tb303)
             (env :perc)
             (fast 1)
-            (swing [0.2])
+            (swing [0.3])
             (gain 0.5))
    )
 
