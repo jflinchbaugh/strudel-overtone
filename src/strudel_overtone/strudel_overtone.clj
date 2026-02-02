@@ -523,6 +523,12 @@
    Values: 0.0 (silent) to 1.0 (default) or higher."
   [pattern val] (set-param pattern :amp val))
 
+(defn swing
+  "Sets the swing amount (shuffle feel).
+   Delays every second 8th note by the specified amount (fraction of an 8th note).
+   Values: 0.0 (straight) to ~0.33 (triplet feel) to 0.5 (hard swing)."
+  [pattern val] (set-param pattern :swing val))
+
 (defn duck
   "Sets the ducking amount (how much this sound is ducked by the sidechain).
    Values: 0.0 (none) to 1.0 (full duck)."
@@ -786,7 +792,7 @@
                        (resolve-note
                          (+ (if (keyword? n) (ov/note n) n) note-offset))
                        nil)
-                reserved #{:sound :note :active :start :duration :env :add}
+                reserved #{:sound :note :active :start :duration :env :add :swing}
                 handled #{:amp :lpf :sustain :freq}
                 args (cond-> (reduce-kv (fn [acc k v]
                                           (if (or (reserved k) (handled k))
@@ -804,6 +810,12 @@
                           (fn [& e] (tel/log! :info {:event (into {} e)})) ev)
                 (apply-at (metro beat) synth-var args)))))))))
 
+(defn- apply-swing [t amount step-size]
+  (let [step-idx (long (/ t step-size))]
+    (if (odd? step-idx)
+      (+ t (* amount step-size))
+      t)))
+
 (defn play-loop [key beat]
   (let [state @player-state]
     (if (and (:playing? state)
@@ -812,13 +824,25 @@
         (if pat
           (let [cycles (:cycles pat 1) ;; Speed multiplier
                 cycle-dur (/ 4 cycles) ;; Beats per cycle (assuming 4/4)
-                next-beat (+ beat cycle-dur)]
+                next-beat (+ beat cycle-dur)
+                events (:events pat)
+                ;; Determine grid from smallest note duration, default to 1/8 (0.125) if empty
+                min-dur (if (seq events)
+                          (apply min (map :duration events))
+                          0.125)]
 
             ;; Schedule events for this cycle
-            (doseq [ev (:events pat)]
-              (let [rel-start (:time ev)
+            (doseq [ev events]
+              (let [orig-start (:time ev)
+                    swing-amount (get-in ev [:params :swing] 0)
+                    swung-start (if (zero? swing-amount)
+                                  orig-start
+                                  (apply-swing orig-start swing-amount min-dur))
+                    ;; Assoc effective start time for logging/debugging
+                    ev (assoc ev :effective-time swung-start)
+                    
                     rel-dur (:duration ev)
-                    ev-beat (+ beat (* rel-start cycle-dur))
+                    ev-beat (+ beat (* swung-start cycle-dur))
                     ev-dur-beats (* rel-dur cycle-dur)]
                 (trigger-event ev ev-beat ev-dur-beats)))
 
@@ -1161,12 +1185,13 @@
   (play!
 
    :plucks (->
-             (note (chosen-from (chord :c4 :minor) 4))
+             (note (chosen-from (chord :c4 :minor) 8))
             (s :tb303)
             (env :perc)
             (fast 1)
+            (swing [0.2])
             (gain 0.5))
-    )
+   )
 
   (cpm)
 
@@ -1185,6 +1210,7 @@
     :snare (->
              (s [:- :snare :- :snare])
              (gain [0.6 0.8])
+             (swing [0.5 0.0])
              (duck-trigger 1)
              (note [:e3 :c3]))
     :hat (->
