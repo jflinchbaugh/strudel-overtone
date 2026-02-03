@@ -2,9 +2,8 @@
   (:require [overtone.core :as ov :refer :all
              :exclude [note lpf decay distort hpf bpf vibrato defsynth]]
             [taoensso.telemere :as tel]
-            [clojure.string :as str])
-  (:import [java.time ZoneId]
-           [java.time.format DateTimeFormatter]))
+            [tick.core :as t]
+            [clojure.string :as str]))
 
 (defmacro s-max [min-val val]
   `(ov/clip ~val ~min-val 20000))
@@ -76,15 +75,14 @@
 ;; --- Logging ---
 
 (def ^:private time-formatter
-  (-> (DateTimeFormatter/ofPattern "HH:mm:ss.SSS")
-      (.withZone (ZoneId/systemDefault))))
+  (t/formatter "HH:mm:ss.SSS"))
 
 (tel/stop-handlers!)
 (tel/add-handler! :console (tel/handler:console
                              {:output-fn
                               (fn [signal]
                                 (let [{:keys [inst msg_ data]} signal]
-                                  (str (.format time-formatter inst) " "
+                                  (str (t/format time-formatter (t/zoned-date-time inst)) " "
                                        (or (force msg_) data)
                                        "\n")))}))
 
@@ -1212,7 +1210,7 @@
 
   (cpm)
 
-  (fade-cpm 60 8 2)
+  (fade-cpm 44 8 2)
 
   (stop!)
 

@@ -1,6 +1,7 @@
 {:paths ["src" "resources"]
  :deps {org.clojure/clojure {:mvn/version "1.12.1"}
         com.taoensso/telemere {:mvn/version "1.2.1"}
+        tick/tick {:mvn/version "0.7.5"}
         overtone/overtone {:mvn/version "0.16.3331"}}
  :aliases
  {:run-m {:main-opts ["-m" "strudel-overtone.strudel-overtone"]}
