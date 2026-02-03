@@ -702,6 +702,24 @@
   "Sets the number of echo repeats (feedback).
    Values: Number of repeats (e.g. 4). Default is 4."
   [pattern val] (set-param pattern :repeats val))
+
+(defn rate
+  "Sets the playback rate for samples.
+   Values: 1.0 (normal), 0.5 (half speed), -1.0 (reverse), etc."
+  [pattern val] (set-param pattern :rate val))
+
+(defn begin
+  "Sets the start position of the sample (0.0 to 1.0)."
+  [pattern val] (set-param pattern :begin val))
+
+(defn end
+  "Sets the end position of the sample (0.0 to 1.0)."
+  [pattern val] (set-param pattern :end val))
+
+(defn looping
+  "Sets the loop flag. 1 for loop, 0 for one-shot."
+  [pattern val] (set-param pattern :loop? val))
+
 (defn env
   "Sets the envelope of a pattern.
    Can be a single value or a sequence/mini-notation."
@@ -747,6 +765,29 @@
                      (tel/log! :info {:cpm target-val})
                      (cpm target-val))))))))
 
+;; --- Sampling ---
+
+(defonce samples (atom {}))
+
+(defn load-sample!
+  "Loads a sample into the registry.
+   Name can be a keyword or string.
+   Path is the filesystem path to the audio file."
+  [name path]
+  (if-let [buf (try (ov/load-sample path)
+                    (catch Exception e
+                      (println "Failed to load sample:" path (.getMessage e))
+                      nil))]
+    (do
+      (swap! samples assoc (str/replace (str name) #"^:" "") buf)
+      (println "Loaded sample:" name))
+    (println "Sample not loaded:" path)))
+
+(def-strudel-synth sampler [buf 0 rate 1 begin 0 end 1 loop? 0]
+  (let [rate-s (* rate (buf-rate-scale buf))
+        start-pos (* begin (buf-frames buf))]
+    (play-buf 2 buf rate-s 1 start-pos loop? :action NO-ACTION)))
+
 (defonce player-state (atom {:playing? false :patterns {} :loops #{}}))
 
 (defn- resolve-note [n]
@@ -774,6 +815,8 @@
     (when active?
       (let [sound-param (:sound params)
             n (:note params)
+            sound-name (or sound-param (if n "saw" nil))
+            sample-buf (when sound-name (get @samples sound-name))
             note-offset (get params :add 0)
             amp (let [a (or (:amp params) 1.0)]
                   (if (string? a)
@@ -785,20 +828,27 @@
                        (try (Double/parseDouble c)
                             (catch Exception _ 2000))
                        c))
-            ;; Calculate sustain in seconds from beats, or use explicit param
+            ;; Calculate sustain in seconds
             param-sustain (:sustain params)
-            sustain-sec (if param-sustain
+            sustain-sec (cond
+                          param-sustain
                           (if (string? param-sustain)
-                            (try
-                              (Double/parseDouble param-sustain)
-                              (catch Exception _ 0.1))
+                            (try (Double/parseDouble param-sustain) (catch Exception _ 0.1))
                             param-sustain)
-                          (* dur-beats (/ 60 (metro-bpm metro))))
-            ;; Default sound if only note is provided
-            sound-name (or sound-param (if n "saw" nil))]
+
+                          (and sample-buf (:end params))
+                          (let [b (get params :begin 0)
+                                e (:end params)
+                                r (get params :rate 1)
+                                abs-r (Math/abs (double r))
+                                dur (:duration sample-buf)]
+                            (* (Math/abs (double (- e b))) dur (/ 1 (max 0.001 abs-r))))
+
+                          :else
+                          (* dur-beats (/ 60 (metro-bpm metro))))]
 
         (when sound-name
-          (let [base (get synth-aliases sound-name sound-name)
+          (let [base (if sample-buf "sampler" (get synth-aliases sound-name sound-name))
                 synth-key (get-synth-name base params)
                 synth-var (or
                            (resolve-synth synth-key)
@@ -818,7 +868,8 @@
                        true (conj :amp amp)
                        freq (conj :freq freq)
                        lpf (conj :lpf lpf)
-                       sustain-sec (conj :sustain sustain-sec))]
+                       sustain-sec (conj :sustain sustain-sec)
+                       sample-buf (conj :buf (:id sample-buf)))]
             (when synth-var
               (do
                 (apply-at (metro beat)
@@ -1241,6 +1292,31 @@
            (gain 0.5)
            (s-level 1)
            (duck 0.8)))
+
+  (stop!)
+
+  ;; --- Sampling Example ---
+  ;; (load-sample! :break "/path/to/loop.wav")
+  ;; (play! :drums (-> (s [:break]) (rate 1.0) (begin 0.2)))
+  (load-sample! :cq "/usr/share/wsjtx/sounds/CQ.wav")
+  (play!
+    :c (->
+         (s [[:cq :cq] :-])
+         (rate 1.0)
+         (begin 0.0)
+         (end 0.45)
+         (attack 0)
+         (room 0.5)
+         (release 0))
+    :q (->
+         (s [:- [:cq :cq :cq]])
+         (rate 1.0)
+         (begin 0.45)
+         (end 1.0)
+         (room 0.5)
+         (attack 0)
+         (release 0))
+    )
 
   (stop!)
 
