@@ -726,8 +726,16 @@
                                 e (:end params)
                                 r (get params :rate 1)
                                 abs-r (Math/abs (double r))
-                                dur (:duration sample-buf)]
-                            (* (Math/abs (double (- e b))) dur (/ 1 (max 0.001 abs-r))))
+                                dur (:duration sample-buf)
+                                total-dur (* (Math/abs (double (- e b))) dur (/ 1 (max 0.001 abs-r)))
+                                env (get params :env "adsr")]
+                            (if (= env "perc")
+                              (let [attack (let [a (get params :attack 0.01)]
+                                             (if (string? a) (try (Double/parseDouble a) (catch Exception _ 0.01)) a))]
+                                (max 0.001 (- total-dur attack)))
+                              (let [release (let [r (get params :release 0.3)]
+                                              (if (string? r) (try (Double/parseDouble r) (catch Exception _ 0.3)) r))]
+                                (max 0.001 (- total-dur release)))))
 
                           :else
                           (* dur-beats (/ 60 (metro-bpm metro))))]
@@ -1185,18 +1193,10 @@
   (load-sample! :cq "/usr/share/wsjtx/sounds/CQ.wav")
   (play!
     :c (->
-         (s [[:cq :cq] :-])
-         (end 0.4)
-         (attack 0)
-         (release 0))
-    :q (->
-         (s [:- [:cq :cq :cq]])
-         (rate 1.0)
-         (begin 0.57)
-         (end 1.0)
-         (attack 0)
-         (release 0)
-         )
+         (s [[:cq]])
+         (begin 0.2)
+         (end 0.7)
+         (release 0.2))
     )
 
   (stop!)
@@ -1204,8 +1204,6 @@
   (play! (->
            (note [:c1 :d1 :e1])
            (s [:sine])
-           (pan-hz 5)
-           (pan-depth 1)
            ))
 
   .)
