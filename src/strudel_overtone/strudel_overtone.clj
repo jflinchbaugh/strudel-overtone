@@ -1233,17 +1233,29 @@
 
   (stop!)
 
-  (play! (->
-           (note [:c1 [:d1 :c1 :-]])
-           (s [:sine])
-           ))
+  (play!
+    :bass (->
+            (note [#{:c1 :e1} [:e1 :g1]])
+           (s [#{:tri :sine :square}])
+           (gain [0.5 0.5])
+           #_(distort [0.5 1])
+           (pan-hz [5])
+           (env :perc)
+           (pan-depth [0.5])
+           )
+    :kick (-> (s [:dub-kick [:- :dub-kick]]))
+    :clap (-> (s [:clap-808
+                  [:clap-808 :clap-808]
+                  :clap-808
+                  [:clap-808 :clap :clap-808]])
+            (gain 0.3)))
 
 
   (load-sample!
     :clap-808
-    "/home/john/workspace/strudel-overtone/samples/99sounds/clap-crushed.wav")
+    "samples/99sounds/clap-808.wav")
 
-  (play! (-> (s (repeat 8 [:clap-808])) (gain 0.2) (fshift 120)))
+  (play! (-> (s (repeat 8 [:clap-808])) (gain 0.2) (fshift 0)))
 
   .)
 
