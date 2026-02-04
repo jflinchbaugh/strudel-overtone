@@ -15,7 +15,7 @@
     (is (= "sine-perc" (#'sut/get-synth-name "sine" {:env "perc"}))))
 
   (testing "resolve-synth finds existing synths"
-    (is (var? (#'sut/resolve-synth "kick")))
+    (is (var? (#'sut/resolve-synth "kick-adsr")))
     (is (var? (#'sut/resolve-synth "saw-adsr")))
     (is (var? (#'sut/resolve-synth "saw-perc")))
     (is (nil? (#'sut/resolve-synth "non-existent-synth")))))

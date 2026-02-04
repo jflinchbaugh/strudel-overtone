@@ -20,6 +20,10 @@
 (defmacro def-strudel-synth [name extra-args & body]
   (let [common-args '[amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
                       crush 0 distort 0
+                      pshift 0 fshift 0
+                      tremolo-hz 0 tremolo-depth 0
+                      pan-hz 0 pan-depth 0
+                      phaser-hz 0 phaser-depth 0
                       hpf 0 bpf -1 room 0 delay 0 repeats 4
                       duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2
                       room-size 0.5 damp 0.5]
@@ -38,30 +42,59 @@
                               ~'amp-duck (ov/clip (~'- 1 (~'* ~'duck ~'duck-env)) 0 1)
                               ~'snd (do ~@body)
                               ;; Effect Chain
-                              ~'filt (ov/hpf ~'snd (~'s-max 20 ~'hpf))
-                              ~'filt (select (~' > ~'bpf 0)
-                                       [~'filt
-                                        (ov/bpf ~'filt (~'s-max 20 ~'bpf) 1)])
+                              ;; Pitch Shift bypass
+                              ~'ps (let [~'use-ps (~' > (ov/absdif ~'pshift 0) 0.01)
+                                         ~'ps-sig (ov/pitch-shift ~'snd 0.2 (ov/pow 2 (~' / ~'pshift 12)))]
+                                     (ov/x-fade2 ~'snd ~'ps-sig (ov/lin-lin ~'use-ps 0 1 -1 1)))
+
+                              ;; Freq Shift bypass
+                              ~'fs (let [~'use-fs (~' > (ov/absdif ~'fshift 0) 0.01)
+                                         ~'fs-sig (ov/freq-shift ~'ps ~'fshift)]
+                                     (ov/x-fade2 ~'ps ~'fs-sig (ov/lin-lin ~'use-fs 0 1 -1 1)))
+
+                              ~'trem (let [~'dry ~'fs
+                                           ~'wet (~' * ~'dry (ov/lin-lin (ov/sin-osc:kr ~'tremolo-hz) -1 1 (~' - 1 ~'tremolo-depth) 1))]
+                                       (ov/x-fade2 ~'dry ~'wet (ov/lin-lin (~' > ~'tremolo-depth 0) 0 1 -1 1)))
+
+                              ~'phs (let [~'dry ~'trem
+                                          ~'wet (ov/allpass-n ~'dry 0.02
+                                                (ov/lin-lin (ov/sin-osc:kr ~'phaser-hz) -1 1 0.001 0.01)
+                                                0.1)]
+                                      (ov/x-fade2 ~'dry ~'wet (ov/lin-lin ~'phaser-depth 0 1 -1 1)))
+
+                              ~'filt (ov/hpf ~'phs (~'s-max 20 ~'hpf))
+                              ~'filt (let [~'bpf-sig (ov/bpf ~'filt (~'s-max 20 ~'bpf) 1)]
+                                       (ov/x-fade2 ~'filt ~'bpf-sig (ov/lin-lin (~' > ~'bpf 0) 0 1 -1 1)))
+                              ~'filt (ov/rlpf ~'filt (~'s-max 20 ~'lpf) ~'resonance)
+
                               ~'dst (ov/distort
                                       (~' * ~'filt
                                        (ov/dbamp (~' * ~'distort 24))))
-                              ~'crs (decimator ~'dst
-                                      (ov/lin-lin ~'crush 0 1 44100 2000)
-                                      (ov/lin-lin ~'crush 0 1 24 4))
+
+                              ;; Decimator bypass - critical for ringing
+                              ~'crs (let [~'dry ~'dst
+                                          ~'wet (decimator ~'dry
+                                                (ov/lin-lin ~'crush 0 1 44100 2000)
+                                                (ov/lin-lin ~'crush 0 1 24 4))]
+                                      (ov/x-fade2 ~'dry ~'wet (ov/lin-lin (~' > ~'crush 0) 0 1 -1 1)))
+
                               ~'gated (~' * ~'crs ~'env)
-                              ~'dly (select (~' > ~'delay 0)
-                                      [~'gated
-                                       (~' + ~'gated
-                                        (comb-n ~'gated 0.5
-                                          (~'s-max 0.0001 ~'delay)
-                                          (~' * ~'delay ~'repeats)))])
+                              ~'dly (let [~'dry ~'gated
+                                          ~'wet (~' + ~'dry
+                                                (comb-n ~'dry 0.5
+                                                  (~'s-max 0.0001 ~'delay)
+                                                  (~' * ~'delay ~'repeats)))]
+                                      (ov/x-fade2 ~'dry ~'wet (ov/lin-lin (~' > ~'delay 0) 0 1 -1 1)))
+
                               ~'reverbed (free-verb ~'dly ~'room ~'room-size ~'damp)
                               _# (detect-silence
                                    ~'reverbed
                                    :amp 0.0001
                                    :time 0.2
-                                   :action FREE)]
-                          (out 0 (pan2 (~' * ~'reverbed ~'amp ~'amp-duck) ~'pan)))))]
+                                   :action FREE)
+                              ~'actual-pan (~' + ~'pan (let [~'mod (~' * (ov/sin-osc:kr ~'pan-hz) ~'pan-depth)]
+                                                         (~' * ~'mod (~' > ~'pan-depth 0))))]
+                          (out 0 (pan2 (~' * (ov/mix [~'reverbed]) ~'amp ~'amp-duck) ~'actual-pan)))))]
     `(do
        ~(make-synth "-adsr"
                     `(env-gen (adsr ~'attack ~'decay ~'s-level ~'release)
@@ -86,167 +119,38 @@
                                        (or (force msg_) data)
                                        "\n")))}))
 
-(defsynth kick [amp 1 sustain 0.3 freq 60 lpf 3000 pan 0
-                crush 0 distort 0
-                hpf 0 bpf -1 room 0 delay 0 repeats 4
-                duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2
-                room-size 0.5 damp 0.5]
-  (let [env (env-gen (perc 0.01 sustain) :action NO-ACTION)
-        ;; Trigger Sidechain
-        _ (let [trig-env (env-gen (perc duck-attack duck-release) :level-scale duck-trigger)]
-            (out:kr duck-bus trig-env))
-        ;; Read Sidechain
-        duck-env (in:kr duck-bus)
-        amp-duck (ov/clip (- 1 (* duck duck-env)) 0 1)
+(def-strudel-synth kick [freq 60]
+  (sin-osc (line:kr (* 2 freq) freq 0.1)))
 
-        snd (ov/lpf (sin-osc (line:kr (* 2 freq) freq 0.1)) lpf)
-        filt (ov/hpf snd (s-max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (s-max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator
-              dst
-              (ov/lin-lin crush 0 1 44100 2000)
-              (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0)
-              [gated
-               (+ gated
-                 (comb-n
-                   gated
-                   0.5
-                   (s-max 0.0001 delay)
-                   (* delay repeats)))])
-        reverbed (free-verb dly room room-size damp)
-        _ (detect-silence reverbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* reverbed amp amp-duck) pan))))
+(def-strudel-synth snare [freq 200]
+  (let [noise (white-noise)]
+    (+ (* 0.5 (sin-osc freq)) (* 0.8 noise))))
 
-(defsynth snare [amp 1 sustain 0.2 freq 200 lpf 3000 pan 0
-                 crush 0 distort 0
-                 hpf 0 bpf -1 room 0 delay 0 repeats 4
-                 duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2
-                 room-size 0.5 damp 0.5]
-  (let [env (env-gen (perc 0.01 sustain) :action NO-ACTION)
-        ;; Trigger Sidechain
-        _ (let [trig-env (env-gen (perc duck-attack duck-release) :level-scale duck-trigger)]
-            (out:kr duck-bus trig-env))
-        ;; Read Sidechain
-        duck-env (in:kr duck-bus)
-        amp-duck (ov/clip (- 1 (* duck duck-env)) 0 1)
+(def-strudel-synth hat [freq 8000]
+  (white-noise))
 
-        noise (ov/lpf (white-noise) lpf)
-        snd (+ (* 0.5 (sin-osc freq)) (* 0.8 noise))
-        filt (ov/hpf snd (s-max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (s-max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator
-              dst
-              (ov/lin-lin crush 0 1 44100 2000)
-              (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0)
-              [gated
-               (+ gated
-                 (comb-n
-                   gated
-                   0.5
-                   (s-max 0.0001 delay)
-                   (* delay repeats)))])
-        reverbed (free-verb dly room room-size damp)
-        _ (detect-silence reverbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* reverbed amp amp-duck) pan))))
-
-(defsynth hat [amp 1 sustain 0.1 freq 8000 lpf 6000 pan 0
-               crush 0 distort 0
-               hpf 0 bpf -1 room 0 delay 0 repeats 4
-               duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2
-               room-size 0.5 damp 0.5]
-  (let [env (env-gen (perc 0.001 sustain) :action NO-ACTION)
-        ;; Trigger Sidechain
-        _ (let [trig-env (env-gen (perc duck-attack duck-release) :level-scale duck-trigger)]
-            (out:kr duck-bus trig-env))
-        ;; Read Sidechain
-        duck-env (in:kr duck-bus)
-        amp-duck (ov/clip (- 1 (* duck duck-env)) 0 1)
-
-        snd (ov/hpf (white-noise) lpf)
-        filt (ov/hpf snd (s-max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (s-max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator
-              dst
-              (ov/lin-lin crush 0 1 44100 2000)
-              (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select
-              (> delay 0)
-              [gated
-               (+ gated
-                 (comb-n
-                   gated
-                   0.5
-                   (s-max 0.0001 delay)
-                   (* delay repeats)))])
-        reverbed (free-verb dly room room-size damp)
-        _ (detect-silence reverbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* reverbed amp amp-duck) pan))))
-
-(defsynth clap [amp 1 sustain 0.1 freq 1200 lpf 1500 resonance 0.2 pan 0
-                crush 0 distort 0
-                hpf 0 bpf -1 room 0 delay 0 repeats 4
-                duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2
-                room-size 0.5 damp 0.5]
-  (let [env (env-gen (perc 0.005 sustain) :action NO-ACTION)
-        ;; Trigger Sidechain
-        _ (let [trig-env (env-gen (perc duck-attack duck-release) :level-scale duck-trigger)]
-            (out:kr duck-bus trig-env))
-        ;; Read Sidechain
-        duck-env (in:kr duck-bus)
-        amp-duck (ov/clip (- 1 (* duck duck-env)) 0 1)
-
-        snd (ov/bpf (white-noise) freq resonance)
-        filt (ov/hpf snd (s-max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (s-max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator
-              dst
-              (ov/lin-lin crush 0 1 44100 2000)
-              (ov/lin-lin crush 0 1 24 4))
-        gated (* crs env)
-        dly (select (> delay 0)
-              [gated
-               (+ gated
-                 (comb-n
-                   gated
-                   0.5
-                   (s-max 0.0001 delay)
-                   (* delay repeats)))])
-        reverbed (free-verb dly room room-size damp)
-        _ (detect-silence reverbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* reverbed amp amp-duck) pan))))
+(def-strudel-synth clap [freq 1200]
+  (ov/bpf (white-noise) freq resonance))
 
 (def-strudel-synth saw [freq 440 detune 0 vibrato 0]
   (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))
-        f-vib (ov/vibrato:kr f-raw vibrato 0.02)
-        snd (saw f-vib)]
-    (rlpf snd lpf resonance)))
+        f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
+    (saw f-vib)))
 
 (def-strudel-synth sine [freq 440 detune 0 vibrato 0]
   (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))
-        f-vib (ov/vibrato:kr f-raw vibrato 0.02)
-        snd (sin-osc f-vib)]
-    (rlpf snd lpf resonance)))
+        f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
+    (sin-osc f-vib)))
 
 (def-strudel-synth square [freq 440 detune 0 vibrato 0 width 0.5]
   (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))
-        f-vib (ov/vibrato:kr f-raw vibrato 0.02)
-        snd (pulse f-vib width)]
-    (rlpf snd lpf resonance)))
+        f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
+    (pulse f-vib width)))
 
 (def-strudel-synth tri [freq 440 detune 0 vibrato 0]
   (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))
-        f-vib (ov/vibrato:kr f-raw vibrato 0.02)
-        snd (lf-tri f-vib)]
-    (rlpf snd lpf resonance)))
+        f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
+    (lf-tri f-vib)))
 
 (def-strudel-synth fm
   [freq 440
@@ -260,40 +164,40 @@
         modulator (sin-osc (* f-vib modulator-ratio))
         carrier (sin-osc (+ (* f-vib carrier-ratio)
                             (* modulator mod-index f-vib)))]
-    (rlpf carrier lpf resonance)))
+    carrier))
 
 ;; --- Noise Synths ---
 
-(def-strudel-synth white [freq 440] (rlpf (white-noise) lpf resonance))
-(def-strudel-synth pink [freq 440] (rlpf (pink-noise) lpf resonance))
-(def-strudel-synth brown [freq 440] (rlpf (brown-noise) lpf resonance))
-(def-strudel-synth gray [freq 440] (rlpf (gray-noise) lpf resonance))
-(def-strudel-synth clip [freq 440] (rlpf (clip-noise) lpf resonance))
+(def-strudel-synth white [freq 440] (white-noise))
+(def-strudel-synth pink [freq 440] (pink-noise))
+(def-strudel-synth brown [freq 440] (brown-noise))
+(def-strudel-synth gray [freq 440] (gray-noise))
+(def-strudel-synth clip [freq 440] (clip-noise))
 
 (def-strudel-synth crackle
   [freq 440
    chaos 1.5]
-  (rlpf (crackle chaos) lpf resonance))
+  (crackle chaos))
 
 (def-strudel-synth dust [freq 440 detune 0]
   (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
-    (rlpf (dust f-raw) lpf resonance)))
+    (dust f-raw)))
 
 (def-strudel-synth dust2 [freq 440 detune 0]
   (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
-    (rlpf (dust2 f-raw) lpf resonance)))
+    (dust2 f-raw)))
 
 (def-strudel-synth lf-noise0 [freq 440 detune 0]
   (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
-    (rlpf (lf-noise0 f-raw) lpf resonance)))
+    (lf-noise0 f-raw)))
 
 (def-strudel-synth lf-noise1 [freq 440 detune 0]
   (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
-    (rlpf (lf-noise1 f-raw) lpf resonance)))
+    (lf-noise1 f-raw)))
 
 (def-strudel-synth lf-noise2 [freq 440 detune 0]
   (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
-    (rlpf (lf-noise2 f-raw) lpf resonance)))
+    (lf-noise2 f-raw)))
 
 (def-strudel-synth tb303 [freq 440 wave 1 env-amount 1000]
   (let [freqs [freq (* 1.01 freq)]
@@ -314,13 +218,12 @@
         comp1 (> input shift1)
         comp2 (> input shift2)
         comp3 (> input shift3)
-        comp4 (> input shift4)
-        output (leak-dc:ar
-                 (* (- (+ (- input comp1)
-                          (- input comp2)
-                          (- input comp3)
-                          (- input comp4)) input) 0.25))]
-    (rlpf output lpf resonance)))
+        comp4 (> input shift4)]
+    (leak-dc:ar
+      (* (- (+ (- input comp1)
+               (- input comp2)
+               (- input comp3)
+               (- input comp4)) input) 0.25))))
 
 (def-strudel-synth mooger
   [freq 440
@@ -337,82 +240,22 @@
 (def-strudel-synth ks-stringer [freq 440 coef 0.5]
   (let [noize (* 0.8 (white-noise))
         trig (impulse:kr 0)
-        delay-time (/ 1.0 freq)
-        plk (pluck noize trig delay-time delay-time 10 coef)]
-    (rlpf plk lpf resonance)))
+        delay-time (/ 1.0 freq)]
+    (pluck noize trig delay-time delay-time 10 coef)))
 
-(defsynth dub-kick [freq 80 amp 1 sustain 0.3 lpf 2000 pan 0
-                    crush 0 distort 0
-                    hpf 0 bpf -1 room 0 delay 0 repeats 4
-                    duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2
-                    room-size 0.5 damp 0.5]
+(def-strudel-synth dub-kick [freq 80]
   (let [lpf-env (perc 0.001 1 freq -20)
-        ;; Trigger Sidechain
-        _ (let [trig-env (env-gen (perc duck-attack duck-release) :level-scale duck-trigger)]
-            (out:kr duck-bus trig-env))
-        ;; Read Sidechain
-        duck-env (in:kr duck-bus)
-        amp-duck (ov/clip (- 1 (* duck duck-env)) 0 1)
-
         amp-env (perc 0.001 1 1 -8)
         osc-env (perc 0.001 1 freq -8)
         noiz (ov/lpf (white-noise) (+ (env-gen:kr lpf-env) 20))
-        snd (ov/lpf (sin-osc (+ (env-gen:kr osc-env) 20)) 200)
-        mixed (* (+ noiz snd) (env-gen amp-env :action NO-ACTION))
-        ;; Standard chain
-        filt (ov/hpf mixed (s-max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (s-max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator
-              dst
-              (ov/lin-lin crush 0 1 44100 2000)
-              (ov/lin-lin crush 0 1 24 4))
-        gated crs ;; env already applied
-        dly (select (> delay 0)
-              [gated
-               (+ gated
-                 (comb-n gated 0.5
-                   (s-max 0.0001 delay)
-                   (* delay repeats)))])
-        reverbed (free-verb dly room room-size damp)
-        _ (detect-silence reverbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* reverbed amp amp-duck) pan))))
+        snd (ov/lpf (sin-osc (+ (env-gen:kr osc-env) 20)) 200)]
+    (* (+ noiz snd) (env-gen amp-env :action NO-ACTION))))
 
-(defsynth dance-kick [freq 80 amp 1 sustain 0.3 lpf 2000 pan 0
-                      crush 0 distort 0
-                      hpf 0 bpf -1 room 0 delay 0 repeats 4
-                      duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2
-                      room-size 0.5 damp 0.5]
-  (let [env (env-gen (perc 0.001 1) :action NO-ACTION)
-        ;; Trigger Sidechain
-        _ (let [trig-env (env-gen (perc duck-attack duck-release) :level-scale duck-trigger)]
-            (out:kr duck-bus trig-env))
-        ;; Read Sidechain
-        duck-env (in:kr duck-bus)
-        amp-duck (ov/clip (- 1 (* duck duck-env)) 0 1)
-
-        freq-env (env-gen (perc 0.001 0.1))
+(def-strudel-synth dance-kick [freq 80]
+  (let [freq-env (env-gen (perc 0.001 0.1))
         snd (sin-osc (+ freq (* freq-env 200)))
-        click (ov/lpf (white-noise) (+ 500 (* freq-env 2000)))
-        mixed (+ snd (* 0.3 click))
-        gated (* mixed env)
-        ;; Standard chain
-        filt (ov/hpf gated (s-max 20 hpf))
-        filt (select (> bpf 0) [filt (ov/bpf filt (s-max 20 bpf) 1)])
-        dst (ov/distort (* filt (ov/dbamp (* distort 24))))
-        crs (decimator dst
-              (ov/lin-lin crush 0 1 44100 2000)
-              (ov/lin-lin crush 0 1 24 4))
-        gated crs
-        dly (select (> delay 0)
-              [gated
-               (+ gated
-                 (comb-n gated 0.5
-                   (s-max 0.0001 delay)
-                   (* delay repeats)))])
-        reverbed (free-verb dly room room-size damp)
-        _ (detect-silence reverbed :amp 0.0001 :time 0.2 :action FREE)]
-    (out 0 (pan2 (* reverbed amp amp-duck) pan))))
+        click (ov/lpf (white-noise) (+ 500 (* freq-env 2000)))]
+    (+ snd (* 0.3 click))))
 
 ;; --- Pattern Engine ---
 
@@ -708,6 +551,48 @@
    Values: 1.0 (normal), 0.5 (half speed), -1.0 (reverse), etc."
   [pattern val] (set-param pattern :rate val))
 
+(defn pshift
+  "Sets the pitch shift in semitones.
+   Uses a time-domain granular pitch shifter.
+   Values: -24 to 24 (default 0)."
+  [pattern val] (set-param pattern :pshift val))
+
+(defn fshift
+  "Sets the frequency shift in Hz.
+   Shifts all frequencies by a fixed amount.
+   Values: -2000 to 2000 (default 0)."
+  [pattern val] (set-param pattern :fshift val))
+
+(defn tremolo-hz
+  "Sets the tremolo (amplitude modulation) frequency in Hz.
+   Values: 0.1 to 20 (default 0)."
+  [pattern val] (set-param pattern :tremolo-hz val))
+
+(defn tremolo-depth
+  "Sets the tremolo depth.
+   Values: 0.0 (none) to 1.0 (full modulation)."
+  [pattern val] (set-param pattern :tremolo-depth val))
+
+(defn pan-hz
+  "Sets the auto-pan (panning modulation) frequency in Hz.
+   Values: 0.1 to 20 (default 0)."
+  [pattern val] (set-param pattern :pan-hz val))
+
+(defn pan-depth
+  "Sets the auto-pan depth.
+   Values: 0.0 (center) to 1.0 (full stereo sweep)."
+  [pattern val] (set-param pattern :pan-depth val))
+
+(defn phaser-hz
+  "Sets the phaser frequency in Hz.
+   Values: 0.1 to 10 (default 0)."
+  [pattern val] (set-param pattern :phaser-hz val))
+
+(defn phaser-depth
+  "Sets the phaser depth (mix).
+   Values: 0.0 (dry) to 1.0 (wet)."
+  [pattern val] (set-param pattern :phaser-depth val))
+
 (defn begin
   "Sets the start position of the sample (0.0 to 1.0)."
   [pattern val] (set-param pattern :begin val))
@@ -906,7 +791,7 @@
                                   (apply-swing orig-start swing-amount min-dur))
                     ;; Assoc effective start time for logging/debugging
                     ev (assoc ev :effective-time swung-start)
-                    
+
                     rel-dur (:duration ev)
                     ev-beat (+ beat (* swung-start cycle-dur))
                     ev-dur-beats (* rel-dur cycle-dur)]
@@ -1148,7 +1033,7 @@
 
   (play!
    :kick (->
-          (s [[:kick] :_ [:- :kick] :_])
+          (s [[:dub-kick] :_ [:- :kick] :_])
           #_(s [:kick :- :kick :-])
           (note :d1)
           (env :perc)
@@ -1245,14 +1130,13 @@
            (s [:dance-kick :dance-kick :dance-kick :dance-kick])
            (fast 2)
            (gain 0.8))
-
    )
 
   (play!
 
    :plucks (->
              (note (chosen-from (chord :c4 :minor) 4))
-            (s :tb303)
+            (s :ks-stringer)
             (env :perc)
             (fast 1)
             (swing [0.3])
@@ -1285,10 +1169,10 @@
            (duck 0.9))
     :pad (->
            (note [:c5 [:b4 :b4 :c5]])
+           (s [#{:mooger}])
            (add [-24])
            (attack 0.2)
            (release 1)
-           (s [#{:mooger}])
            (gain 0.5)
            (s-level 1)
            (duck 0.8)))
@@ -1302,24 +1186,27 @@
   (play!
     :c (->
          (s [[:cq :cq] :-])
-         (rate 1.0)
-         (begin 0.0)
-         (end 0.45)
+         (end 0.4)
          (attack 0)
-         (room 0.5)
          (release 0))
     :q (->
          (s [:- [:cq :cq :cq]])
          (rate 1.0)
-         (begin 0.45)
+         (begin 0.57)
          (end 1.0)
-         (room 0.5)
          (attack 0)
-         (release 0))
+         (release 0)
+         )
     )
 
   (stop!)
 
+  (play! (->
+           (note [:c1 :d1 :e1])
+           (s [:sine])
+           (pan-hz 5)
+           (pan-depth 1)
+           ))
 
   .)
 
