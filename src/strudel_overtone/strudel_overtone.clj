@@ -961,6 +961,16 @@
             (apply-by (metro start-beat) #'play-loop [key start-beat])))))
     (map first pairs)))
 
+(defn play-only!
+  "Like play!, but stops any other patterns that are currently playing."
+  [& args]
+  (let [pairs (if (= 1 (count args))
+                [[:main (first args)]]
+                (partition 2 args))
+        new-keys (set (map first pairs))]
+    (swap! player-state update :patterns select-keys new-keys)
+    (apply play! args)))
+
 (defn stop!
   ([] (swap! player-state assoc :playing? false :patterns {} :loops #{}))
   ([key] (swap! player-state update :patterns dissoc key)))
@@ -1330,7 +1340,7 @@
 
   (stop!)
 
-  (play!
+  (play-only!
    :bass (->
           (note [#{:c1 :e1} [:e1 :g1]])
           (s [#{:tri :sine :square}])
@@ -1344,15 +1354,18 @@
                  [:clap-808 :clap-808]
                  :clap-808
                  [:clap-808 :clap :clap-808]])
-             (gain 0.3)))
+             (gain 0.3))
+   )
 
   (stop!)
+
+  (cpm 40)
 
   (load-sample!
    :clap-808
    "samples/99sounds/clap-808.wav")
 
-  (play! :clap (->
+  (play-only! :clap (->
                 (s [:clap-808 :clap-808 :clap-808])
                 (pan [1 0 -1])
                 (gain 0.2)))
@@ -1363,8 +1376,10 @@
 
   (fade-cpm 20 4)
 
-  (play!
-   :drone (-> (s [#{:drone-slice} :drone-slice])
+  (play-only!
+    :kick (-> (s [:dub-kick :dub-kick]))
+    :clap (-> (s [:- :clap-808 :- [:clap-808 :clap-808]]))
+    :drone (-> (s [#{:drone-slice} :drone-slice])
               (attack 0.5)
               (release 0.01)
               (pan-depth 0.75)
@@ -1374,6 +1389,10 @@
   (playing)
 
   (stop! :drone)
+
+  (stop!)
+
+  (stop)
 
   .)
 
