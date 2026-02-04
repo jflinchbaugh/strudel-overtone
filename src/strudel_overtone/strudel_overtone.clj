@@ -665,14 +665,16 @@
   [name path]
   (if-let [buf (try (ov/load-sample path)
                     (catch Exception e
-                      (println "Failed to load sample:" path (.getMessage e))
+                      (tel/log!
+                        :error
+                        {:sample {:path path :failed (.getMessage e)}})
                       nil))]
     (do
       (swap! samples assoc (str/replace (str name) #"^:" "") buf)
-      (println "Loaded sample:" name)
+      (tel/log! :info {:sample-loaded {:name name :from-path path}})
       name)
     (do
-      (println "Sample not loaded:" path)
+      (tel/log! :warn {:sample-not-loaded {:name name :from-path path}})
       nil)))
 
 (defn slice-sample!
@@ -685,7 +687,7 @@
   (let [s-name (str/replace (str name) #"^:" "")
         src-name (str/replace (str source-name) #"^:" "")]
     (swap! sample-slices assoc s-name {:source src-name :begin begin :end end})
-    (println "Sliced sample:" name "from" source-name)))
+    (tel/log! :info {:sample-sliced {:name name :from source-name}})))
 
 (def-strudel-synth sampler [buf 0 rate 1 begin 0 end 1 loop? 0 attack 0 release 0]
   (let [rate-s (* rate (buf-rate-scale buf))
@@ -880,7 +882,7 @@
 
 (defn -main [& args]
   (connect-server)
-  (println "Strudel-Overtone Ready."))
+  (tel/log! :info {:studel-overtone :ready}))
 
 (comment
 
@@ -1264,18 +1266,23 @@
    "samples/99sounds/clap-808.wav")
 
   (play! (->
-          (s [:clap-808])
+          (s [:clap-808 :clap-808 :clap-808])
+          (pan [1 0 -1])
           (gain 0.2)))
 
   (load-sample! :drone "samples/inferno/Drone - Stellar Overdrive (C).wav")
 
   (slice-sample! :drone-slice :drone 0.15 0.55)
 
+  (fade-cpm 30 4)
+
   (play!
-   :drone (-> (s [:drone-slice :drone-slice :-])
+   :drone (-> (s [:drone-slice :drone-slice :drone-slice])
               (attack 0.5)
               (release 0.01)
-              (rate -1.0)))
+              (pan-depth 1)
+              (pan-hz 2)
+              (rate 1.0)))
 
 
   (playing)

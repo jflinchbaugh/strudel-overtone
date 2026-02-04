@@ -153,7 +153,7 @@
         (testing "active event is triggered"
           (reset! mock-calls [])
           (sut/trigger-event (sut/->Event 0 1 {:sound "bd" :active 1}) 0 1)
-          (is (= 2 (count @mock-calls)))) ;; println and synth-fn
+          (is (= 2 (count @mock-calls)))) ;; log! and synth-fn
 
         (testing "inactive event is not triggered"
           (reset! mock-calls [])

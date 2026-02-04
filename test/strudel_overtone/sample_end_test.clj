@@ -22,7 +22,7 @@
                 (let [ev (sut/->Event 0 1 {:sound "test" :end 0.5})]
                   (sut/trigger-event ev 0 2)
 
-                  (let [synth-call (second @mock-calls) ;; first is println
+                  (let [synth-call (second @mock-calls) ;; first is log!
                         args (first (:args synth-call))
                         args-map (apply hash-map args)]
                     (is (sut-test/approx= 1.0 (:sustain args-map)))))
@@ -35,7 +35,7 @@
                 (let [ev (sut/->Event 0 1 {:sound "test" :begin 0.1 :end 0.6 :rate 2.0 :release 0.1})]
                   (sut/trigger-event ev 0 2)
 
-                  (let [synth-call (second @mock-calls)
+                  (let [synth-call (second @mock-calls) ;; first is log!
                         args (first (:args synth-call))
                         args-map (apply hash-map args)]
                     (is (sut-test/approx= 0.4 (:sustain args-map)))))
@@ -48,7 +48,7 @@
                 (let [ev (sut/->Event 0 1 {:sound "test" :end 0.5 :env "perc" :attack 0.05})]
                   (sut/trigger-event ev 0 2)
 
-                  (let [synth-call (second @mock-calls)
+                  (let [synth-call (second @mock-calls) ;; first is log!
                         args (first (:args synth-call))
                         args-map (apply hash-map args)]
                     (is (sut-test/approx= 0.95 (:sustain args-map)))))
