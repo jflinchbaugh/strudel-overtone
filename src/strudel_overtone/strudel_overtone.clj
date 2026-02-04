@@ -746,6 +746,7 @@
                             (catch Exception _ 2000))
                        c))
             ;; Calculate sustain in seconds
+            step-dur-sec (* dur-beats (/ 60 (metro-bpm metro)))
             param-sustain (:sustain params)
             sustain-sec (cond
                           param-sustain
@@ -760,6 +761,7 @@
                                 abs-r (Math/abs (double r))
                                 dur (:duration sample-buf)
                                 total-dur (* (Math/abs (double (- e b))) dur (/ 1 (max 0.001 abs-r)))
+                                total-dur (min total-dur step-dur-sec)
                                 env (get params :env "adsr")]
                             (if (= env "perc")
                               (let [attack (let [a (get params :attack 0)]
@@ -770,7 +772,7 @@
                                 (max 0.001 (- total-dur release)))))
 
                           :else
-                          (* dur-beats (/ 60 (metro-bpm metro))))]
+                          step-dur-sec)]
 
         (when sound-name
           (let [base (if sample-buf "sampler" (get synth-aliases sound-name sound-name))
@@ -1255,7 +1257,17 @@
     :clap-808
     "samples/99sounds/clap-808.wav")
 
-  (play! (-> (s (repeat 8 [:clap-808])) (gain 0.2) (fshift 0)))
+  (play! (->
+           (s ([:drone-loud]))
+           (gain 0.2)))
+
+  (load-sample! :drone "samples/inferno/Drone - Stellar Overdrive (C).wav")
+  (slice-sample! :drone-slice :drone 0.2 0.55)
+
+  (play!
+    :drone (-> (s [:drone-slice :drone-slice :-])
+             (attack 0)
+             (release 0)))
 
   .)
 

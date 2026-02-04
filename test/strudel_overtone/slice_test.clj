@@ -41,4 +41,15 @@
                   args-map (apply hash-map args)]
               (is (= 1 (:buf args-map)))
               (is (sut-test/approx= 0.5 (:begin args-map)))
-              (is (sut-test/approx= 0.6 (:end args-map))))))))))
+              (is (sut-test/approx= 0.6 (:end args-map))))))
+
+        (testing "long slices are truncated to step duration"
+          (reset! mock-calls [])
+          (sut/slice-sample! :long-slice :break 0.0 0.5) ; 0.5 * 4.0 = 2.0s
+          ;; step duration is 1 beat = 0.5s
+          (let [ev (sut/->Event 0 0.25 {:sound "long-slice"})]
+            (sut/trigger-event ev 0 1) ; dur-beats = 1
+            (let [synth-call (second @mock-calls)
+                  args (first (:args synth-call))
+                  args-map (apply hash-map args)]
+              (is (sut-test/approx= 0.5 (:sustain args-map))))))))))
