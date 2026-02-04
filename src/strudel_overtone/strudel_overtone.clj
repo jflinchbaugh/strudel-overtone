@@ -669,8 +669,11 @@
                       nil))]
     (do
       (swap! samples assoc (str/replace (str name) #"^:" "") buf)
-      (println "Loaded sample:" name))
-    (println "Sample not loaded:" path)))
+      (println "Loaded sample:" name)
+      name)
+    (do
+      (println "Sample not loaded:" path)
+      nil)))
 
 (defn slice-sample!
   "Creates a new virtual sample instrument from a slice of an existing sample.
@@ -1253,6 +1256,8 @@
             (gain 0.3)))
 
 
+  (stop!)
+
   (load-sample!
     :clap-808
     "samples/99sounds/clap-808.wav")
@@ -1262,12 +1267,14 @@
            (gain 0.2)))
 
   (load-sample! :drone "samples/inferno/Drone - Stellar Overdrive (C).wav")
-  (slice-sample! :drone-slice :drone 0.2 0.55)
+
+  (slice-sample! :drone-slice :drone 0.15 0.55)
 
   (play!
     :drone (-> (s [:drone-slice :drone-slice :-])
-             (attack 0)
-             (release 0)))
+             (attack 0.5)
+             (release 0.01)
+             (rate -1.0)))
 
   .)
 
