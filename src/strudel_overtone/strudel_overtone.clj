@@ -848,6 +848,12 @@
       ;; Stopped, loop dies
       (swap! player-state update :loops disj key))))
 
+(defn playing
+  "Returns a list of the names of the currently playing patterns.
+  nil if nothing is playing"
+  []
+  (seq (:loops @player-state)))
+
 (defn play!
   [& args]
   (let [pairs (if (= 1 (count args))
@@ -1271,5 +1277,10 @@
               (release 0.01)
               (rate -1.0)))
 
+
+  (playing)
+
   .)
+
+
 
