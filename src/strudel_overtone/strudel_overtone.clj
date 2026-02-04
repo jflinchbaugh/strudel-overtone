@@ -46,58 +46,58 @@
                                 ~'snd (do ~@body)
                                 ;; Effect Chain
                                 ;; Pitch Shift bypass
-                                ~'ps (let [~'use-ps (~' > (ov/absdif ~'pshift 0) 0.01)
-                                           ~'ps-sig (ov/pitch-shift ~'snd 0.2 (ov/pow 2 (~' / ~'pshift 12)))]
+                                ~'ps (let [~'use-ps (~'> (ov/absdif ~'pshift 0) 0.01)
+                                           ~'ps-sig (ov/pitch-shift ~'snd 0.2 (ov/pow 2 (~'/ ~'pshift 12)))]
                                        (ov/x-fade2 ~'snd ~'ps-sig (ov/lin-lin ~'use-ps 0 1 -1 1)))
 
                                 ;; Freq Shift bypass
-                                ~'fs (let [~'use-fs (~' > (ov/absdif ~'fshift 0) 0.01)
+                                ~'fs (let [~'use-fs (~'> (ov/absdif ~'fshift 0) 0.01)
                                            ~'fs-sig (ov/freq-shift ~'ps ~'fshift)]
                                        (ov/x-fade2 ~'ps ~'fs-sig (ov/lin-lin ~'use-fs 0 1 -1 1)))
 
                                 ~'trem (let [~'dry ~'fs
-                                             ~'wet (~' * ~'dry (ov/lin-lin (ov/sin-osc:kr ~'tremolo-hz) -1 1 (~' - 1 ~'tremolo-depth) 1))]
-                                         (ov/x-fade2 ~'dry ~'wet (ov/lin-lin (~' > ~'tremolo-depth 0) 0 1 -1 1)))
+                                             ~'wet (~'* ~'dry (ov/lin-lin (ov/sin-osc:kr ~'tremolo-hz) -1 1 (~'- 1 ~'tremolo-depth) 1))]
+                                         (ov/x-fade2 ~'dry ~'wet (ov/lin-lin (~'> ~'tremolo-depth 0) 0 1 -1 1)))
 
                                 ~'phs (let [~'dry ~'trem
                                             ~'wet (ov/allpass-n ~'dry 0.02
-                                                  (ov/lin-lin (ov/sin-osc:kr ~'phaser-hz) -1 1 0.001 0.01)
-                                                  0.1)]
+                                                                (ov/lin-lin (ov/sin-osc:kr ~'phaser-hz) -1 1 0.001 0.01)
+                                                                0.1)]
                                         (ov/x-fade2 ~'dry ~'wet (ov/lin-lin ~'phaser-depth 0 1 -1 1)))
 
                                 ~'filt (ov/hpf ~'phs (~'s-max 20 ~'hpf))
                                 ~'filt (let [~'bpf-sig (ov/bpf ~'filt (~'s-max 20 ~'bpf) 1)]
-                                         (ov/x-fade2 ~'filt ~'bpf-sig (ov/lin-lin (~' > ~'bpf 0) 0 1 -1 1)))
+                                         (ov/x-fade2 ~'filt ~'bpf-sig (ov/lin-lin (~'> ~'bpf 0) 0 1 -1 1)))
                                 ~'filt (ov/rlpf ~'filt (~'s-max 20 ~'lpf) ~'resonance)
 
                                 ~'dst (ov/distort
-                                        (~' * ~'filt
-                                         (ov/dbamp (~' * ~'distort 24))))
+                                       (~'* ~'filt
+                                            (ov/dbamp (~'* ~'distort 24))))
 
                                 ;; Decimator bypass - critical for ringing
                                 ~'crs (let [~'dry ~'dst
                                             ~'wet (decimator ~'dry
-                                                  (ov/lin-lin ~'crush 0 1 44100 2000)
-                                                  (ov/lin-lin ~'crush 0 1 24 4))]
-                                        (ov/x-fade2 ~'dry ~'wet (ov/lin-lin (~' > ~'crush 0) 0 1 -1 1)))
+                                                             (ov/lin-lin ~'crush 0 1 44100 2000)
+                                                             (ov/lin-lin ~'crush 0 1 24 4))]
+                                        (ov/x-fade2 ~'dry ~'wet (ov/lin-lin (~'> ~'crush 0) 0 1 -1 1)))
 
-                                ~'gated (~' * ~'crs ~'env)
+                                ~'gated (~'* ~'crs ~'env)
                                 ~'dly (let [~'dry ~'gated
-                                            ~'wet (~' + ~'dry
-                                                  (comb-n ~'dry 0.5
-                                                    (~'s-max 0.0001 ~'delay)
-                                                    (~' * ~'delay ~'repeats)))]
-                                        (ov/x-fade2 ~'dry ~'wet (ov/lin-lin (~' > ~'delay 0) 0 1 -1 1)))
+                                            ~'wet (~'+ ~'dry
+                                                       (comb-n ~'dry 0.5
+                                                               (~'s-max 0.0001 ~'delay)
+                                                               (~'* ~'delay ~'repeats)))]
+                                        (ov/x-fade2 ~'dry ~'wet (ov/lin-lin (~'> ~'delay 0) 0 1 -1 1)))
 
                                 ~'reverbed (free-verb ~'dly ~'room ~'room-size ~'damp)
                                 _# (detect-silence
-                                     ~'reverbed
-                                     :amp 0.0001
-                                     :time 0.2
-                                     :action FREE)
-                                ~'actual-pan (~' + ~'pan (let [~'mod (~' * (ov/sin-osc:kr ~'pan-hz) ~'pan-depth)]
-                                                           (~' * ~'mod (~' > ~'pan-depth 0))))]
-                            (out 0 (pan2 (~' * (ov/mix [~'reverbed]) ~'amp ~'amp-duck) ~'actual-pan))))))]
+                                    ~'reverbed
+                                    :amp 0.0001
+                                    :time 0.2
+                                    :action FREE)
+                                ~'actual-pan (~'+ ~'pan (let [~'mod (~'* (ov/sin-osc:kr ~'pan-hz) ~'pan-depth)]
+                                                          (~'* ~'mod (~'> ~'pan-depth 0))))]
+                            (out 0 (pan2 (~'* (ov/mix [~'reverbed]) ~'amp ~'amp-duck) ~'actual-pan))))))]
     `(do
        ~(make-synth "-adsr"
                     `(env-gen (adsr ~'attack ~'decay ~'s-level ~'release)
@@ -115,12 +115,12 @@
 
 (tel/stop-handlers!)
 (tel/add-handler! :console (tel/handler:console
-                             {:output-fn
-                              (fn [signal]
-                                (let [{:keys [inst msg_ data]} signal]
-                                  (str (t/format time-formatter (t/zoned-date-time inst)) " "
-                                       (or (force msg_) data)
-                                       "\n")))}))
+                            {:output-fn
+                             (fn [signal]
+                               (let [{:keys [inst msg_ data]} signal]
+                                 (str (t/format time-formatter (t/zoned-date-time inst)) " "
+                                      (or (force msg_) data)
+                                      "\n")))}))
 
 (def-strudel-synth kick [freq 60]
   (sin-osc (line:kr (* 2 freq) freq 0.1)))
@@ -223,10 +223,10 @@
         comp3 (> input shift3)
         comp4 (> input shift4)]
     (leak-dc:ar
-      (* (- (+ (- input comp1)
-               (- input comp2)
-               (- input comp3)
-               (- input comp4)) input) 0.25))))
+     (* (- (+ (- input comp1)
+              (- input comp2)
+              (- input comp3)
+              (- input comp4)) input) 0.25))))
 
 (def-strudel-synth mooger
   [freq 440
@@ -338,11 +338,11 @@
                                            new-events)]
                        (if (seq matches)
                          (map
-                           (fn [match]
-                               (assoc-in be
-                                 [:params key]
-                                 (get-in match [:params key])))
-                              matches)
+                          (fn [match]
+                            (assoc-in be
+                                      [:params key]
+                                      (get-in match [:params key])))
+                          matches)
                          [be])))
                    base-events))))
 
@@ -351,9 +351,9 @@
   ([pattern key val transform-fn]
    (if (sequential? val)
      (combine-patterns
-       pattern
-       (make-pattern (make-event-list val key transform-fn))
-       key)
+      pattern
+      (make-pattern (make-event-list val key transform-fn))
+      key)
      (with-param pattern key (transform-fn val)))))
 
 (defn s
@@ -744,10 +744,10 @@
                          (catch Exception _ 1.0))
                     a))
             lpf (let [c (or (:lpf params) 2000)]
-                     (if (string? c)
-                       (try (Double/parseDouble c)
-                            (catch Exception _ 2000))
-                       c))
+                  (if (string? c)
+                    (try (Double/parseDouble c)
+                         (catch Exception _ 2000))
+                    c))
             ;; Calculate sustain in seconds
             step-dur-sec (* dur-beats (/ 60 (metro-bpm metro)))
             param-sustain (:sustain params)
@@ -785,7 +785,7 @@
                            (resolve-synth base))
                 freq (if n
                        (resolve-note
-                         (+ (if (keyword? n) (ov/note n) n) note-offset))
+                        (+ (if (keyword? n) (ov/note n) n) note-offset))
                        nil)
                 reserved #{:sound :note :active :start :duration :env :add :swing}
                 handled #{:amp :lpf :sustain :freq}
@@ -863,7 +863,8 @@
         (when start-loop?
           (let [now (metro)
                 start-beat (+ now (- 4 (mod now 4)))]
-            (apply-by (metro start-beat) #'play-loop [key start-beat])))))))
+            (apply-by (metro start-beat) #'play-loop [key start-beat])))))
+    (map first pairs)))
 
 (defn stop!
   ([] (swap! player-state assoc :playing? false :patterns {} :loops #{}))
@@ -949,10 +950,10 @@
           (note [:g2 :f2 :g2 :g2 :g2])
           (gain (concat (range 0.0 1.0 0.05) (range 1.0 0.0 -0.05)))
           (lpf (map
-                 (partial * 1000)
-                 (concat
-                   (range 0.0 1.0 0.05)
-                   (range 1.0 0.0 -0.05))))
+                (partial * 1000)
+                (concat
+                 (range 0.0 1.0 0.05)
+                 (range 1.0 0.0 -0.05))))
           (s :fm)
           (fast 1)))
 
@@ -984,7 +985,7 @@
           (lpf 400)
           (fast 1/8)
           (gain [0.2]
-            #_(take 4 (chosen-from (map (partial * 1/16) (range 16))))))
+                #_(take 4 (chosen-from (map (partial * 1/16) (range 16))))))
 
    :bd (->
         (s [:bd :bd :- :-])
@@ -1095,18 +1096,18 @@
            (duck 1)
            (active (chosen-from [1 1 1 1] 2))
            #_(active 0))
-   :hat   (->
-           (s (repeat 8 :hat))
-           (gain 0.05)
-           (active (chosen-from [0 1 1] 8))
-           (duck 1)
-           #_(active 0))
-   :shaker   (->
-              (s (repeat 16 :clap))
-              (gain 0.20)
-              (active (chosen-from [0 1 1] 4))
-              (duck 1)
-              #_(active 0))
+   :hat (->
+         (s (repeat 8 :hat))
+         (gain 0.05)
+         (active (chosen-from [0 1 1] 8))
+         (duck 1)
+         #_(active 0))
+   :shaker (->
+            (s (repeat 16 :clap))
+            (gain 0.20)
+            (active (chosen-from [0 1 1] 4))
+            (duck 1)
+            #_(active 0))
    :bass (->
           (note [(set (take 3 (chord :f0 :minor)))
                  (set (take 3 (chord :bb0 :minor)))
@@ -1174,19 +1175,17 @@
    :dance (->
            (s [:dance-kick :dance-kick :dance-kick :dance-kick])
            (fast 2)
-           (gain 0.8))
-   )
+           (gain 0.8)))
 
   (play!
 
    :plucks (->
-             (note (chosen-from (chord :c4 :minor) 4))
+            (note (chosen-from (chord :c4 :minor) 4))
             (s :ks-stringer)
             (env :perc)
             (fast 1)
             (swing [0.3])
-            (gain 0.5))
-   )
+            (gain 0.5)))
 
   (cpm)
 
@@ -1195,32 +1194,31 @@
   (stop!)
 
   (play!
-    :kick (->
-            (s [#{[:kick :- :-] :dub-kick} :-
-                [:- #{[:kick :- :-] :dub-kick}] :-])
-            (note [:d2 :c2])
-            (gain 1)
-            (duck-trigger 1)
-            )
-    :snare (->
-             (s [:- :snare :- :snare])
-             (gain [0.6 0.8])
-             (swing [0.5 0.0])
-             (duck-trigger 1)
-             (note [:e3 :c3]))
-    :hat (->
-           (s (take 8 (cycle [:hat])))
-           (gain 0.5)
-           (duck 0.9))
-    :pad (->
-           (note [:c5 [:b4 :b4 :c5]])
-           (s [#{:mooger}])
-           (add [-24])
-           (attack 0.2)
-           (release 1)
-           (gain 0.5)
-           (s-level 1)
-           (duck 0.8)))
+   :kick (->
+          (s [#{[:kick :- :-] :dub-kick} :-
+              [:- #{[:kick :- :-] :dub-kick}] :-])
+          (note [:d2 :c2])
+          (gain 1)
+          (duck-trigger 1))
+   :snare (->
+           (s [:- :snare :- :snare])
+           (gain [0.6 0.8])
+           (swing [0.5 0.0])
+           (duck-trigger 1)
+           (note [:e3 :c3]))
+   :hat (->
+         (s (take 8 (cycle [:hat])))
+         (gain 0.5)
+         (duck 0.9))
+   :pad (->
+         (note [:c5 [:b4 :b4 :c5]])
+         (s [#{:mooger}])
+         (add [-24])
+         (attack 0.2)
+         (release 1)
+         (gain 0.5)
+         (s-level 1)
+         (duck 0.8)))
 
   (stop!)
 
@@ -1231,50 +1229,47 @@
   (slice-sample! :c :cq 0.42 1)
 
   (play!
-    :c (->
-         (s [#{:c :cq}])
-         (gain 0.5))
-    )
+   :c (->
+       (s [#{:c :cq}])
+       (gain 0.5)))
 
   (stop!)
 
   (play!
-    :bass (->
-            (note [#{:c1 :e1} [:e1 :g1]])
-           (s [#{:tri :sine :square}])
-           (gain [0.5 0.5])
-           #_(distort [0.5 1])
-           (pan-hz [5])
-           (env :perc)
-           (pan-depth [0.5])
-           )
-    :kick (-> (s [:dub-kick [:- :dub-kick]]))
-    :clap (-> (s [:clap-808
-                  [:clap-808 :clap-808]
-                  :clap-808
-                  [:clap-808 :clap :clap-808]])
-            (gain 0.3)))
-
+   :bass (->
+          (note [#{:c1 :e1} [:e1 :g1]])
+          (s [#{:tri :sine :square}])
+          (gain [0.5 0.5])
+          #_(distort [0.5 1])
+          (pan-hz [5])
+          (env :perc)
+          (pan-depth [0.5]))
+   :kick (-> (s [:dub-kick [:- :dub-kick]]))
+   :clap (-> (s [:clap-808
+                 [:clap-808 :clap-808]
+                 :clap-808
+                 [:clap-808 :clap :clap-808]])
+             (gain 0.3)))
 
   (stop!)
 
   (load-sample!
-    :clap-808
-    "samples/99sounds/clap-808.wav")
+   :clap-808
+   "samples/99sounds/clap-808.wav")
 
   (play! (->
-           (s ([:drone-loud]))
-           (gain 0.2)))
+          (s [:clap-808])
+          (gain 0.2)))
 
   (load-sample! :drone "samples/inferno/Drone - Stellar Overdrive (C).wav")
 
   (slice-sample! :drone-slice :drone 0.15 0.55)
 
   (play!
-    :drone (-> (s [:drone-slice :drone-slice :-])
-             (attack 0.5)
-             (release 0.01)
-             (rate -1.0)))
+   :drone (-> (s [:drone-slice :drone-slice :-])
+              (attack 0.5)
+              (release 0.01)
+              (rate -1.0)))
 
   .)
 

@@ -40,6 +40,14 @@
           (is (= #'strudel-overtone.strudel-overtone/play-loop (:func call)))
           (is (= [:test-pat 12.0] (:args call))))))))
 
+(deftest play!-return-value-test
+  (testing "play! returns the names of the patterns"
+    (reset! sut/player-state {:playing? false :patterns {} :loops #{}})
+    (with-redefs [sut/metro (constantly 0)
+                  ov/apply-by (fn [& _] nil)]
+      (is (= '(:main) (sut/play! {:events []})))
+      (is (= '(:p1 :p2) (sut/play! :p1 {:events []} :p2 {:events []}))))))
+
 (deftest play!-multi-test
   (testing "play! handles multiple patterns"
     (reset! sut/player-state {:playing? false :patterns {} :loops #{}})
