@@ -28,8 +28,8 @@
               (is (= 1 (:buf args-map)))
               (is (sut-test/approx= 0.0 (:begin args-map)))
               (is (sut-test/approx= 0.1 (:end args-map)))
-              ;; total dur is 0.4. release is 0.3. sustain should be 0.1
-              (is (sut-test/approx= 0.1 (:sustain args-map))))))
+              ;; total dur is 0.4. release is 0. sustain should be 0.4
+              (is (sut-test/approx= 0.4 (:sustain args-map))))))
 
         (testing "triggering another slice"
           (reset! mock-calls [])
