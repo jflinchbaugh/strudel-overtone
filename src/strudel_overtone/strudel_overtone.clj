@@ -1239,9 +1239,11 @@
            ))
 
 
-  (load-sample! :clap-808 "/home/john/workspace/music/samples/99sounds/clap-808.wav")
+  (load-sample!
+    :clap-808
+    "/home/john/workspace/strudel-overtone/samples/99sounds/clap-crushed.wav")
 
-  (play! (-> (s (repeat 8 [:clap-808])) (gain 0.2)))
+  (play! (-> (s (repeat 8 [:clap-808])) (gain 0.2) (fshift 120)))
 
   .)
 
