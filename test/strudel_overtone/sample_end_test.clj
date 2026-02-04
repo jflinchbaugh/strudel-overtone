@@ -21,7 +21,7 @@
         ;; sustain should be 1.0 - 0.3 = 0.7
         (let [ev (sut/->Event 0 1 {:sound "test" :end 0.5})]
           (sut/trigger-event ev 0 1)
-          
+
           (let [synth-call (second @mock-calls) ;; first is println
                 args (first (:args synth-call))
                 args-map (apply hash-map args)]
@@ -33,7 +33,7 @@
         ;; sustain should be 0.5 - 0.1 = 0.4
         (let [ev (sut/->Event 0 1 {:sound "test" :begin 0.1 :end 0.6 :rate 2.0 :release 0.1})]
           (sut/trigger-event ev 0 1)
-          
+
           (let [synth-call (second @mock-calls)
                 args (first (:args synth-call))
                 args-map (apply hash-map args)]
@@ -45,7 +45,7 @@
         ;; sustain should be 1.0 - 0.05 = 0.95
         (let [ev (sut/->Event 0 1 {:sound "test" :end 0.5 :env "perc" :attack 0.05})]
           (sut/trigger-event ev 0 1)
-          
+
           (let [synth-call (second @mock-calls)
                 args (first (:args synth-call))
                 args-map (apply hash-map args)]
@@ -55,7 +55,7 @@
         ;; Explicit sustain should take precedence over end
         (let [ev (sut/->Event 0 1 {:sound "test" :end 0.5 :sustain 5.0})]
           (sut/trigger-event ev 0 1)
-          
+
           (let [synth-call (second @mock-calls)
                 args (first (:args synth-call))
                 args-map (apply hash-map args)]

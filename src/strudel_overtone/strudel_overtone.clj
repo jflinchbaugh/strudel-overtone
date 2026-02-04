@@ -653,6 +653,7 @@
 ;; --- Sampling ---
 
 (defonce samples (atom {}))
+(defonce sample-slices (atom {}))
 
 (defn load-sample!
   "Loads a sample into the registry.
@@ -667,6 +668,18 @@
       (swap! samples assoc (str/replace (str name) #"^:" "") buf)
       (println "Loaded sample:" name))
     (println "Sample not loaded:" path)))
+
+(defn slice-sample!
+  "Creates a new virtual sample instrument from a slice of an existing sample.
+   name: The name for the new instrument (e.g., :kick)
+   source-name: The name of the loaded sample (e.g., :break)
+   begin: Start position (0.0 to 1.0)
+   end: End position (0.0 to 1.0)"
+  [name source-name begin end]
+  (let [s-name (str/replace (str name) #"^:" "")
+        src-name (str/replace (str source-name) #"^:" "")]
+    (swap! sample-slices assoc s-name {:source src-name :begin begin :end end})
+    (println "Sliced sample:" name "from" source-name)))
 
 (def-strudel-synth sampler [buf 0 rate 1 begin 0 end 1 loop? 0]
   (let [rate-s (* rate (buf-rate-scale buf))
@@ -701,7 +714,23 @@
       (let [sound-param (:sound params)
             n (:note params)
             sound-name (or sound-param (if n "saw" nil))
-            sample-buf (when sound-name (get @samples sound-name))
+            ;; Check if it's a slice first
+            slice (when sound-name (get @sample-slices sound-name))
+            effective-sound (if slice (:source slice) sound-name)
+            sample-buf (when effective-sound (get @samples effective-sound))
+
+            ;; Adjust begin/end if it's a slice
+            params (if slice
+                     (let [s-begin (:begin slice)
+                           s-end (:end slice)
+                           s-dur (- s-end s-begin)
+                           p-begin (get params :begin 0)
+                           p-end (get params :end 1)]
+                       (assoc params
+                              :begin (+ s-begin (* p-begin s-dur))
+                              :end (+ s-begin (* p-end s-dur))))
+                     params)
+
             note-offset (get params :add 0)
             amp (let [a (or (:amp params) 1.0)]
                   (if (string? a)
@@ -1191,18 +1220,18 @@
   ;; (load-sample! :break "/path/to/loop.wav")
   ;; (play! :drums (-> (s [:break]) (rate 1.0) (begin 0.2)))
   (load-sample! :cq "/usr/share/wsjtx/sounds/CQ.wav")
+  (slice-sample! :c :cq 0 0.4)
+
   (play!
     :c (->
-         (s [[:cq]])
-         (begin 0.2)
-         (end 0.7)
-         (release 0.2))
+         (s [[:c]])
+         (release 0.01))
     )
 
   (stop!)
 
   (play! (->
-           (note [:c1 :d1 :e1])
+           (note [:c1 [:d1 :c1 :-]])
            (s [:sine])
            ))
 
