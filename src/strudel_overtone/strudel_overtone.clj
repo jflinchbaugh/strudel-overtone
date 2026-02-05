@@ -792,8 +792,12 @@
    "hh" "hat"
    "cp" "clap"})
 
+(def ^:private percussive-synths
+  #{"kick" "snare" "hat" "clap" "bd" "sd" "hh" "cp" "dub-kick" "dance-kick"})
+
 (defn- get-synth-name [sound params]
-  (let [env (get params :env "adsr")]
+  (let [default-env (if (percussive-synths sound) "perc" "adsr")
+        env (get params :env default-env)]
     (str sound "-" env)))
 
 (defn- resolve-synth [name]
@@ -991,8 +995,6 @@
 
 (comment
 
-  (connect-server)
-
   ;; Play a bassline
   (play! :bass (-> (note [:c2 :g2]) (s :saw) (gain 0.5)))
 
@@ -1026,6 +1028,8 @@
   (play! :bass (-> (note [:c2])
                    (s [:sine :tri])))
 
+  (stop!)
+
   (play! :arp
          (->
           (note [:c4 :_ :d4 :_ :e4 :_ :f4 :_ :g4 :_ :f4 :_ :e4 :_ :d4 :_])
@@ -1039,6 +1043,7 @@
   (play! :hh
          (-> (s [:hh :hh :hh :hh])
              (fast 1)
+             (env :perc)
              (gain 0.3)))
 
   (play! :cp
@@ -1056,7 +1061,7 @@
          (-> (note [:f4 :a4 :c5 :b4])
              (s :tri)
              (fast 0.5)
-             (gain 0.8)))
+             (gain 0.2)))
 
   (play! :metal
          (->
@@ -1290,21 +1295,26 @@
            (fast 2)
            (gain 0.8)))
 
+    (chord :c4 :minor)
+    (scale :c4 :minor)
+
   (play!
 
    :plucks (->
-            (note (chosen-from (chord :c4 :minor) 4))
+            (note (chosen-from (chord :c4 :minor7) 16))
             (s :ks-stringer)
-            (env :perc)
-            (fast 1)
-            (swing [0.3])
-            (gain 0.5)))
+            (fast 1/4)
+            (duck-trigger 1)
+            (swing [0])
+            (gain 0.7)))
+
+  (:patterns @player-state)
 
   (cpm)
 
   (fade-cpm 44 8 2)
 
-  (stop!)
+  (stop! :plucks)
 
   (play!
    :kick (->
@@ -1316,20 +1326,20 @@
    :snare (->
            (s [:- :snare :- :snare])
            (gain [0.6 0.8])
-           (swing [0.5 0.0])
-           (duck-trigger 1)
+;           (duck-trigger 1)
            (note [:e3 :c3]))
    :hat (->
          (s (take 8 (cycle [:hat])))
-         (gain 0.5)
+         (gain 0.6)
          (duck 0.9))
    :pad (->
-         (note [:c5 [:b4 :b4 :c5]])
+         lnote [:c5 [:b4 :a4 :c5]])
          (s [#{:mooger}])
+         (resonance 2)
          (add [-24])
-         (attack 0.2)
-         (release 1)
-         (gain 0.5)
+         (attack 0.8)
+         (release 0.01)
+         (gain 0.4)
          (s-level 1)
          (duck 0.8)))
 
@@ -1362,8 +1372,7 @@
                  [:clap-808 :clap-808]
                  :clap-808
                  [:clap-808 :clap :clap-808]])
-             (gain 0.3))
-   )
+             (gain 0.3)))
 
   (stop!)
 
@@ -1374,9 +1383,9 @@
    "samples/99sounds/clap-808.wav")
 
   (play-only! :clap (->
-                (s [:clap-808 :clap-808 :clap-808])
-                (pan [1 0 -1])
-                (gain 0.2)))
+                     (s [:clap-808 :clap-808 :clap-808])
+                     (pan [1 0 -1])
+                     (gain 0.2)))
 
   (load-sample! :drone "samples/inferno/Drone - Stellar Overdrive (C).wav")
 
@@ -1385,14 +1394,19 @@
   (fade-cpm 20 4)
 
   (play-only!
-    :kick (-> (s [:dub-kick :dub-kick]))
-    :clap (-> (s [:- :clap-808 :- [:clap-808 :clap-808]]))
-    :drone (-> (s [#{:drone-slice} :drone-slice])
-              (attack 0.5)
-              (release 0.01)
-              (pan-depth 0.75)
-              (pan-hz (/ 30 (cpm)))
-              (rate 1.0)))
+   :kick (-> (s [:dub-kick :- :dub-kick :-]))
+   :clap (->
+           (s [:- :clap-808 :- [:clap-808 :clap-808]])
+           (pan-depth 0.75)
+           (pan-hz (/ 20 (cpm))))
+   :drone (->
+           (s [#{:drone-slice} :drone-slice])
+           (gain 0.5)
+           (attack 0.5)
+           (release 0.01)
+           (pan-depth 0.75)
+           (pan-hz (/ 30 (cpm)))
+           (rate 1.0)))
 
   (playing)
 
@@ -1404,12 +1418,12 @@
   (stop)
 
   (play!
-    :early (-> (s [:clap-808 :- :- :-]))
-    :later (-> (s [:sine :- :- :-])))
+   :early (-> (s [:clap-808 :- :- :-]))
+   :later (-> (s [:sine :- :- :-])))
 
   (play!
-    :early-1 (-> (s [:clap-808 :- :- :-]))
-    :later-2 (-> (s [:sine :- :- :-])))
+   :early-1 (-> (s [:clap-808 :- :- :-]))
+   :later-2 (-> (s [:sine :- :- :-])))
 
   .)
 

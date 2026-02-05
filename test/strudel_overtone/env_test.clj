@@ -4,10 +4,10 @@
             [overtone.core :as ov]))
 
 (deftest synth-lookup-test
-  (testing "get-synth-name resolves aliases"
+  (testing "get-synth-name resolves aliases and defaults"
     (is (= "saw-adsr" (#'sut/get-synth-name "saw" {})))
-    (is (= "bd-adsr" (#'sut/get-synth-name "bd" {})))
-    (is (= "sd-adsr" (#'sut/get-synth-name "sd" {}))))
+    (is (= "bd-perc" (#'sut/get-synth-name "bd" {})))
+    (is (= "sd-perc" (#'sut/get-synth-name "sd" {}))))
 
   (testing "get-synth-name handles env param"
     (is (= "bd-perc" (#'sut/get-synth-name "bd" {:env "perc"})))
