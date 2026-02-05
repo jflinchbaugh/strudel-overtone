@@ -7,7 +7,7 @@
   (< (Math/abs (- a b)) 0.01))
 
 (deftest play!-test
-  (testing "play! starts a loop aligned to 4 beats"
+  (testing "play! quantization logic"
     ;; Reset state
     (reset! sut/player-state {:playing? false :patterns {} :loops #{}})
 
@@ -15,30 +15,89 @@
       (with-redefs [sut/metro (fn
                                 ([] 10.5) ;; Mock current time: 10.5 beats
                                 ([b] (* b 1000))) ;; Mock beat->ms conversion
+                    ov/metro-bpm (constantly 120)
+                    ov/metronome (fn [& _] sut/metro)
                     ov/apply-at (fn [ms func & args]
                                   (swap! mock-calls conj {:ms ms :func func :args args}))
                     ov/apply-by (fn [ms func args]
-                                  (swap! mock-calls conj {:ms ms :func func :args args}))]
+                                  (swap! mock-calls conj {:ms ms :func func :args args}))
+                    ov/at (fn [ms body] (body))]
 
-        ;; Call play!
-        (sut/play! :test-pat {:events []})
+        (testing "first loop starts on the next cycle (quant = 4)"
+          (reset! mock-calls [])
+          (sut/play! :p1 {:events []})
+          ;; 10.5 -> next multiple of 4 is 12.0
+          (let [call (first @mock-calls)]
+            (is (= 12000.0 (:ms call)))
+            (is (= [:p1 12.0] (:args call)))))
 
-        ;; Verify state updated
+        (testing "subsequent loops align to 4-beat cycle (quant = 4)"
+          (reset! mock-calls [])
+          ;; :p1 is now in :loops
+          (sut/play! :p2 {:events []})
+          ;; 10.5 -> next multiple of 4 is 12.0
+          (let [call (first @mock-calls)]
+            (is (= 12000.0 (:ms call)))
+            (is (= [:p2 12.0] (:args call)))))))))
+
+(deftest play!-return-value-test
+  (testing "play! returns the names of the patterns"
+    (reset! sut/player-state {:playing? false :patterns {} :loops #{}})
+    (with-redefs [sut/metro (constantly 0)
+                  ov/metro-bpm (constantly 120)
+                  ov/metronome (constantly (constantly 0))
+                  ov/apply-by (fn [& _] nil)]
+      (is (= '(:main) (sut/play! {:events []})))
+      (is (= '(:p1 :p2) (sut/play! :p1 {:events []} :p2 {:events []}))))))
+
+(deftest play!-multi-test
+  (testing "play! handles multiple patterns"
+    (reset! sut/player-state {:playing? false :patterns {} :loops #{}})
+    (let [mock-calls (atom [])]
+      (with-redefs [sut/metro (fn ([] 10.5) ([b] (* b 1000)))
+                    ov/metro-bpm (constantly 120)
+                    ov/metronome (fn [& _] sut/metro)
+                    ov/apply-at (fn [ms func & args] (swap! mock-calls conj {:func func :args args}))
+                    ov/apply-by (fn [ms func args] (swap! mock-calls conj {:func func :args args}))]
+
+        (sut/play! :p1 {:events []} :p2 {:events []})
+
         (is (:playing? @sut/player-state))
-        (is (= :test-pat (first (:loops @sut/player-state))))
-        (is (= {:events []} (get-in @sut/player-state [:patterns :test-pat])))
+        (is (contains? (:loops @sut/player-state) :p1))
+        (is (contains? (:loops @sut/player-state) :p2))
+        (is (= {:events []} (get-in @sut/player-state [:patterns :p1])))
+        (is (= {:events []} (get-in @sut/player-state [:patterns :p2])))
 
-        ;; Verify apply-at called with correct quantization
-        ;; Current time 10.5. Next multiple of 4 is 12.0.
-        ;; 10.5 mod 4 = 2.5. 4 - 2.5 = 1.5. 10.5 + 1.5 = 12.0.
-        ;; beat->ms(12.0) -> 12000.
+        ;; Should have 2 calls to schedule loops
+        (is (= 2 (count @mock-calls)))))))
 
-        (is (= 1 (count @mock-calls)))
-        (let [call (first @mock-calls)]
-          (is (= 12000.0 (:ms call)))
-          ;; Check if func is the play-loop var.
-          (is (= #'strudel-overtone.strudel-overtone/play-loop (:func call)))
-          (is (= [:test-pat 12.0] (:args call))))))))
+(deftest play!-single-arg-test
+  (testing "play! with single argument defaults to :main"
+    (reset! sut/player-state {:playing? false :patterns {} :loops #{}})
+    (let [mock-calls (atom [])]
+      (with-redefs [sut/metro (fn ([] 10.5) ([b] (* b 1000)))
+                    ov/metro-bpm (constantly 120)
+                    ov/metronome (fn [& _] sut/metro)
+                    ov/apply-at (fn [ms func & args] (swap! mock-calls conj {:func func :args args}))
+                    ov/apply-by (fn [ms func args] (swap! mock-calls conj {:func func :args args}))]
+
+        (sut/play! {:events []})
+
+        (is (:playing? @sut/player-state))
+        (is (contains? (:loops @sut/player-state) :main))
+        (is (= {:events []} (get-in @sut/player-state [:patterns :main])))
+        (is (= 1 (count @mock-calls)))))))
+
+(deftest play!-extra-test
+  (testing "play! does not schedule loop if already running"
+    (reset! sut/player-state {:playing? true :patterns {} :loops #{:existing}})
+    (let [mock-calls (atom [])]
+      (with-redefs [sut/metro (constantly 0)
+                    ov/metro-bpm (constantly 120)
+                    ov/metronome (fn [& _] sut/metro)
+                    ov/apply-at (fn [& _] (swap! mock-calls conj :called))]
+        (sut/play! :existing {:events []})
+        (is (empty? @mock-calls))))))
 
 (deftest play!-return-value-test
   (testing "play! returns the names of the patterns"
@@ -55,15 +114,15 @@
       (with-redefs [sut/metro (fn ([] 10.5) ([b] (* b 1000)))
                     ov/apply-at (fn [ms func & args] (swap! mock-calls conj {:ms ms :func func :args args}))
                     ov/apply-by (fn [ms func args] (swap! mock-calls conj {:ms ms :func func :args args}))]
-        
+
         (sut/play! :p1 {:events []} :p2 {:events []})
-        
+
         (is (:playing? @sut/player-state))
         (is (contains? (:loops @sut/player-state) :p1))
         (is (contains? (:loops @sut/player-state) :p2))
         (is (= {:events []} (get-in @sut/player-state [:patterns :p1])))
         (is (= {:events []} (get-in @sut/player-state [:patterns :p2])))
-        
+
         ;; Should have 2 calls to schedule loops
         (is (= 2 (count @mock-calls)))))))
 
@@ -74,7 +133,7 @@
       (with-redefs [sut/metro (fn ([] 10.5) ([b] (* b 1000)))
                     ov/apply-at (fn [ms func & args] (swap! mock-calls conj {:ms ms :func func :args args}))
                     ov/apply-by (fn [ms func args] (swap! mock-calls conj {:ms ms :func func :args args}))]
-        
+
         (sut/play! {:events []})
 
         (is (:playing? @sut/player-state))
@@ -147,13 +206,15 @@
 
   (testing "trigger-event respects active parameter"
     (let [mock-calls (atom [])]
-      (with-redefs [ov/apply-at (fn [& _] (swap! mock-calls conj :called))
+      (with-redefs [ov/apply-at (fn [& _] (swap! mock-calls conj :log-called))
+                    sut/at-metro (fn [beat synth-var args] (swap! mock-calls conj :at-metro-called))
+                    sut/resolve-synth (constantly (fn [& _] (swap! mock-calls conj :synth-called)))
                     ov/metro-bpm (constantly 120)
                     sut/metro (constantly 0)]
         (testing "active event is triggered"
           (reset! mock-calls [])
           (sut/trigger-event (sut/->Event 0 1 {:sound "bd" :active 1}) 0 1)
-          (is (= 2 (count @mock-calls)))) ;; log! and synth-fn
+          (is (= 2 (count @mock-calls)))) ;; log-called and at-metro-called
 
         (testing "inactive event is not triggered"
           (reset! mock-calls [])
@@ -168,4 +229,4 @@
         (testing "event without active param is triggered"
           (reset! mock-calls [])
           (sut/trigger-event (sut/->Event 0 1 {:sound "bd"}) 0 1)
-          (is (= 2 (count @mock-calls))))))))
+          (is (= 2 (count @mock-calls)))))))) ;; log-called and at-metro-called

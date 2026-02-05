@@ -10,6 +10,7 @@
       (with-redefs [ov/metro-bpm (constantly 120)
                     sut/metro (constantly 0)
                     ov/apply-at (fn [ms func & args] (swap! mock-calls conj {:func func :args args}))
+                    sut/at-metro (fn [beat synth-var args] (swap! mock-calls conj {:func synth-var :args [args]}))
                     sut/samples (atom {"break" {:id 1 :duration 4.0}})
                     sut/sample-slices (atom {})
                     sut/sampler-adsr (fn [& args] args)]

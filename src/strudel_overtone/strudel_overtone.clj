@@ -801,6 +801,12 @@
     (ns-resolve ns (symbol name))
     nil))
 
+(defn at-metro
+  "Executes synth-var with args at the specified beat.
+   Uses Overtone's 'at' for sample-accurate timing."
+  [beat synth-var args]
+  (ov/at (metro beat) (apply synth-var args)))
+
 (defn trigger-event [ev beat dur-beats]
   (let [params (:params ev)
         active (get params :active 1)
@@ -893,7 +899,7 @@
               (do
                 (apply-at (metro beat)
                           (fn [& e] (tel/log! :info {:event (into {} e)})) ev)
-                (apply-at (metro beat) synth-var args)))))))))
+                (at-metro beat synth-var args)))))))))
 
 (defn- apply-swing [t amount step-size]
   (let [step-idx (long (/ t step-size))]
@@ -947,19 +953,21 @@
   [& args]
   (let [pairs (if (= 1 (count args))
                 [[:main (first args)]]
-                (partition 2 args))]
-    (doseq [[key pattern] pairs]
-      (let [start-loop? (not (contains? (:loops @player-state) key))]
-        (swap! player-state (fn [s]
-                              (-> s
-                                  (assoc :playing? true)
-                                  (assoc-in [:patterns key] pattern)
-                                  (update :loops conj key))))
-        (when start-loop?
-          (let [now (metro)
-                start-beat (+ now (- 4 (mod now 4)))]
-            (apply-by (metro start-beat) #'play-loop [key start-beat])))))
-    (map first pairs)))
+                (partition 2 args))
+        something-playing? (seq (playing))]
+    (let [quant 4]
+      (doseq [[key pattern] pairs]
+        (let [start-loop? (not (contains? (:loops @player-state) key))]
+          (swap! player-state (fn [s]
+                                (-> s
+                                    (assoc :playing? true)
+                                    (assoc-in [:patterns key] pattern)
+                                    (update :loops conj key))))
+          (when start-loop?
+            (let [now (metro)
+                  start-beat (+ now (- quant (mod now quant)))]
+              (apply-by (metro start-beat) #'play-loop [key start-beat])))))
+      (map first pairs))))
 
 (defn play-only!
   "Like play!, but stops any other patterns that are currently playing."
@@ -1389,10 +1397,19 @@
   (playing)
 
   (stop! :drone)
+  (metro)
 
   (stop!)
 
   (stop)
+
+  (play!
+    :early (-> (s [:clap-808 :- :- :-]))
+    :later (-> (s [:sine :- :- :-])))
+
+  (play!
+    :early-1 (-> (s [:clap-808 :- :- :-]))
+    :later-2 (-> (s [:sine :- :- :-])))
 
   .)
 

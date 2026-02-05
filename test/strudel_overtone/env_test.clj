@@ -30,6 +30,7 @@
       (with-redefs [ov/metro-bpm (constantly 120)
                     sut/metro (constantly 0)
                     ov/apply-at (fn [ms func & args] (swap! mock-calls conj {:func func :args args}))
+                    sut/at-metro (fn [beat synth-var args] (swap! mock-calls conj {:func synth-var :args [args]}))
                     sut/saw-perc (fn [& args] args)] ;; Mock synth var
 
         ;; We need to make sure sut/saw-perc is resolved to our mock
