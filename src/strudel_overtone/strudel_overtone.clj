@@ -1295,56 +1295,6 @@
            (fast 2)
            (gain 0.8)))
 
-    (chord :c4 :minor)
-    (scale :c4 :minor)
-
-  (play!
-
-   :plucks (->
-            (note (chosen-from (chord :c4 :minor7) 16))
-            (s :ks-stringer)
-            (fast 1/4)
-            (duck-trigger 1)
-            (swing [0])
-            (gain 0.7)))
-
-  (:patterns @player-state)
-
-  (cpm)
-
-  (fade-cpm 44 8 2)
-
-  (stop! :plucks)
-
-  (play!
-   :kick (->
-          (s [#{[:kick :- :-] :dub-kick} :-
-              [:- #{[:kick :- :-] :dub-kick}] :-])
-          (note [:d2 :c2])
-          (gain 1)
-          (duck-trigger 1))
-   :snare (->
-           (s [:- :snare :- :snare])
-           (gain [0.6 0.8])
-;           (duck-trigger 1)
-           (note [:e3 :c3]))
-   :hat (->
-         (s (take 8 (cycle [:hat])))
-         (gain 0.6)
-         (duck 0.9))
-   :pad (->
-         lnote [:c5 [:b4 :a4 :c5]])
-         (s [#{:mooger}])
-         (resonance 2)
-         (add [-24])
-         (attack 0.8)
-         (release 0.01)
-         (gain 0.4)
-         (s-level 1)
-         (duck 0.8)))
-
-  (stop!)
-
   ;; --- Sampling Example ---
   ;; (load-sample! :break "/path/to/loop.wav")
   ;; (play! :drums (-> (s [:break]) (rate 1.0) (begin 0.2)))
