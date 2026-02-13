@@ -5,7 +5,7 @@
 (comment
   (cpm)
 
-  (fade-cpm 32 8)
+  (slide-cpm 32 8)
 
   (playing)
 

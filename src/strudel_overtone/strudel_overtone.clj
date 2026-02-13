@@ -719,11 +719,11 @@
   ([] (/ (metro-bpm metro) 4))
   ([n] (metro :bpm (* n 4)) n))
 
-(defn fade-cpm
+(defn slide-cpm
   "Smoothly transitions the CPM to a new value over a duration (in cycles).
    Default resolution is 1 step per cycle."
   ([target-cpm dur-cycles]
-   (fade-cpm target-cpm dur-cycles 1))
+   (slide-cpm target-cpm dur-cycles 1))
   ([target-cpm dur-cycles steps-per-cycle]
    (let [dur-beats (* dur-cycles 4)
          start-cpm (cpm)
@@ -1341,7 +1341,7 @@
 
   (slice-sample! :drone-slice :drone 0.35 0.55)
 
-  (fade-cpm 20 4)
+  (slide-cpm 20 4)
 
   (play-only!
    :kick (-> (s [:dub-kick :- :dub-kick :-]))
