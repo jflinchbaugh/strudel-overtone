@@ -230,3 +230,14 @@
           (reset! mock-calls [])
           (sut/trigger-event (sut/->Event 0 1 {:sound "bd"}) 0 1)
           (is (= 2 (count @mock-calls)))))))) ;; log-called and at-metro-called
+
+(deftest fast-slow-test
+  (testing "fast function multiplies cycles"
+    (let [pat {:cycles 1}
+          fast-pat (sut/fast pat 2)]
+      (is (== 2 (:cycles fast-pat)))))
+
+  (testing "slow function divides cycles"
+    (let [pat {:cycles 1}
+          slow-pat (sut/slow pat 2)]
+      (is (== 0.5 (:cycles slow-pat))))))

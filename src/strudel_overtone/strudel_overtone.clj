@@ -709,6 +709,9 @@
 (defn fast [pattern amount]
   (update pattern :cycles #(* % amount)))
 
+(defn slow [pattern amount]
+  (update pattern :cycles #(/ % amount)))
+
 ;; --- Player ---
 
 (defonce metro (metronome 120))

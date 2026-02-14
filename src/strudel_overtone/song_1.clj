@@ -12,7 +12,8 @@
   (play!
 
    :plucks (->
-            (note (chosen-from (chord :c4 :minor7) 16))
+            (note (chosen-from (scale :c4 :minor7) 16))
+            (fast 2)
             (s :ks-stringer)
             (distort 0.7)
             #_(echo-delay 0.02)
@@ -24,7 +25,7 @@
             (pan-depth 0.9)
             (duck-trigger 1)
             (swing [1/1])
-            (gain 0.3)))
+            (gain 0.1)))
 
   (play!
    :kick (->
@@ -43,7 +44,7 @@
          (swing 0/3)
          (duck 0.9))
    :pad (->
-         (note [:c4 [:b4 :c5]])
+         (note [:c4 [:b3 :b4]])
          (s [#{:mooger}])
          (resonance 3)
          (distort 0.5)
@@ -65,5 +66,6 @@
   (stop! :plucks)
 
   (stop!)
+
 
   .)
