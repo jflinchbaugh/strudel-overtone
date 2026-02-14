@@ -12,24 +12,24 @@
   (play!
 
    :plucks (->
-            (note (chosen-from (scale :c4 :minor7) 16))
-            (fast 2)
+            (note (chosen-from (chord :c6 :minor7) 3))
+            (fast 4)
             (s :ks-stringer)
             (distort 0.7)
             #_(echo-delay 0.02)
-            (fast 1/2)
             (crush 0.9)
             (distort 0.5)
             (release 0.01)
+            (room 0.5)
             (pan-hz 1)
             (pan-depth 0.9)
             (duck-trigger 1)
-            (swing [1/1])
-            (gain 0.1)))
+            (swing [0/4])
+            (gain 0.3)))
 
   (play!
    :kick (->
-          (s [#{[:kick :- :-] :dub-kick} :-
+           (s [#{[:kick :- :-] :dub-kick} :-
               [:- #{[:kick :- :-] :dub-kick}] :-])
           (note [:d2 :c2])
           (gain 1)
@@ -44,14 +44,14 @@
          (swing 0/3)
          (duck 0.9))
    :pad (->
-         (note [:c4 [:b3 :b4]])
+         (note [:c2 [:b2 :b3 :d2]])
          (s [#{:mooger}])
          (resonance 3)
          (distort 0.5)
          (add [-24 -12])
          (attack 1.2)
          (release 0.01)
-         (gain [0.2 0.1])
+         (gain [0.3 0.3])
          (s-level 1)
          (duck 0.8)))
 
