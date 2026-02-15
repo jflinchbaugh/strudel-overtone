@@ -54,3 +54,23 @@
                   args (first (:args synth-call))
                   args-map (apply hash-map args)]
               (is (sut-test/approx= 0.5 (:sustain args-map))))))))))
+
+(deftest slice-info-test
+  (testing "sample-info correctly reports slice information"
+    (let [buf {:duration 4.0 :n-channels 2 :rate 44100.0 :path "path" :size 176400}]
+      (with-redefs [sut/samples (atom {"break" buf})
+                    sut/sample-slices (atom {"kick" {:source "break" :begin 0.0 :end 0.1}})]
+        (let [info (sut/sample-info :kick)]
+          (is (= :slice (:type info)))
+          (is (= "break" (:source info)))
+          (is (sut-test/approx= 0.4 (:duration info)))
+          (is (= 4.0 (:full-duration info)))
+          (is (= 0.0 (:begin info)))
+          (is (= 0.1 (:end info)))))))
+
+  (testing "sample-info handles reversed slices"
+    (let [buf {:duration 4.0 :n-channels 2 :rate 44100.0 :path "path" :size 176400}]
+      (with-redefs [sut/samples (atom {"break" buf})
+                    sut/sample-slices (atom {"kick" {:source "break" :begin 0.1 :end 0.0}})]
+        (let [info (sut/sample-info :kick)]
+          (is (sut-test/approx= 0.4 (:duration info))))))))

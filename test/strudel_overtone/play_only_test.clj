@@ -8,9 +8,9 @@
             {:playing? true
              :patterns {:p1 (sut/s [:bd]) :p2 (sut/s [:hh])}
              :loops #{:p1 :p2}})
-    
+
     (sut/play-only! :p2 (sut/s [:sn]))
-    
+
     (let [state @sut/player-state]
       (is (= #{:p2} (set (keys (:patterns state)))))
       (is (= "sn" (get-in (first (get-in state [:patterns :p2 :events])) [:params :sound])))))
@@ -20,9 +20,12 @@
             {:playing? true
              :patterns {:p1 (sut/s [:bd]) :p2 (sut/s [:hh])}
              :loops #{:p1 :p2}})
-    
+
     (sut/play-only! (sut/s [:clap]))
-    
+
     (let [state @sut/player-state]
       (is (= #{:main} (set (keys (:patterns state)))))
-      (is (= "clap" (get-in (first (get-in state [:patterns :main :events])) [:params :sound]))))))
+      (is (= "clap" (get-in (first (get-in state [:patterns :main :events])) [:params :sound])))))
+
+  (sut/stop!))
+;; => #'strudel-overtone.play-only-test/play-only-test

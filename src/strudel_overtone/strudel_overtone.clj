@@ -1,6 +1,6 @@
 (ns strudel-overtone.strudel-overtone
   (:require [overtone.core :as ov :refer :all
-             :exclude [note lpf decay distort hpf bpf vibrato defsynth]]
+             :exclude [note lpf decay distort hpf bpf vibrato defsynth sample-info]]
             [taoensso.telemere :as tel]
             [tick.core :as t]
             [clojure.string :as str]))
@@ -798,6 +798,35 @@
     (swap! sample-slices assoc s-name {:source src-name :begin begin :end end})
     (tel/log! :info {:sample-sliced {:name name :from source-name}})))
 
+(defn sample-info
+  "Returns information about a sample or slice by name."
+  [name]
+  (let [s-name (str/replace (str name) #"^:" "")
+        slice (get @sample-slices s-name)
+        effective-name (if slice (:source slice) s-name)
+        buf (get @samples effective-name)]
+    (when buf
+      (let [base-info {:duration (:duration buf)
+                       :n-channels (:n-channels buf)
+                       :rate (:rate buf)
+                       :path (:path buf)
+                       :size (:size buf)}]
+        (if slice
+          (let [begin (:begin slice)
+                end (:end slice)
+                _ (tel/log! :info {:slice slice})
+                _ (tel/log! :info {:math (- end begin)})
+                _ (tel/log! :info {:abs (abs (- end begin))})
+                dur (* (:duration buf) (abs (- end begin)))]
+            (merge base-info
+                   {:type :slice
+                    :source effective-name
+                    :begin begin
+                    :end end
+                    :duration dur
+                    :full-duration (:duration buf)}))
+          (assoc base-info :type :sample))))))
+
 (def-strudel-synth sampler [buf 0 rate 1 begin 0 end 1 loop? 0 attack 0 release 0]
   (let [rate-s (* rate (buf-rate-scale buf))
         start-pos (* begin (buf-frames buf))]
@@ -882,9 +911,9 @@
                           (let [b (get params :begin 0)
                                 e (:end params)
                                 r (get params :rate 1)
-                                abs-r (Math/abs (double r))
+                                abs-r (abs (double r))
                                 dur (:duration sample-buf)
-                                total-dur (* (Math/abs (double (- e b))) dur (/ 1 (max 0.001 abs-r)))
+                                total-dur (* (abs (double (- e b))) dur (/ 1 (max 0.001 abs-r)))
                                 total-dur (min total-dur step-dur-sec)
                                 env (get params :env "adsr")]
                             (if (= env "perc")
@@ -1445,7 +1474,9 @@
 
   (stop!)
 
-  (sample-info )
+  (sample-info :storm)
+
+  (sample-info :storm-beat)
 
   .)
 
