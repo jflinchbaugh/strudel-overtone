@@ -767,6 +767,25 @@
       (tel/log! :warn {:sample-not-loaded {:name name :from-path path}})
       nil)))
 
+(defn load-freesound!
+  "Loads a Freesound sample into the registry by ID.
+   Name can be a keyword or string.
+   ID is the Freesound sample ID."
+  [name id]
+  (if-let [buf (try (ov/freesound id)
+                    (catch Exception e
+                      (tel/log!
+                       :error
+                       {:freesound {:id id :failed (.getMessage e)}})
+                      nil))]
+    (do
+      (swap! samples assoc (str/replace (str name) #"^:" "") buf)
+      (tel/log! :info {:freesound-loaded {:name name :id id}})
+      name)
+    (do
+      (tel/log! :warn {:freesound-not-loaded {:name name :id id}})
+      nil)))
+
 (defn slice-sample!
   "Creates a new virtual sample instrument from a slice of an existing sample.
    name: The name for the new instrument (e.g., :kick)
@@ -1349,9 +1368,9 @@
   (play-only!
    :kick (-> (s [:dub-kick :- :dub-kick :-]))
    :clap (->
-           (s [:- :clap-808 :- [:clap-808 :clap-808]])
-           (pan-depth 0.75)
-           (pan-hz (/ 20 (cpm))))
+          (s [:- :clap-808 :- [:clap-808 :clap-808]])
+          (pan-depth 0.75)
+          (pan-hz (/ 20 (cpm))))
    :drone (->
            (s [#{:drone-slice} :drone-slice])
            (gain 0.5)
@@ -1377,6 +1396,56 @@
   (play!
    :early-1 (-> (s [:clap-808 :- :- :-]))
    :later-2 (-> (s [:sine :- :- :-])))
+
+  ;; --- Freesound Example ---
+  (load-freesound! :birds 650965)
+
+  (play! :birds (-> (s [:birds]) (slow 4) (gain 0.5)))
+
+  (load-freesound! :storm 681517)
+
+
+  (slice-sample! :sliced-storm :storm 0/2320 400/2320)
+
+  (slice-sample! :storm-beat :storm 9/2320 15/2320)
+
+  (slide-cpm 40 4)
+
+  (play-only!
+    :intro (->
+             (s [:sliced-storm]) (slow 4)
+             (gain 2)
+             (hpf 0)
+             (duck 1)
+             (lpf 30000)))
+
+  (play-only!
+    :storm (->
+             (s [:storm-beat :- :storm-beat [:- :storm-beat]])
+             (env :perc)
+             (hpf 300)
+             (distort 0.7)
+             (duck 1)
+             (lpf 3000))
+    :snare (->
+             (s [:snare :snare :snare :snare])
+             (s-level 0.2)
+             (decay 0.01)
+             (gain 0.2)
+             (duck-trigger 1))
+    :pad (->
+           (note [:b2 :f2 :g2 :g2])
+           (s [:sine])
+           (slow 4)
+           (distort 0.3)
+           (crush 0.3)
+           (gain 0.1)
+           )
+    )
+
+  (stop!)
+
+  (sample-info )
 
   .)
 
