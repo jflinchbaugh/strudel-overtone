@@ -814,10 +814,8 @@
         (if slice
           (let [begin (:begin slice)
                 end (:end slice)
-                _ (tel/log! :info {:slice slice})
-                _ (tel/log! :info {:math (- end begin)})
-                _ (tel/log! :info {:abs (abs (- end begin))})
                 dur (* (:duration buf) (abs (- end begin)))]
+            ;; TODO is this just merging values already in the map?
             (merge base-info
                    {:type :slice
                     :source effective-name
