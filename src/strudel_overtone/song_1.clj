@@ -8,11 +8,12 @@
   (slide-cpm 32 8)
 
   (playing)
+  (stop!)
 
   (play!
-
    :plucks (->
             (note (chosen-from (chord :c6 :minor7) 3))
+            (add 0)
             (fast 4)
             (s :ks-stringer)
             (distort 0.7)
