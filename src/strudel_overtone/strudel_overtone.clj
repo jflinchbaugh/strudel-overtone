@@ -798,6 +798,20 @@
     (swap! sample-slices assoc s-name {:source src-name :begin begin :end end})
     (tel/log! :info {:sample-sliced {:name name :from source-name}})))
 
+(defn slice-sample-ms!
+  "Like slice-sample!, but uses milliseconds instead of 0.0 to 1.0 fractions.
+   Note: Currently only supports slicing base samples, not nested slices."
+  [name source-name begin-ms end-ms]
+  (let [s-name (str/replace (str name) #"^:" "")
+        src-name (str/replace (str source-name) #"^:" "")
+        buf (get @samples src-name)]
+    (if buf
+      (let [total-ms (* (:duration buf) 1000)
+            begin (double (/ begin-ms total-ms))
+            end (double (/ end-ms total-ms))]
+        (slice-sample! name source-name begin end))
+      (tel/log! :error {:slice-ms-failed {:name name :source source-name :reason "Source sample not found"}}))))
+
 (defn sample-info
   "Returns information about a sample or slice by name."
   [name]
@@ -1436,9 +1450,11 @@
   (load-freesound! :storm 681517)
 
 
-  (slice-sample! :sliced-storm :storm 0/2320 400/2320)
+  (slice-sample-ms! :sliced-storm :storm 0 40000)
 
   (slice-sample! :storm-beat :storm 9/2320 15/2320)
+
+  (slice-sample-ms! :storm-beat :storm 900 1500)
 
   (slide-cpm 40 4)
 
@@ -1448,23 +1464,30 @@
              (gain 2)
              (hpf 0)
              (duck 1)
-             (lpf 30000)))
+             (lpf 30000))
+    )
 
   (play-only!
-    :storm (->
+    :intro (->
+             (s [:sliced-storm]) (slow 4)
+             (gain 2)
+             (hpf 0)
+             (duck 1)
+             (lpf 30000))
+    #_#_:storm (->
              (s [:storm-beat :- :storm-beat [:- :storm-beat]])
              (env :perc)
              (hpf 300)
              (distort 0.7)
              (duck 1)
              (lpf 3000))
-    :snare (->
+    #_#_:snare (->
              (s [:snare :snare :snare :snare])
              (s-level 0.2)
              (decay 0.01)
              (gain 0.2)
              (duck-trigger 1))
-    :pad (->
+    #_#_:pad (->
            (note [:b2 :f2 :g2 :g2])
            (s [:sine])
            (slow 4)
@@ -1479,6 +1502,7 @@
   (sample-info :storm)
 
   (sample-info :storm-beat)
+
 
   .)
 

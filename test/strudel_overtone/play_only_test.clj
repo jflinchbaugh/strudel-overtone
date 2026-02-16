@@ -28,4 +28,3 @@
       (is (= "clap" (get-in (first (get-in state [:patterns :main :events])) [:params :sound])))))
 
   (sut/stop!))
-;; => #'strudel-overtone.play-only-test/play-only-test

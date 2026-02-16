@@ -107,3 +107,14 @@
                                               :end 0.0}})]
         (let [info (sut/sample-info :kick)]
           (is (sut-test/approx= 0.4 (:duration info))))))))
+
+(deftest slice-ms-test
+  (testing "slice-sample-ms! converts ms to fractions correctly"
+    (let [buf {:duration 2.0 :n-channels 2 :rate 44100.0 :path "path" :size 88200}]
+      (with-redefs [sut/samples (atom {"break" buf})
+                    sut/sample-slices (atom {})]
+        ;; 2.0s = 2000ms. Slicing 500ms to 1500ms should be 0.25 to 0.75
+        (sut/slice-sample-ms! :ms-slice :break 500 1500)
+        (let [slice (get @sut/sample-slices "ms-slice")]
+          (is (sut-test/approx= 0.25 (:begin slice)))
+          (is (sut-test/approx= 0.75 (:end slice))))))))
