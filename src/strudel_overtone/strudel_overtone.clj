@@ -1452,23 +1452,25 @@
 
   (slice-sample-ms! :sliced-storm :storm 0 40000)
 
-  (slice-sample! :storm-beat :storm 9/2320 15/2320)
+  (stop!)
 
   (slice-sample-ms! :storm-beat :storm 900 1500)
+  (slice-sample! :storm-beat :storm 900 1500)
 
   (slide-cpm 40 4)
 
   (play-only!
     :intro (->
              (s [:sliced-storm]) (slow 4)
-             (gain 2)
+             (gain 1)
+             (resonance 0.1)
              (duck 1)
              (hpf 0)
              (lpf 30000))
     )
 
   (play-only!
-    #_#_:intro (->
+    :intro (->
              (s [:sliced-storm]) (slow 4)
              (gain 0.5)
              (fshift 0)
@@ -1476,7 +1478,7 @@
              (hpf 0)
              (duck 1)
              (lpf 30000))
-    :storm (->
+    #_#_:storm (->
              (s [:storm-beat :- :storm-beat [:- :storm-beat]])
              (env :perc)
              (distort 0.7)
@@ -1490,7 +1492,7 @@
              (decay 0.01)
              (gain 0.2)
              (duck-trigger 1))
-    :pad (->
+    #_#_:pad (->
            (note [:b2 :f2 :g2 :g2])
            (s [:sine])
            (slow 4)
