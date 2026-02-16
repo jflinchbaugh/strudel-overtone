@@ -5,12 +5,12 @@
 
 (deftest playing-test
   (testing "playing returns list of active loops"
-    (reset! sut/player-state {:playing? true :patterns {} :loops #{:p1 :p2}})
-    (let [current (sut/playing)]
-      (is (= 2 (count current)))
-      (is (some #(= :p1 %) current))
-      (is (some #(= :p2 %) current))))
+    (with-redefs [sut/player-state (atom {:playing? true :patterns {} :loops #{:p1 :p2}})]
+      (let [current (sut/playing)]
+        (is (= 2 (count current)))
+        (is (some #(= :p1 %) current))
+        (is (some #(= :p2 %) current)))))
 
   (testing "playing returns nil when no loops are active"
-    (reset! sut/player-state {:playing? true :patterns {} :loops #{}})
-    (is (nil? (sut/playing)))))
+    (with-redefs [sut/player-state (atom {:playing? true :patterns {} :loops #{}})]
+      (is (nil? (sut/playing))))))

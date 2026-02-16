@@ -75,6 +75,7 @@
       (with-redefs [sut/metro mock-metro
                     sut/player-state player-state
                     ov/apply-at mock-apply-at
+                    ov/apply-by (fn [& _] nil)
                     sut/at-metro (fn [& _] nil) ;; Ignore synth calls for this test
                     ov/metro-bpm (constantly 120) ;; Mock metro-bpm
                     ;; Stub trigger-event dependencies if needed, or just let it run
