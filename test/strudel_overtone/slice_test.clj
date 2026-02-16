@@ -57,9 +57,16 @@
 
 (deftest slice-info-test
   (testing "sample-info correctly reports slice information"
-    (let [buf {:duration 4.0 :n-channels 2 :rate 44100.0 :path "path" :size 176400}]
+    (let [buf {:duration 4.0
+               :n-channels 2
+               :rate 44100.0
+               :path "path"
+               :size 176400}]
       (with-redefs [sut/samples (atom {"break" buf})
-                    sut/sample-slices (atom {"kick" {:source "break" :begin 0.0 :end 0.1}})]
+                    sut/sample-slices (atom {"kick"
+                                             {:source "break"
+                                              :begin 0.0
+                                              :end 0.1}})]
         (let [info (sut/sample-info :kick)]
           (is (= :slice (:type info)))
           (is (= "break" (:source info)))
@@ -68,9 +75,35 @@
           (is (= 0.0 (:begin info)))
           (is (= 0.1 (:end info)))))))
 
-  (testing "sample-info handles reversed slices"
-    (let [buf {:duration 4.0 :n-channels 2 :rate 44100.0 :path "path" :size 176400}]
+  (testing "sample-info correctly reports slice information with fractions"
+    (let [buf {:duration 4.0
+               :n-channels 2
+               :rate 44100.0
+               :path "path"
+               :size 176400}]
       (with-redefs [sut/samples (atom {"break" buf})
-                    sut/sample-slices (atom {"kick" {:source "break" :begin 0.1 :end 0.0}})]
+                    sut/sample-slices (atom {"kick"
+                                             {:source "break"
+                                              :begin 1/2
+                                              :end 3/4}})]
+        (let [info (sut/sample-info :kick)]
+          (is (= :slice (:type info)))
+          (is (= "break" (:source info)))
+          (is (sut-test/approx= 1.0 (:duration info)))
+          (is (= 4.0 (:full-duration info)))
+          (is (= 1/2 (:begin info)))
+          (is (= 3/4 (:end info)))))))
+
+  (testing "sample-info handles reversed slices"
+    (let [buf {:duration 4.0
+               :n-channels 2
+               :rate 44100.0
+               :path "path"
+               :size 176400}]
+      (with-redefs [sut/samples (atom {"break" buf})
+                    sut/sample-slices (atom {"kick"
+                                             {:source "break"
+                                              :begin 0.1
+                                              :end 0.0}})]
         (let [info (sut/sample-info :kick)]
           (is (sut-test/approx= 0.4 (:duration info))))))))
