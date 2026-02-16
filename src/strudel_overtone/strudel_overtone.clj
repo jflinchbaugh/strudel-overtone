@@ -959,6 +959,11 @@
       (+ t (* amount step-size))
       t)))
 
+(defn cycle-n
+  "cycle the collection and take n from it"
+  [n col]
+  (take n (cycle col)))
+
 (defn play-loop [key beat]
   (let [state @player-state]
     (if (and (:playing? state)
@@ -1200,9 +1205,9 @@
           (gain 1)
           (active 0))
    :sd (->
-        (s (take 16 (cycle [:- :sd])))
+         (s (cycle-n 16 [:- :sd]))
         (gain 0.2)
-        (active 0))
+        (active 1))
    :clap (->
           (s (cons :fm (repeat 7 :-)))
           (env :perc)
