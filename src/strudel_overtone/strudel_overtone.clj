@@ -806,7 +806,7 @@
         effective-name (if slice (:source slice) s-name)
         buf (get @samples effective-name)]
     (when buf
-      (let [base-info {:duration (:duration buf)
+      (let [buf-info {:duration (:duration buf)
                        :n-channels (:n-channels buf)
                        :rate (:rate buf)
                        :path (:path buf)
@@ -815,15 +815,14 @@
           (let [begin (:begin slice)
                 end (:end slice)
                 dur (* (:duration buf) (abs (- end begin)))]
-            ;; TODO is this just merging values already in the map?
-            (merge base-info
+            (merge buf-info
                    {:type :slice
                     :source effective-name
                     :begin begin
                     :end end
                     :duration dur
                     :full-duration (:duration buf)}))
-          (assoc base-info :type :sample))))))
+          (assoc buf-info :type :sample))))))
 
 (def-strudel-synth sampler [buf 0 rate 1 begin 0 end 1 loop? 0 attack 0 release 0]
   (let [rate-s (* rate (buf-rate-scale buf))
