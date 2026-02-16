@@ -3,7 +3,7 @@
             [strudel-overtone.strudel-overtone :as sut]))
 
 (defn approx= [a b]
-  (< (Math/abs (- a b)) 0.01))
+  (< (abs (- a b)) 0.01))
 
 (deftest nested-vector-test
   (testing "Nested vectors split the duration"
@@ -14,9 +14,9 @@
       ;;    :b -> 0.333, dur 1/6
       ;;    :c -> 0.5, dur 1/6
       ;; :d -> 0.666 to 1.0 (1/3)
-      
+
       (is (= 4 (count (:events pat))))
-      
+
       (let [evs (:events pat)
             [e1 e2 e3 e4] evs]
         (is (= "a" (get-in e1 [:params :sound])))
@@ -34,7 +34,7 @@
         (is (= "d" (get-in e4 [:params :sound])))
         (is (approx= 0.666 (:time e4)))
         (is (approx= 0.333 (:duration e4))))))
-  
+
   (testing "Deeply nested vectors"
     (let [pat (sut/s [:a [:b [:c :d]]])]
       ;; :a -> 0.0, dur 0.5
@@ -43,7 +43,7 @@
       ;;    [:c :d] -> 0.75, dur 0.25
       ;;       :c -> 0.75, dur 0.125
       ;;       :d -> 0.875, dur 0.125
-      
+
       (is (= 4 (count (:events pat))))
       (let [evs (:events pat)
             e4 (last evs)]
@@ -59,22 +59,22 @@
       ;;    :e4 -> 0.33, dur 0.33
       ;;    :g4 -> 0.33, dur 0.33
       ;; :b4 -> 0.66, dur 0.33
-      
+
       (is (= 4 (count (:events pat))))
-      
+
       (let [evs (:events pat)
             sorted-evs (sort-by :time evs)
             e1 (first sorted-evs)
             middle-evs (filter #(approx= 0.333 (:time %)) evs)
             e4 (last sorted-evs)]
-            
+
         (is (= :c4 (get-in e1 [:params :note])))
         (is (approx= 0.333 (:duration e1)))
-        
+
         (is (= 2 (count middle-evs)))
         (is (= #{:e4 :g4} (set (map #(get-in % [:params :note]) middle-evs))))
         (is (every? #(approx= 0.333 (:duration %)) middle-evs))
-        
+
         (is (= :b4 (get-in e4 [:params :note])))
         (is (approx= 0.666 (:time e4))))))
 
@@ -84,7 +84,9 @@
       (let [evs (:events pat)
             middle-evs (filter #(approx= 0.333 (:time %)) evs)]
         (is (= 2 (count middle-evs)))
-        (is (= #{:e4 :g4} (set (map #(get-in % [:params :note]) middle-evs))))))))
+        (is (= #{:e4 :g4} (set (map
+                                 #(get-in % [:params :note])
+                                 middle-evs))))))))
 
 (deftest cartesian-product-test
   (testing "Combining sets of notes and instruments creates Cartesian product"
@@ -105,7 +107,11 @@
       ;; Expect 2x2 = 4 events.
       (is (= 4 (count (:events pat))))
       (let [evs (:events pat)
-            combos (set (map (fn [e] [(get-in e [:params :note]) (get-in e [:params :sound])]) evs))]
+            combos (set (map
+                          (fn [e]
+                            [(get-in e [:params :note])
+                             (get-in e [:params :sound])])
+                          evs))]
         (is (contains? combos [:c4 "piano"]))
         (is (contains? combos [:c4 "violin"]))
         (is (contains? combos [:e4 "piano"]))

@@ -4,7 +4,7 @@
             [overtone.core :as ov]))
 
 (defn approx= [a b]
-  (< (Math/abs (- a b)) 0.01))
+  (< (abs (- a b)) 0.01))
 
 (deftest play!-test
   (testing "play! quantization logic"
@@ -18,9 +18,11 @@
                     ov/metro-bpm (constantly 120)
                     ov/metronome (fn [& _] sut/metro)
                     ov/apply-at (fn [ms func & args]
-                                  (swap! mock-calls conj {:ms ms :func func :args args}))
+                                  (swap! mock-calls
+                                    conj {:ms ms :func func :args args}))
                     ov/apply-by (fn [ms func args]
-                                  (swap! mock-calls conj {:ms ms :func func :args args}))
+                                  (swap! mock-calls
+                                    conj {:ms ms :func func :args args}))
                     ov/at (fn [ms body] (body))]
 
         (testing "first loop starts on the next cycle (quant = 4)"
