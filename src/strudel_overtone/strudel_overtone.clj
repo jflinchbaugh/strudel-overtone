@@ -1462,32 +1462,35 @@
     :intro (->
              (s [:sliced-storm]) (slow 4)
              (gain 2)
-             (hpf 0)
              (duck 1)
+             (hpf 0)
              (lpf 30000))
     )
 
   (play-only!
-    :intro (->
+    #_#_:intro (->
              (s [:sliced-storm]) (slow 4)
-             (gain 2)
+             (gain 0.5)
+             (fshift 0)
+             (distort 0.5)
              (hpf 0)
              (duck 1)
              (lpf 30000))
-    #_#_:storm (->
+    :storm (->
              (s [:storm-beat :- :storm-beat [:- :storm-beat]])
              (env :perc)
-             (hpf 300)
              (distort 0.7)
+             #_(crush 0.9)
+             (rate 1.5)
              (duck 1)
-             (lpf 3000))
+             (lpf 500))
     #_#_:snare (->
              (s [:snare :snare :snare :snare])
              (s-level 0.2)
              (decay 0.01)
              (gain 0.2)
              (duck-trigger 1))
-    #_#_:pad (->
+    :pad (->
            (note [:b2 :f2 :g2 :g2])
            (s [:sine])
            (slow 4)
