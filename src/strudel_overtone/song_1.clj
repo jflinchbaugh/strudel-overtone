@@ -1,5 +1,5 @@
 (ns strudel-overtone.song-1
-  (:require [overtone.core :refer :all]
+  (:require [overtone.core :as ov]
             [strudel-overtone.strudel-overtone :refer :all]))
 
 (comment
@@ -12,7 +12,7 @@
 
   (play!
    :plucks (->
-            (note (chosen-from (chord :c6 :minor7) 3))
+            (note (chosen-from (ov/chord :c6 :minor7) 3))
             (add 0)
             (fast 4)
             (s :ks-stringer)
@@ -38,7 +38,7 @@
    :snare (->
            (s [:- :snare :- :snare])
            (gain [0.6 0.8])
-           (note (chosen-from (chord :e3 :minor) 2)))
+           (note (chosen-from (ov/chord :e3 :minor) 2)))
    :hat (->
          (s (map (fn [n] (cons  n [:- :-])) (take 8 (cycle [:hat]))))
          (gain 0.6)

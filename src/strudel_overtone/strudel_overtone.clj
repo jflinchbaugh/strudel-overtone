@@ -1,6 +1,5 @@
 (ns strudel-overtone.strudel-overtone
-  (:require [overtone.core :as ov :refer :all
-             :exclude [note lpf decay distort hpf bpf vibrato defsynth sample-info]]
+  (:require [overtone.core :as ov]
             [taoensso.telemere :as tel]
             [tick.core :as t]
             [clojure.string :as str]))
@@ -10,12 +9,12 @@
 
 (defmacro defsynth [name args & body]
   `(ov/defsynth ~name ~args
-     (line:kr 0 0 60 FREE)
+     (ov/line:kr 0 0 60 ov/FREE)
      ~@body))
 
 ;; --- Synths ---
 
-(defonce duck-bus (control-bus))
+(defonce duck-bus (ov/control-bus))
 
 (defmacro def-strudel-synth [name extra-args & body]
   (let [common-args '{amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
@@ -44,15 +43,15 @@
                           ~final-args-vec
                           (let [~'env ~env-gen-form
                                 ;; Trigger Sidechain
-                                _# (let [trig-env# (env-gen
-                                                    (perc
+                                _# (let [trig-env# (ov/env-gen
+                                                    (ov/perc
                                                      ~'duck-attack
                                                      ~'duck-release)
                                                     :level-scale
                                                     ~'duck-trigger)]
-                                     (out:kr duck-bus trig-env#))
+                                     (ov/out:kr duck-bus trig-env#))
                                 ;; Read Sidechain
-                                ~'duck-env (in:kr duck-bus)
+                                ~'duck-env (ov/in:kr duck-bus)
                                 ~'amp-duck (ov/clip
                                             (~'- 1 (~'* ~'duck ~'duck-env))
                                             0 1)
@@ -129,7 +128,7 @@
 
                                 ;; Decimator bypass - critical for ringing
                                 ~'crs (let [~'dry ~'dst
-                                            ~'wet (decimator
+                                            ~'wet (ov/decimator
                                                    ~'dry
                                                    (ov/lin-lin
                                                     ~'crush 0 1 44100 2000)
@@ -145,7 +144,7 @@
                                 ~'gated (~'* ~'crs ~'env)
                                 ~'dly (let [~'dry ~'gated
                                             ~'wet (~'+ ~'dry
-                                                       (comb-n
+                                                       (ov/comb-n
                                                         ~'dry 0.5
                                                         (~'s-max 0.0001 ~'delay)
                                                         (~'*
@@ -158,16 +157,16 @@
                                           (~'> ~'delay 0)
                                           0 1 -1 1)))
 
-                                ~'reverbed (free-verb
+                                ~'reverbed (ov/free-verb
                                             ~'dly
                                             ~'room
                                             ~'room-size
                                             ~'damp)
-                                _# (detect-silence
+                                _# (ov/detect-silence
                                     ~'reverbed
                                     :amp 0.0001
                                     :time 0.2
-                                    :action FREE)
+                                    :action ov/FREE)
                                 ~'actual-pan (~'+
                                               ~'pan
                                               (let [~'mod (~'*
@@ -176,8 +175,8 @@
                                                 (~'*
                                                  ~'mod
                                                  (~'> ~'pan-depth 0))))]
-                            (out 0
-                                 (pan2
+                            (ov/out 0
+                                 (ov/pan2
                                   (~'*
                                    (ov/mix [~'reverbed])
                                    ~'amp
@@ -185,12 +184,12 @@
                                   ~'actual-pan))))))]
     `(do
        ~(make-synth "-adsr"
-                    `(env-gen (adsr ~'attack ~'decay ~'s-level ~'release)
-                              :gate (line:kr 1 0 ~'sustain)
-                              :action NO-ACTION)
+                    `(ov/env-gen (ov/adsr ~'attack ~'decay ~'s-level ~'release)
+                              :gate (ov/line:kr 1 0 ~'sustain)
+                              :action ov/NO-ACTION)
                     adsr-defaults)
        ~(make-synth "-perc"
-                    `(env-gen (perc ~'attack ~'sustain) :action NO-ACTION)
+                    `(ov/env-gen (ov/perc ~'attack ~'sustain) :action ov/NO-ACTION)
                     perc-defaults))))
 
 ;; --- Logging ---
@@ -210,37 +209,37 @@
             "\n")))}))
 
 (def-strudel-synth kick [freq 60]
-  (sin-osc (line:kr (* 2 freq) freq 0.1)))
+  (ov/sin-osc (ov/line:kr (* 2 freq) freq 0.1)))
 
 (def-strudel-synth snare [freq 200]
-  (let [noise (white-noise)]
-    (+ (* 0.5 (sin-osc freq)) (* 0.8 noise))))
+  (let [noise (ov/white-noise)]
+    (+ (* 0.5 (ov/sin-osc freq)) (* 0.8 noise))))
 
 (def-strudel-synth hat [freq 8000]
-  (white-noise))
+  (ov/white-noise))
 
 (def-strudel-synth clap [freq 1200]
-  (ov/bpf (white-noise) freq resonance))
+  (ov/bpf (ov/white-noise) freq resonance))
 
 (def-strudel-synth saw [freq 440 detune 0 vibrato 0]
   (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))
         f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
-    (saw f-vib)))
+    (ov/saw f-vib)))
 
 (def-strudel-synth sine [freq 440 detune 0 vibrato 0]
   (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))
         f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
-    (sin-osc f-vib)))
+    (ov/sin-osc f-vib)))
 
 (def-strudel-synth square [freq 440 detune 0 vibrato 0 width 0.5]
   (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))
         f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
-    (pulse f-vib width)))
+    (ov/pulse f-vib width)))
 
 (def-strudel-synth tri [freq 440 detune 0 vibrato 0]
   (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))
         f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
-    (lf-tri f-vib)))
+    (ov/lf-tri f-vib)))
 
 (def-strudel-synth fm
   [freq 440
@@ -251,65 +250,65 @@
    mod-index 5]
   (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))
         f-vib (ov/vibrato:kr f-raw vibrato 0.02)
-        modulator (sin-osc (* f-vib modulator-ratio))
-        carrier (sin-osc (+ (* f-vib carrier-ratio)
+        modulator (ov/sin-osc (* f-vib modulator-ratio))
+        carrier (ov/sin-osc (+ (* f-vib carrier-ratio)
                             (* modulator mod-index f-vib)))]
     carrier))
 
 ;; --- Noise Synths ---
 
-(def-strudel-synth white [freq 440] (white-noise))
-(def-strudel-synth pink [freq 440] (pink-noise))
-(def-strudel-synth brown [freq 440] (brown-noise))
-(def-strudel-synth gray [freq 440] (gray-noise))
-(def-strudel-synth clip [freq 440] (clip-noise))
+(def-strudel-synth white [freq 440] (ov/white-noise))
+(def-strudel-synth pink [freq 440] (ov/pink-noise))
+(def-strudel-synth brown [freq 440] (ov/brown-noise))
+(def-strudel-synth gray [freq 440] (ov/gray-noise))
+(def-strudel-synth clip [freq 440] (ov/clip-noise))
 
 (def-strudel-synth crackle
   [freq 440
    chaos 1.5]
-  (crackle chaos))
+  (ov/crackle chaos))
 
 (def-strudel-synth dust [freq 440 detune 0]
   (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
-    (dust f-raw)))
+    (ov/dust f-raw)))
 
 (def-strudel-synth dust2 [freq 440 detune 0]
   (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
-    (dust2 f-raw)))
+    (ov/dust2 f-raw)))
 
 (def-strudel-synth lf-noise0 [freq 440 detune 0]
   (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
-    (lf-noise0 f-raw)))
+    (ov/lf-noise0 f-raw)))
 
 (def-strudel-synth lf-noise1 [freq 440 detune 0]
   (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
-    (lf-noise1 f-raw)))
+    (ov/lf-noise1 f-raw)))
 
 (def-strudel-synth lf-noise2 [freq 440 detune 0]
   (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
-    (lf-noise2 f-raw)))
+    (ov/lf-noise2 f-raw)))
 
 (def-strudel-synth tb303 [freq 440 wave 1 env-amount 1000]
   (let [freqs [freq (* 1.01 freq)]
-        waves [(saw freqs)
-               (pulse freqs 0.5)
-               (lf-tri freqs)]
-        selector (select wave waves)
-        fil-env (env-gen (perc attack sustain))
+        waves [(ov/saw freqs)
+               (ov/pulse freqs 0.5)
+               (ov/lf-tri freqs)]
+        selector (ov/select wave waves)
+        fil-env (ov/env-gen (ov/perc attack sustain))
         fil-lpf (s-max 20 (+ lpf (* env-amount fil-env)))]
-    (rlpf selector fil-lpf (lin-lin resonance 0 1 0.9 0.05))))
+    (ov/rlpf selector fil-lpf (ov/lin-lin resonance 0 1 0.9 0.05))))
 
 (def-strudel-synth supersaw [freq 440]
-  (let [input (lf-saw freq)
-        shift1 (lf-saw 4)
-        shift2 (lf-saw 7)
-        shift3 (lf-saw 5)
-        shift4 (lf-saw 2)
+  (let [input (ov/lf-saw freq)
+        shift1 (ov/lf-saw 4)
+        shift2 (ov/lf-saw 7)
+        shift3 (ov/lf-saw 5)
+        shift4 (ov/lf-saw 2)
         comp1 (> input shift1)
         comp2 (> input shift2)
         comp3 (> input shift3)
         comp4 (> input shift4)]
-    (leak-dc:ar
+    (ov/leak-dc:ar
      (* (- (+ (- input comp1)
               (- input comp2)
               (- input comp3)
@@ -321,30 +320,30 @@
    osc2 1
    osc1-level 0.5
    osc2-level 0.5]
-  (let [osc-bank-1 [(saw freq) (sin-osc freq) (pulse freq)]
-        osc-bank-2 [(saw freq) (sin-osc freq) (pulse freq)]
-        s1 (* osc1-level (select osc1 osc-bank-1))
-        s2 (* osc2-level (select osc2 osc-bank-2))]
-    (moog-ff (+ s1 s2) lpf (lin-lin resonance 0 1 3 0))))
+  (let [osc-bank-1 [(ov/saw freq) (ov/sin-osc freq) (ov/pulse freq)]
+        osc-bank-2 [(ov/saw freq) (ov/sin-osc freq) (ov/pulse freq)]
+        s1 (* osc1-level (ov/select osc1 osc-bank-1))
+        s2 (* osc2-level (ov/select osc2 osc-bank-2))]
+    (ov/moog-ff (+ s1 s2) lpf (ov/lin-lin resonance 0 1 3 0))))
 
 (def-strudel-synth ks-stringer [freq 440 coef 0.5]
-  (let [noize (* 0.8 (white-noise))
-        trig (impulse:kr 0)
+  (let [noize (* 0.8 (ov/white-noise))
+        trig (ov/impulse:kr 0)
         delay-time (/ 1.0 freq)]
-    (pluck noize trig delay-time delay-time 10 coef)))
+    (ov/pluck noize trig delay-time delay-time 10 coef)))
 
 (def-strudel-synth dub-kick [freq 80]
-  (let [lpf-env (perc 0.001 1 freq -20)
-        amp-env (perc 0.001 1 1 -8)
-        osc-env (perc 0.001 1 freq -8)
-        noiz (ov/lpf (white-noise) (+ (env-gen:kr lpf-env) 20))
-        snd (ov/lpf (sin-osc (+ (env-gen:kr osc-env) 20)) 200)]
-    (* (+ noiz snd) (env-gen amp-env :action NO-ACTION))))
+  (let [lpf-env (ov/perc 0.001 1 freq -20)
+        amp-env (ov/perc 0.001 1 1 -8)
+        osc-env (ov/perc 0.001 1 freq -8)
+        noiz (ov/lpf (ov/white-noise) (+ (ov/env-gen:kr lpf-env) 20))
+        snd (ov/lpf (ov/sin-osc (+ (ov/env-gen:kr osc-env) 20)) 200)]
+    (* (+ noiz snd) (ov/env-gen amp-env :action ov/NO-ACTION))))
 
 (def-strudel-synth dance-kick [freq 80]
-  (let [freq-env (env-gen (perc 0.001 0.1))
-        snd (sin-osc (+ freq (* freq-env 200)))
-        click (ov/lpf (white-noise) (+ 500 (* freq-env 2000)))]
+  (let [freq-env (ov/env-gen (ov/perc 0.001 0.1))
+        snd (ov/sin-osc (+ freq (* freq-env 200)))
+        click (ov/lpf (ov/white-noise) (+ 500 (* freq-env 2000)))]
     (+ snd (* 0.3 click))))
 
 ;; --- Pattern Engine ---
@@ -714,12 +713,12 @@
 
 ;; --- Player ---
 
-(defonce metro (metronome 120))
+(defonce metro (ov/metronome 120))
 
 (defn cpm
   "Sets or gets the cycles per minute.
    Assumes 4 beats per cycle."
-  ([] (/ (metro-bpm metro) 4))
+  ([] (/ (ov/metro-bpm metro) 4))
   ([n] (metro :bpm (* n 4)) n))
 
 (defn slide-cpm
@@ -738,7 +737,7 @@
      (dotimes [i total-steps]
        (let [beat-offset (* (inc i) step-dur-beats)
              target-val (+ start-cpm (* (inc i) step-size))]
-         (apply-at (metro (+ now beat-offset))
+         (ov/apply-at (metro (+ now beat-offset))
                    (fn []
                      (tel/log! :info {:cpm target-val})
                      (cpm target-val))))))))
@@ -839,9 +838,9 @@
           (assoc buf-info :type :sample))))))
 
 (def-strudel-synth sampler [buf 0 rate 1 begin 0 end 1 loop? 0 attack 0 release 0]
-  (let [rate-s (* rate (buf-rate-scale buf))
-        start-pos (* begin (buf-frames buf))]
-    (play-buf 2 buf rate-s 1 start-pos loop? :action NO-ACTION)))
+  (let [rate-s (* rate (ov/buf-rate-scale buf))
+        start-pos (* begin (ov/buf-frames buf))]
+    (ov/play-buf 2 buf rate-s 1 start-pos loop? :action ov/NO-ACTION)))
 
 (defonce player-state (atom {:playing? false :patterns {} :loops #{}}))
 
@@ -910,7 +909,7 @@
                          (catch Exception _ 2000))
                     c))
             ;; Calculate sustain in seconds
-            step-dur-sec (* dur-beats (/ 60 (metro-bpm metro)))
+            step-dur-sec (* dur-beats (/ 60 (ov/metro-bpm metro)))
             param-sustain (:sustain params)
             sustain-sec (cond
                           param-sustain
@@ -963,7 +962,7 @@
                        sample-buf (conj :buf (:id sample-buf)))]
             (when synth-var
               (do
-                (apply-at (metro beat)
+                (ov/apply-at (metro beat)
                           (fn [& e] (tel/log! :info {:event (into {} e)})) ev)
                 (at-metro beat synth-var args)))))))))
 
@@ -1008,7 +1007,7 @@
                     ev-dur-beats (* rel-dur cycle-dur)]
                 (trigger-event ev ev-beat ev-dur-beats)))
 
-            (apply-by (metro next-beat) #'play-loop [key next-beat]))
+            (ov/apply-by (metro next-beat) #'play-loop [key next-beat]))
           ;; Pattern removed, loop dies
           (swap! player-state update :loops disj key)))
       ;; Stopped, loop dies
@@ -1037,7 +1036,7 @@
           (when start-loop?
             (let [now (metro)
                   start-beat (+ now (- quant (mod now quant)))]
-              (apply-by (metro start-beat) #'play-loop [key start-beat])))))
+              (ov/apply-by (metro start-beat) #'play-loop [key start-beat])))))
       (map first pairs))))
 
 (defn play-only!
@@ -1057,7 +1056,7 @@
 ;; --- Main / Entry ---
 
 (defn -main [& args]
-  (connect-server)
+  (ov/connect-server)
   (tel/log! :info {:studel-overtone :ready}))
 
 (comment
@@ -1159,13 +1158,13 @@
 
   (play!
    :arp (->
-         (note (->> (chord :c4 :minor7) chosen-from (take 16)))
+         (note (->> (ov/chord :c4 :minor7) chosen-from (take 16)))
          (s :sine)
          (gain (take 16 (chosen-from (map (partial * 1/16) (range 16)))))
          (active [0]))
 
    :bass (->
-          (note (->> (chord :c1 :minor7) chosen-from (take 4)))
+          (note (->> (ov/chord :c1 :minor7) chosen-from (take 4)))
           (s :square)
           (lpf 400)
           (fast 1/8)
@@ -1204,7 +1203,7 @@
 
   (->> [1 2 3] shuffle (take 2))
 
-  (take 16 (chosen-from (chord :c4 :minor7)))
+  (take 16 (chosen-from (ov/chord :c4 :minor7)))
 
   (cpm (/ 80 4))
 
@@ -1252,7 +1251,7 @@
             (gain 0.1)
             (active 0))
    :arp (->
-         (note [(set (chord :a3 :major)) (set (chord :a3 :minor))])
+         (note [(set (ov/chord :a3 :major)) (set (ov/chord :a3 :minor))])
          (s [#{:sine :tri}])
          (gain 0.2)
          (env [#{:adsr :perc}])
@@ -1294,10 +1293,10 @@
             (duck 1)
             #_(active 0))
    :bass (->
-          (note [(set (take 3 (chord :f0 :minor)))
-                 (set (take 3 (chord :bb0 :minor)))
-                 (set (take 3 (chord :c0 :major)))
-                 (set (take 3 (chord :d0 :major)))])
+          (note [(set (take 3 (ov/chord :f0 :minor)))
+                 (set (take 3 (ov/chord :bb0 :minor)))
+                 (set (take 3 (ov/chord :c0 :major)))
+                 (set (take 3 (ov/chord :d0 :major)))])
           (s [:supersaw])
           (vibrato 1)
           (attack 0.5)
@@ -1471,7 +1470,7 @@
     )
 
   (play-only!
-    #_#_:intro (->
+    :intro (->
              (s [:sliced-storm]) (slow 4)
              (gain 0.5)
              (fshift 0)
@@ -1479,7 +1478,7 @@
              (hpf 0)
              (duck 1)
              (lpf 30000))
-    :storm (->
+    #_#_:storm (->
              (s [:storm-beat :- :storm-beat [:- :storm-beat]])
              (swing 1/5)
              (env :adsr)
@@ -1498,9 +1497,9 @@
              (decay 0.01)
              (gain 0.2)
              (duck-trigger 1))
-    :pad (->
+    #_#_:pad (->
            (note [:b2 :f2 :g2 :g2 :b2 :f2 :g2 :c2])
-           (swing 1/3)
+           (swing 1/5)
            (add 24)
            (s [:saw])
            (fast 1)
