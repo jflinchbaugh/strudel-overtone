@@ -31,16 +31,24 @@
             (fast (choose [16])) ;; randomly change the speed
             (gain 0.4)
             (release (srand 0.1 1.0)) ;; random release times
-            (pan sine))
+            (pan sine)
+            (active false))
 
    :chopped (->
              (note (choose-n 16 [:c4 :e4 :g4 :b4]))
              (s [:saw])
-             (ribbon 0 0.25) ;; Loop only the first quarter of the 16-note pattern
+             (ribbon 3 0.25) ;; Loop only the first quarter of the 16-note pattern
              (fast 1)        ;; Speed it up to fill the cycle
              (gain 0.3)
              (pan (srand -1 1))))
 
-  (stop!)
+  ;; Example: Capture the first cycle of a random melody and repeat it
+  (play! :frozen-lead (-> (note (choose-n 8 [:c3 :e3 :g3 :b3]))
+                          (s :saw)
+                          (ribbon 2 0.5) ;; Freeze the first 8 random notes
+                          (gain 0.3)
+                          (lpf (sig-range sine 500 2000)))) ;; LPF still moves!
+
+ (stop!)
 
   )

@@ -868,18 +868,49 @@
    offset: start point in cycles
    len: length of segment in cycles"
   [pattern offset len]
-  (let [events (:events pattern)
+  (let [source-events (:events pattern)
+        ;; Determine the number of cycles in the source pattern
+        max-source-t (if (seq source-events)
+                       (apply max (map :time source-events))
+                       0)
+        source-num-cycles (inc (long max-source-t))
+        ;; How many cycles do we need to reach 'offset + len'?
+        required-cycles (long (Math/ceil (+ offset len)))
+        ;; Unroll the source events if needed to cover the range
+        unroll-count (long (Math/ceil (/ required-cycles (double source-num-cycles))))
+        unrolled-events (if (> unroll-count 1)
+                          (mapcat (fn [i]
+                                    (map (fn [ev]
+                                           (update ev :time + (* i source-num-cycles)))
+                                         source-events))
+                                  (range unroll-count))
+                          source-events)
         end (+ offset len)
         segment-events (filter (fn [ev]
                                  (let [t (:time ev)]
                                    (and (>= t offset) (< t end))))
-                               events)]
+                               unrolled-events)]
     (assoc pattern :events
            (mapcat (fn [i]
                      (map (fn [ev]
-                            (update ev :time (fn [t] (+ (* i len) (- t offset)))))
+                            (let [orig-t (:time ev)
+                                  new-t (+ (* i len) (- orig-t offset))]
+                              (-> ev
+                                  (assoc :time new-t)
+                                  (update :params
+                                          (fn [ps]
+                                            (reduce-kv (fn [m k v]
+                                                         (assoc m k
+                                                           (if (fn? v)
+                                                             ;; Freeze the time for existing functions
+                                                             ;; using a stable t derived from orig-t.
+                                                             ;; We use * 4.0 to match the beat scale.
+                                                             (fn [_t k] (v (* orig-t 4.0) k))
+                                                             v)))
+                                                       {} ps))))))
                           segment-events))
-                   (range 100))))) ;; Pre-generate many cycles
+                   (range 100)))))
+ ;; Pre-generate many cycles
 
 
 ;; --- Player ---
@@ -1174,23 +1205,34 @@
                 ;; Determine grid from smallest note duration, default to 1/8 (0.125) if empty
                 min-dur (if (seq events)
                           (apply min (map :duration events))
-                          0.125)]
+                          0.125)
+                ;; Calculate which cycle of the pattern we are on
+                ;; (Some functions like ribbon create multi-cycle event lists)
+                num-cycles (if (seq events)
+                             (inc (long (apply max (map :time events))))
+                             1)
+                ;; Since play-loop is quantized and incremental, we can 
+                ;; rely on beat being a multiple of cycle-dur
+                cycle-total (Math/round (double (/ beat cycle-dur)))
+                cycle-idx (mod cycle-total num-cycles)]
 
             ;; Schedule events for this cycle
             (doseq [ev events]
-              (let [orig-start (:time ev)
-                    swing-raw (get-in ev [:params :swing] 0)
-                    swing-amount (if (fn? swing-raw) (swing-raw beat :swing) swing-raw)
-                    swung-start (if (zero? swing-amount)
-                                  orig-start
-                                  (apply-swing orig-start swing-amount min-dur))
-                    ;; Assoc effective start time for logging/debugging
-                    ev (assoc ev :effective-time swung-start)
+              (let [t (:time ev)]
+                (when (and (>= t cycle-idx) (< t (inc cycle-idx)))
+                  (let [rel-t (- t cycle-idx)
+                        swing-raw (get-in ev [:params :swing] 0)
+                        swing-amount (if (fn? swing-raw) (swing-raw beat :swing) swing-raw)
+                        swung-start (if (zero? swing-amount)
+                                      rel-t
+                                      (apply-swing rel-t swing-amount min-dur))
+                        ;; Assoc effective start time for logging/debugging
+                        ev (assoc ev :effective-time swung-start)
 
-                    rel-dur (:duration ev)
-                    ev-beat (+ beat (* swung-start cycle-dur))
-                    ev-dur-beats (* rel-dur cycle-dur)]
-                (trigger-event ev ev-beat ev-dur-beats)))
+                        rel-dur (:duration ev)
+                        ev-beat (+ beat (* swung-start cycle-dur))
+                        ev-dur-beats (* rel-dur cycle-dur)]
+                    (trigger-event ev ev-beat ev-dur-beats)))))
 
             (ov/apply-by (metro next-beat) #'play-loop [key next-beat]))
           ;; Pattern removed, loop dies
