@@ -8,9 +8,11 @@
     (let [pat (-> (sut/s [:saw])
                   (sut/duck 0.5)
                   (sut/duck-trigger 0.8))]
-      (let [ev (first (:events pat))]
-        (is (= 0.5 (get-in ev [:params :duck])))
-        (is (= 0.8 (get-in ev [:params :duck-trigger]))))))
+      (let [ev (first (:events pat))
+            duck-fn (get-in ev [:params :duck])
+            trigger-fn (get-in ev [:params :duck-trigger])]
+        (is (= 0.5 (duck-fn 0 :duck)))
+        (is (= 0.8 (trigger-fn 0 :duck-trigger))))))
 
   (testing "trigger-event passes duck params to synth"
      (let [mock-calls (atom [])]

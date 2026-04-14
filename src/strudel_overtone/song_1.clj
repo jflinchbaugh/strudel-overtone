@@ -9,28 +9,27 @@
 
   (playing)
   (stop!)
-
-  (play!
-   :plucks (->
-            (note (chosen-from (ov/chord :c6 :minor7) 3))
-            (add 0)
-            (fast 4)
-            (s :ks-stringer)
-            (distort 0.7)
+(play!
+ :plucks (->
+          (note (choose-n 1 (ov/chord :c6 :minor7)))
+          (add 0)
+          (fast 4)
+          (s :ks-stringer)
+            #_(distort 0.7)
             #_(echo-delay 0.02)
-            (crush 0.9)
-            (distort 0.5)
-            (release 0.01)
-            (room 0.5)
-            (pan-hz 1)
-            (pan-depth 0.9)
+            #_(crush 0.9)
+            #_(distort 0.5)
+            #_(release 0.01)
+            #_(room 0.5)
+            #_(pan-hz 1)
+            #_(pan-depth 0.9)
             (duck-trigger 1)
-            (swing [0/4])
-            (gain 0.3)))
+            #_(swing [0/4])
+            #_(gain 0.3)))
 
   (play!
    :kick (->
-           (s [#{[:kick :- :-] :dub-kick} :-
+          (s [#{[:kick :- :-] :dub-kick} :-
               [:- #{[:kick :- :-] :dub-kick}] :-])
           (note [:d2 :c2])
           (gain 1)
@@ -38,7 +37,7 @@
    :snare (->
            (s [:- :snare :- :snare])
            (gain [0.6 0.8])
-           (note (chosen-from (ov/chord :e3 :minor) 2)))
+           (note (choose-n 2 (ov/chord :e3 :minor))))
    :hat (->
          (s (map (fn [n] (cons  n [:- :-])) (take 8 (cycle [:hat]))))
          (gain 0.6)
@@ -67,6 +66,5 @@
   (stop! :plucks)
 
   (stop!)
-
 
   .)

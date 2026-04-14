@@ -15,7 +15,7 @@
 
         (let [state @player-state]
           (is (= #{:p2} (set (keys (:patterns state)))))
-          (is (= "sn" (get-in (first (get-in state [:patterns :p2 :events])) [:params :sound])))))
+          (is (= :sn (get-in (first (get-in state [:patterns :p2 :events])) [:params :sound])))))
 
       (testing "play-only! with single pattern defaults to :main and clears others"
         (reset! player-state {:playing? true
@@ -25,4 +25,4 @@
 
         (let [state @player-state]
           (is (= #{:main} (set (keys (:patterns state)))))
-          (is (= "clap" (get-in (first (get-in state [:patterns :main :events])) [:params :sound]))))))))
+          (is (= :clap (get-in (first (get-in state [:patterns :main :events])) [:params :sound]))))))))

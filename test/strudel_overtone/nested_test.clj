@@ -19,19 +19,19 @@
 
       (let [evs (:events pat)
             [e1 e2 e3 e4] evs]
-        (is (= "a" (get-in e1 [:params :sound])))
+        (is (= :a (get-in e1 [:params :sound])))
         (is (approx= 0.0 (:time e1)))
         (is (approx= 0.333 (:duration e1)))
 
-        (is (= "b" (get-in e2 [:params :sound])))
+        (is (= :b (get-in e2 [:params :sound])))
         (is (approx= 0.333 (:time e2)))
         (is (approx= 0.166 (:duration e2)))
 
-        (is (= "c" (get-in e3 [:params :sound])))
+        (is (= :c (get-in e3 [:params :sound])))
         (is (approx= 0.5 (:time e3)))
         (is (approx= 0.166 (:duration e3)))
 
-        (is (= "d" (get-in e4 [:params :sound])))
+        (is (= :d (get-in e4 [:params :sound])))
         (is (approx= 0.666 (:time e4)))
         (is (approx= 0.333 (:duration e4))))))
 
@@ -47,7 +47,7 @@
       (is (= 4 (count (:events pat))))
       (let [evs (:events pat)
             e4 (last evs)]
-        (is (= "d" (get-in e4 [:params :sound])))
+        (is (= :d (get-in e4 [:params :sound])))
         (is (approx= 0.875 (:time e4)))
         (is (approx= 0.125 (:duration e4)))))))
 
@@ -97,7 +97,7 @@
       (is (= 2 (count (:events pat))))
       (let [evs (:events pat)
             sounds (set (map #(get-in % [:params :sound]) evs))]
-        (is (= #{"piano" "violin"} sounds))
+        (is (= #{:piano :violin} sounds))
         (is (every? #(= :c4 (get-in % [:params :note])) evs)))))
 
   (testing "Complex Cartesian product"
@@ -112,7 +112,7 @@
                             [(get-in e [:params :note])
                              (get-in e [:params :sound])])
                           evs))]
-        (is (contains? combos [:c4 "piano"]))
-        (is (contains? combos [:c4 "violin"]))
-        (is (contains? combos [:e4 "piano"]))
-        (is (contains? combos [:e4 "violin"]))))))
+        (is (contains? combos [:c4 :piano]))
+        (is (contains? combos [:c4 :violin]))
+        (is (contains? combos [:e4 :piano]))
+        (is (contains? combos [:e4 :violin]))))))

@@ -59,10 +59,9 @@
   (testing "logged event contains effective-time"
     (let [tasks (atom [])
           mock-metro (constantly 1000)
-          ;; Mock apply-at to capture the event passed to logging/synth
-          mock-apply-at (fn [time func & args]
-                          (when (and args (map? (first args))) ;; Capture the event map
-                             (swap! tasks conj (first args))))
+          ;; Mock trigger-event to capture the event map it receives
+          mock-trigger-event (fn [ev beat dur-beats]
+                               (swap! tasks conj ev))
           
           ;; Define a pattern with swing
           pat (-> (sut/s [:bd :sd]) ;; 0.0, 0.5. Grid 0.5
@@ -74,13 +73,9 @@
 
       (with-redefs [sut/metro mock-metro
                     sut/player-state player-state
-                    ov/apply-at mock-apply-at
+                    sut/trigger-event mock-trigger-event
                     ov/apply-by (fn [& _] nil)
-                    sut/at-metro (fn [& _] nil) ;; Ignore synth calls for this test
-                    ov/metro-bpm (constantly 120) ;; Mock metro-bpm
-                    ;; Stub trigger-event dependencies if needed, or just let it run
-                    ;; We need to ensure trigger-event calls apply-at with the event
-                    sut/resolve-synth (constantly (fn [& _]))]
+                    ov/metro-bpm (constantly 120)]
         
         ;; Run one loop iteration
         (sut/play-loop :test 0)
@@ -104,5 +99,5 @@
     (let [pat (sut/s [:bd :sd])
           swung (sut/swing pat 0.2)
           events (:events swung)]
-      (is (= 0.2 (get-in (first events) [:params :swing])))
-      (is (= 0.2 (get-in (second events) [:params :swing]))))))
+      (is (= 0.2 ((get-in (first events) [:params :swing]) 0 :swing)))
+      (is (= 0.2 ((get-in (second events) [:params :swing]) 0 :swing))))))

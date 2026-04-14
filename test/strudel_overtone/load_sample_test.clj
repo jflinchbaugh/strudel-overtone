@@ -14,7 +14,7 @@
 
 (deftest sample-info-test
   (let [buf {:duration 10.0 :n-channels 2 :rate 44100.0 :path "path" :size 441000}]
-    (with-redefs [sut/samples (atom {"test" buf})
+    (with-redefs [sut/samples (atom {:test buf})
                   sut/sample-slices (atom {})]
       (testing "info for regular sample"
         (let [info (sut/sample-info :test)]
@@ -25,7 +25,7 @@
         (sut/slice-sample! :test-slice :test 0.1 0.2)
         (let [info (sut/sample-info :test-slice)]
           (is (= :slice (:type info)))
-          (is (= "test" (:source info)))
+          (is (= :test (:source info)))
           (is (= 1.0 (:duration info)))
           (is (= 10.0 (:full-duration info)))))
 

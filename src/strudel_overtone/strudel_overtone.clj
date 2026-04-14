@@ -39,7 +39,7 @@
                                            (fn [acc k v]
                                              (conj acc k v))
                                            [] final-args-map)]
-                       `(ov/defsynth ~(symbol (str name suffix))
+                       `(ov/defsynth ~(symbol (str (clojure.core/name name) suffix))
                           ~final-args-vec
                           (let [~'env ~env-gen-form
                                 ;; Trigger Sidechain
@@ -198,6 +198,7 @@
   (t/formatter "HH:mm:ss.SSS"))
 
 (tel/stop-handlers!)
+
 (tel/add-handler!
  :console
  (tel/handler:console
@@ -348,39 +349,167 @@
 
 ;; --- Pattern Engine ---
 
+(defonce global-seed (atom 0))
+
+(defn seed!
+  "Sets the global seed for repeatable randomness.
+   Default is 0."
+  [n]
+  (reset! global-seed n))
+
+(defn- repeatable-rand
+  "Returns a deterministic random value [0, 1) based on time t,
+   a seed-offset (usually the param key), and the global-seed."
+  [t seed-offset]
+  (let [s @global-seed
+        h (hash [s t seed-offset])]
+    (/ (Math/abs h) (double Integer/MAX_VALUE))))
+
+(defn irand
+  "Returns a repeatable random integer stream between low (inclusive)
+   and high (exclusive). If only one arg is provided, it's [0, high)."
+  ([high] (irand 0 high))
+  ([low high]
+   (fn [t seed]
+     (let [r (repeatable-rand t seed)]
+       (int (+ low (* r (- high low))))))))
+
+(defn srand
+  "Returns a repeatable random float stream between low and high.
+   Defaults to [0, 1)."
+  ([] (srand 0 1))
+  ([high] (srand 0 high))
+  ([low high]
+   (fn [t seed]
+     (let [r (repeatable-rand t seed)]
+       (+ low (* r (- high low)))))))
+
+(defn pick
+  "Returns a repeatable random stream that picks an element from coll."
+  [coll]
+  (fn [t seed]
+    (let [r (repeatable-rand t seed)
+          idx (int (* r (count coll)))]
+      (nth coll idx))))
+
+(def choose
+  "Alias for pick.
+   Returns a repeatable random stream that picks an element from coll."
+  pick)
+
+(defn wchoose
+  "Returns a repeatable random stream that picks from choices based on weights.
+   pairs: a collection of [value weight] pairs."
+  [pairs]
+  (let [choices (mapv first pairs)
+        weights (mapv second pairs)
+        total (double (reduce + weights))
+        cum-weights (vec (reductions + weights))]
+    (fn [t seed]
+      (if (zero? total)
+        (rand-nth choices)
+        (let [r (* (repeatable-rand t seed) total)]
+          (loop [i 0]
+            (if (< r (cum-weights i))
+              (choices i)
+              (if (< (inc i) (count cum-weights))
+                (recur (inc i))
+                (choices (dec (count choices)))))))))))
+
+(defn- chosen-from
+  "Returns an infinite sequence of repeatable random stream functions
+   that each pick from coll. Useful for initializing patterns.
+   Example: (note (choose-n 16 [:c2 :e2 :g2]))"
+  [coll]
+  (map (fn [i]
+         (fn [t seed]
+           (let [r (repeatable-rand (+ t (* i 0.001)) seed)]
+             (nth coll (int (* r (count coll)))))))
+       (range)))
+
+(defn choose-n
+  "Returns a sequence of n repeatable random stream functions
+   that each pick from coll. Useful for creating random sequences.
+   Example: (s (choose-n 4 [\"kick\" \"snare\" \"hat\"]))"
+  [n coll]
+  (take n (chosen-from coll)))
+
+;; --- Signals ---
+
+(defn- tau [t] (* 2 Math/PI t))
+
+(defn sine
+  "Returns a continuous sine wave signal (0 to 1)."
+  [t _]
+  (+ 0.5 (* 0.5 (Math/sin (tau t)))))
+
+(defn saw
+  "Returns a continuous sawtooth wave signal (0 to 1)."
+  [t _]
+  (mod t 1))
+
+(defn tri
+  "Returns a continuous triangle wave signal (0 to 1)."
+  [t _]
+  (let [x (mod t 1)]
+    (if (< x 0.5)
+      (* 2 x)
+      (- 2 (* 2 x)))))
+
+(defn square
+  "Returns a continuous square wave signal (0 to 1)."
+  [t _]
+  (if (< (mod t 1) 0.5) 1 0))
+
+(defn cosine
+  "Returns a continuous cosine wave signal (0 to 1)."
+  [t _]
+  (+ 0.5 (* 0.5 (Math/cos (tau t)))))
+
+(defn sig-range
+  "Wraps a signal function to scale its output to [low, high]."
+  [sig low high]
+  (fn [t seed]
+    (let [v (sig t seed)]
+      (+ low (* v (- high low))))))
+
 (defrecord Event [time duration params])
 (defrecord Pattern [events cycles])
 
 (defn make-pattern [events]
-  (->Pattern events 1))
+  (->Pattern events (constantly 1)))
 
 (defn parse-mini
-  "Naively parses a collection into a sequence of events with duration.
+  "Naively parses a collection or single value into a sequence of events.
    Returns a list of maps {:value v :start s :duration d}.
    Handles nested collections by subdividing the duration.
    Handles sets by creating simultaneous events with the same duration."
   ([tokens] (parse-mini tokens 0.0 1.0))
   ([tokens start duration]
-   (let [n (count tokens)
-         dur (if (pos? n) (/ duration (double n)) 0)]
-     (mapcat (fn [[i v]]
-               (let [s-time (+ start (* i dur))]
-                 (cond
-                   (set? v)
-                   (map (fn [val]
-                          {:value val
-                           :start s-time
-                           :duration dur})
-                        v)
+   (if (sequential? tokens)
+     (let [n (count tokens)
+           dur (if (pos? n) (/ duration (double n)) 0)]
+       (mapcat (fn [[i v]]
+                 (let [s-time (+ start (* i dur))]
+                   (cond
+                     (set? v)
+                     (map (fn [val]
+                            {:value val
+                             :start s-time
+                             :duration dur})
+                          v)
 
-                   (and (sequential? v) (not (string? v)))
-                   (parse-mini v s-time dur)
+                     (and (sequential? v) (not (string? v)))
+                     (parse-mini v s-time dur)
 
-                   :else
-                   [{:value v
-                     :start s-time
-                     :duration dur}])))
-             (map-indexed vector tokens)))))
+                     :else
+                     [{:value v
+                       :start s-time
+                       :duration dur}])))
+               (map-indexed vector tokens)))
+     [{:value tokens
+       :start start
+       :duration duration}])))
 
 (defn with-param
   "Updates pattern events with a specific parameter."
@@ -391,24 +520,32 @@
 
 (defn- ->name
   [v]
-  (if (instance? clojure.lang.Named v) (name v) (str v)))
+  (cond
+    (fn? v) v
+    (instance? clojure.lang.Named v) (keyword (name v))
+    :else (keyword (str v))))
 
 (defn- is-rest? [v]
-  (#{"-" "_"} (->name v)))
+  (#{:- :_} (->name v)))
 
 (defn- try-parse-number [v]
-  (if (string? v)
-    (try (Double/parseDouble v) (catch Exception _ v))
-    v))
+  (cond
+    (fn? v) v
+    (string? v) (try (Double/parseDouble v) (catch Exception _ v))
+    :else v))
+
+(defn- wrap-number-fn [v]
+  (if (number? v) (constantly v) v))
 
 (defn- make-event-list [pat key transform-fn]
   (let [parsed (parse-mini pat)]
     (keep (fn [p]
-            (let [v (:value p)]
+            (let [v (:value p)
+                  res (wrap-number-fn (transform-fn v))]
               (when-not (is-rest? v)
                 (->Event (:start p)
                          (:duration p)
-                         {key (transform-fn v)}))))
+                         {key res}))))
           parsed)))
 
 (defn- combine-patterns [base-pat new-pat key]
@@ -438,9 +575,9 @@
    (if (sequential? val)
      (combine-patterns
       pattern
-      (make-pattern (make-event-list val key transform-fn))
+      (make-pattern (make-event-list val key (comp wrap-number-fn transform-fn)))
       key)
-     (with-param pattern key (transform-fn val)))))
+     (with-param pattern key (wrap-number-fn (transform-fn val))))))
 
 (defn s
   "Creates a pattern from a sound string (mini-notation),
@@ -640,6 +777,11 @@
    Values: 1.0 (normal), 0.5 (half speed), -1.0 (reverse), etc."
   [pattern val] (set-param pattern :rate val))
 
+(def speed
+  "Alias for rate.
+   Sets the playback rate for samples."
+  rate)
+
 (defn pshift
   "Sets the pitch shift in semitones.
    Uses a time-domain granular pitch shifter.
@@ -706,10 +848,39 @@
   (set-param pattern :active val try-parse-number))
 
 (defn fast [pattern amount]
-  (update pattern :cycles #(* % amount)))
+  (let [amount-fn (wrap-number-fn amount)]
+    (update pattern :cycles
+            (fn [old-val]
+              (let [old-fn (wrap-number-fn old-val)]
+                (fn [t seed]
+                  (* (old-fn t seed) (amount-fn t seed))))))))
 
 (defn slow [pattern amount]
-  (update pattern :cycles #(/ % amount)))
+  (let [amount-fn (wrap-number-fn amount)]
+    (update pattern :cycles
+            (fn [old-val]
+              (let [old-fn (wrap-number-fn old-val)]
+                (fn [t seed]
+                  (/ (old-fn t seed) (amount-fn t seed))))))))
+
+(defn ribbon
+  "Loops a specific segment of a pattern.
+   offset: start point in cycles
+   len: length of segment in cycles"
+  [pattern offset len]
+  (let [events (:events pattern)
+        end (+ offset len)
+        segment-events (filter (fn [ev]
+                                 (let [t (:time ev)]
+                                   (and (>= t offset) (< t end))))
+                               events)]
+    (assoc pattern :events
+           (mapcat (fn [i]
+                     (map (fn [ev]
+                            (update ev :time (fn [t] (+ (* i len) (- t offset)))))
+                          segment-events))
+                   (range 100))))) ;; Pre-generate many cycles
+
 
 ;; --- Player ---
 
@@ -747,6 +918,9 @@
 (defonce samples (atom {}))
 (defonce sample-slices (atom {}))
 
+(defn- clean-name [n]
+  (keyword (str/replace (clojure.core/name (->name n)) #"^:" "")))
+
 (defn load-sample!
   "Loads a sample into the registry.
    Name can be a keyword or string.
@@ -758,10 +932,10 @@
                        :error
                        {:sample {:path path :failed (.getMessage e)}})
                       nil))]
-    (do
-      (swap! samples assoc (str/replace (str name) #"^:" "") buf)
-      (tel/log! :info {:sample-loaded {:name name :from-path path}})
-      name)
+    (let [k (clean-name name)]
+      (swap! samples assoc k buf)
+      (tel/log! :info {:sample-loaded {:name k :from-path path}})
+      k)
     (do
       (tel/log! :warn {:sample-not-loaded {:name name :from-path path}})
       nil)))
@@ -777,10 +951,10 @@
                        :error
                        {:freesound {:id id :failed (.getMessage e)}})
                       nil))]
-    (do
-      (swap! samples assoc (str/replace (str name) #"^:" "") buf)
-      (tel/log! :info {:freesound-loaded {:name name :id id}})
-      name)
+    (let [k (clean-name name)]
+      (swap! samples assoc k buf)
+      (tel/log! :info {:freesound-loaded {:name k :id id}})
+      k)
     (do
       (tel/log! :warn {:freesound-not-loaded {:name name :id id}})
       nil)))
@@ -792,29 +966,29 @@
    begin: Start position (0.0 to 1.0)
    end: End position (0.0 to 1.0)"
   [name source-name begin end]
-  (let [s-name (str/replace (str name) #"^:" "")
-        src-name (str/replace (str source-name) #"^:" "")]
+  (let [s-name (clean-name name)
+        src-name (clean-name source-name)]
     (swap! sample-slices assoc s-name {:source src-name :begin begin :end end})
-    (tel/log! :info {:sample-sliced {:name name :from source-name}})))
+    (tel/log! :info {:sample-sliced {:name s-name :from src-name}})))
 
 (defn slice-sample-ms!
   "Like slice-sample!, but uses milliseconds instead of 0.0 to 1.0 fractions.
    Note: Currently only supports slicing base samples, not nested slices."
   [name source-name begin-ms end-ms]
-  (let [s-name (str/replace (str name) #"^:" "")
-        src-name (str/replace (str source-name) #"^:" "")
+  (let [s-name (clean-name name)
+        src-name (clean-name source-name)
         buf (get @samples src-name)]
     (if buf
       (let [total-ms (* (:duration buf) 1000)
             begin (double (/ begin-ms total-ms))
             end (double (/ end-ms total-ms))]
-        (slice-sample! name source-name begin end))
-      (tel/log! :error {:slice-ms-failed {:name name :source source-name :reason "Source sample not found"}}))))
+        (slice-sample! s-name src-name begin end))
+      (tel/log! :error {:slice-ms-failed {:name s-name :source src-name :reason "Source sample not found"}}))))
 
 (defn sample-info
   "Returns information about a sample or slice by name."
   [name]
-  (let [s-name (str/replace (str name) #"^:" "")
+  (let [s-name (clean-name name)
         slice (get @sample-slices s-name)
         effective-name (if slice (:source slice) s-name)
         buf (get @samples effective-name)]
@@ -848,22 +1022,23 @@
   (ov/midi->hz (ov/note n)))
 
 (def ^:private synth-aliases
-  {"bd" "kick"
-   "sd" "snare"
-   "hh" "hat"
-   "cp" "clap"})
+  {:bd :kick
+   :sd :snare
+   :hh :hat
+   :cp :clap})
 
 (def ^:private percussive-synths
-  #{"kick" "snare" "hat" "clap" "bd" "sd" "hh" "cp" "dub-kick" "dance-kick"})
+  #{:kick :snare :hat :clap :bd :sd :hh :cp :dub-kick :dance-kick})
 
 (defn- get-synth-name [sound params]
-  (let [default-env (if (percussive-synths sound) "perc" "adsr")
+  (let [base (get synth-aliases sound sound)
+        default-env (if (percussive-synths base) :perc :adsr)
         env (get params :env default-env)]
-    (str sound "-" env)))
+    (keyword (str (clojure.core/name base) "-" (clojure.core/name env)))))
 
 (defn- resolve-synth [name]
   (if-let [ns (find-ns 'strudel-overtone.strudel-overtone)]
-    (ns-resolve ns (symbol name))
+    (ns-resolve ns (symbol (clojure.core/name name)))
     nil))
 
 (defn at-metro
@@ -872,14 +1047,21 @@
   [beat synth-var args]
   (ov/at (metro beat) (apply synth-var args)))
 
+(defn- resolve-params [params beat]
+  (reduce-kv (fn [m k v]
+               (assoc m k (if (fn? v) (v beat k) v)))
+             {}
+             params))
+
 (defn trigger-event [ev beat dur-beats]
-  (let [params (:params ev)
+  (let [raw-params (:params ev)
+        params (resolve-params raw-params beat)
         active (get params :active 1)
         active? (if (number? active) (not (zero? active)) active)]
     (when active?
       (let [sound-param (:sound params)
             n (:note params)
-            sound-name (or sound-param (if n "saw" nil))
+            sound-name (or sound-param (if n :saw nil))
             ;; Check if it's a slice first
             slice (when sound-name (get @sample-slices sound-name))
             effective-sound (if slice (:source slice) sound-name)
@@ -925,8 +1107,8 @@
                                 dur (:duration sample-buf)
                                 total-dur (* (abs (double (- e b))) dur (/ 1 (max 0.001 abs-r)))
                                 total-dur (min total-dur step-dur-sec)
-                                env (get params :env "adsr")]
-                            (if (= env "perc")
+                                env (get params :env :adsr)]
+                            (if (= env :perc)
                               (let [attack (let [a (get params :attack 0)]
                                              (if (string? a) (try (Double/parseDouble a) (catch Exception _ 0)) a))]
                                 (max 0.001 (- total-dur attack)))
@@ -938,7 +1120,7 @@
                           step-dur-sec)]
 
         (when sound-name
-          (let [base (if sample-buf "sampler" (get synth-aliases sound-name sound-name))
+          (let [base (if sample-buf :sampler (get synth-aliases sound-name sound-name))
                 synth-key (get-synth-name base params)
                 synth-var (or
                            (resolve-synth synth-key)
@@ -983,7 +1165,9 @@
              (contains? (:loops state) key))
       (let [pat (get-in state [:patterns key])]
         (if pat
-          (let [cycles (:cycles pat 1) ;; Speed multiplier
+          (let [cycles-raw (:cycles pat (constantly 1))
+                cycles-fn (if (fn? cycles-raw) cycles-raw (constantly cycles-raw))
+                cycles (cycles-fn beat :cycles)
                 cycle-dur (/ 4 cycles) ;; Beats per cycle (assuming 4/4)
                 next-beat (+ beat cycle-dur)
                 events (:events pat)
@@ -995,7 +1179,8 @@
             ;; Schedule events for this cycle
             (doseq [ev events]
               (let [orig-start (:time ev)
-                    swing-amount (get-in ev [:params :swing] 0)
+                    swing-raw (get-in ev [:params :swing] 0)
+                    swing-amount (if (fn? swing-raw) (swing-raw beat :swing) swing-raw)
                     swung-start (if (zero? swing-amount)
                                   orig-start
                                   (apply-swing orig-start swing-amount min-dur))
@@ -1431,8 +1616,6 @@
 
   (stop!)
 
-  (stop)
-
   (play!
    :early (-> (s [:clap-808 :- :- :-]))
    :later (-> (s [:sine :- :- :-])))
@@ -1461,7 +1644,8 @@
 
   (play-only!
     :intro (->
-             (s [:sliced-storm]) (slow 4)
+             (s [:sliced-storm])
+             (slow 4)
              (gain 1)
              (resonance 0.1)
              (duck 1)
@@ -1471,7 +1655,8 @@
 
   (play-only!
     :intro (->
-             (s [:sliced-storm]) (slow 4)
+             (s [:sliced-storm])
+             (slow 4)
              (gain 0.5)
              (fshift 0)
              (distort 0.5)

@@ -11,16 +11,16 @@
                     sut/metro (constantly 0)
                     ov/apply-at (fn [ms func & args] (swap! mock-calls conj {:func func :args args}))
                     sut/at-metro (fn [beat synth-var args] (swap! mock-calls conj {:func synth-var :args [args]}))
-                    sut/samples (atom {"test" {:id 1 :duration 2.0}})
+                    sut/samples (atom {:test {:id 1 :duration 2.0}})
                     sut/sampler-adsr (fn [& args] args)
                     sut/sampler-perc (fn [& args] args)]
 
-                ;; Event with sound "test" and end 0.5
+                ;; Event with sound :test and end 0.5
                 ;; begin defaults to 0, rate defaults to 1
                 ;; total-dur = (0.5 - 0) * 2.0 / 1 = 1.0
                 ;; step duration is 2 beats = 1.0s (at 120 BPM)
                 ;; total-dur 1.0 is <= step-dur 1.0, so sustain should be 1.0
-                (let [ev (sut/->Event 0 1 {:sound "test" :end 0.5})]
+                (let [ev (sut/->Event 0 1 {:sound :test :end 0.5})]
                   (sut/trigger-event ev 0 2)
 
                   (let [synth-call (second @mock-calls) ;; first is log!
@@ -33,7 +33,7 @@
                 ;; total-dur = (0.6 - 0.1) * 2.0 / 2 = 0.5
                 ;; step duration is 2 beats = 1.0s
                 ;; sustain should be 0.5 - 0.1 = 0.4
-                (let [ev (sut/->Event 0 1 {:sound "test" :begin 0.1 :end 0.6 :rate 2.0 :release 0.1})]
+                (let [ev (sut/->Event 0 1 {:sound :test :begin 0.1 :end 0.6 :rate 2.0 :release 0.1})]
                   (sut/trigger-event ev 0 2)
 
                   (let [synth-call (second @mock-calls) ;; first is log!
@@ -42,11 +42,11 @@
                     (is (sut-test/approx= 0.4 (:sustain args-map)))))
 
                 (reset! mock-calls [])
-                ;; Event with env "perc", attack 0.05, end 0.5
+                ;; Event with env :perc, attack 0.05, end 0.5
                 ;; total-dur = (0.5 - 0) * 2.0 / 1 = 1.0
                 ;; step duration is 2 beats = 1.0s
                 ;; sustain should be 1.0 - 0.05 = 0.95
-                (let [ev (sut/->Event 0 1 {:sound "test" :end 0.5 :env "perc" :attack 0.05})]
+                (let [ev (sut/->Event 0 1 {:sound :test :end 0.5 :env :perc :attack 0.05})]
                   (sut/trigger-event ev 0 2)
 
                   (let [synth-call (second @mock-calls) ;; first is log!
@@ -55,7 +55,7 @@
                     (is (sut-test/approx= 0.95 (:sustain args-map)))))
         (reset! mock-calls [])
         ;; Explicit sustain should take precedence over end
-        (let [ev (sut/->Event 0 1 {:sound "test" :end 0.5 :sustain 5.0})]
+        (let [ev (sut/->Event 0 1 {:sound :test :end 0.5 :sustain 5.0})]
           (sut/trigger-event ev 0 1)
 
           (let [synth-call (second @mock-calls)

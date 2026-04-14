@@ -18,19 +18,21 @@
                   (sut/modulator-ratio 3)
                   (sut/mod-index 10)
                   (sut/echo-repeats 8))]
-      (let [ev (first (:events pat))]
-        (is (= 0.5 (get-in ev [:params :pan])))
-        (is (= 0.2 (get-in ev [:params :resonance])))
-        (is (= 0.05 (get-in ev [:params :attack])))
-        (is (= 0.2 (get-in ev [:params :decay])))
-        (is (= 0.4 (get-in ev [:params :s-level])))
-        (is (= 0.5 (get-in ev [:params :release])))
-        (is (= 0.6 (get-in ev [:params :width])))
-        (is (= 2 (get-in ev [:params :carrier-ratio])))
-        (is (= 3 (get-in ev [:params :modulator-ratio])))
-        (is (= 10 (get-in ev [:params :mod-index])))
-        (is (= 8 (get-in ev [:params :repeats]))))))
+      (let [ev (first (:events pat))
+            params (:params ev)]
+        (is (= 0.5 ((:pan params) 0 :pan)))
+        (is (= 0.2 ((:resonance params) 0 :resonance)))
+        (is (= 0.05 ((:attack params) 0 :attack)))
+        (is (= 0.2 ((:decay params) 0 :decay)))
+        (is (= 0.4 ((:s-level params) 0 :s-level)))
+        (is (= 0.5 ((:release params) 0 :release)))
+        (is (= 0.6 ((:width params) 0 :width)))
+        (is (= 2 ((:carrier-ratio params) 0 :carrier-ratio)))
+        (is (= 3 ((:modulator-ratio params) 0 :modulator-ratio)))
+        (is (= 10 ((:mod-index params) 0 :mod-index)))
+        (is (= 8 ((:repeats params) 0 :repeats)))))))
 
+(deftest trigger-event-params-test
   (testing "trigger-event passes parameters to synth"
      (let [mock-calls (atom [])]
       (with-redefs [ov/metro-bpm (constantly 120)
@@ -54,15 +56,17 @@
             ;; args is a list/vector of keywords and values
             (let [args-map (apply hash-map (first args))]
               (is (= 0.5 (:pan args-map)))
-              (is (= 0.2 (:resonance args-map)))))))))
+              (is (= 0.2 (:resonance args-map))))))))))
 
+(deftest env-param-test
   (testing "env parameter is combinable"
     (let [pat (-> (sut/s [:bd :sd])
                   (sut/env [:perc :adsr]))]
-      (is (= "perc" (get-in (first (:events pat)) [:params :env])))
-      (is (= "adsr" (get-in (second (:events pat)) [:params :env])))))
+      (is (= :perc (get-in (first (:events pat)) [:params :env])))
+      (is (= :adsr (get-in (second (:events pat)) [:params :env]))))))
 
+(deftest active-param-test
   (testing "active parameter parses strings in single value"
     (let [pat (-> (sut/s [:bd])
                   (sut/active "0"))]
-      (is (= 0.0 (get-in (first (:events pat)) [:params :active]))))))
+      (is (= 0.0 ((get-in (first (:events pat)) [:params :active]) 0 :active))))))

@@ -16,14 +16,14 @@
                   (sut/phaser-depth 0.6))]
       (let [ev (first (:events pat))
             params (:params ev)]
-        (is (= 12 (:pshift params)))
-        (is (= 100 (:fshift params)))
-        (is (= 5 (:tremolo-hz params)))
-        (is (= 0.5 (:tremolo-depth params)))
-        (is (= 1 (:pan-hz params)))
-        (is (= 0.8 (:pan-depth params)))
-        (is (= 0.5 (:phaser-hz params)))
-        (is (= 0.6 (:phaser-depth params))))))
+        (is (= 12 ((:pshift params) 0 :pshift)))
+        (is (= 100 ((:fshift params) 0 :fshift)))
+        (is (= 5 ((:tremolo-hz params) 0 :tremolo-hz)))
+        (is (= 0.5 ((:tremolo-depth params) 0 :tremolo-depth)))
+        (is (= 1 ((:pan-hz params) 0 :pan-hz)))
+        (is (= 0.8 ((:pan-depth params) 0 :pan-depth)))
+        (is (= 0.5 ((:phaser-hz params) 0 :phaser-hz)))
+        (is (= 0.6 ((:phaser-depth params) 0 :phaser-depth))))))
 
   (testing "trigger-event passes new effects to sampler"
     (let [mock-calls (atom [])]

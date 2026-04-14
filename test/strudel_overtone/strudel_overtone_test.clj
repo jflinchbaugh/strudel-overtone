@@ -126,49 +126,50 @@
         ;; Simulate the loop running one iteration
         (sut/play-loop :sine 12.0)
         (let [trigger-call (first (filter :event @mock-calls))]
-          (is (= "sine-synth" (:sound trigger-call))))))))
+          (is (= :sine-synth (:sound trigger-call))))))))
 
 (deftest s-function-list-test
   (testing "s function accepts a list of strings"
     (let [pat (sut/s '("bd" "sd"))]
       (is (= 2 (count (:events pat))))
-      (is (= "bd" (get-in (first (:events pat)) [:params :sound])))
-      (is (= "sd" (get-in (second (:events pat)) [:params :sound])))))
+      (is (= :bd (get-in (first (:events pat)) [:params :sound])))
+      (is (= :sd (get-in (second (:events pat)) [:params :sound])))))
 
   (testing "s function accepts a vector of strings"
     (let [pat (sut/s ["bd" "sd"])]
       (is (= 2 (count (:events pat))))
-      (is (= "bd" (get-in (first (:events pat)) [:params :sound])))))
+      (is (= :bd (get-in (first (:events pat)) [:params :sound])))))
 
   (testing "s function accepts a list of symbols"
     (let [pat (sut/s '(bd sd))]
       (is (= 2 (count (:events pat))))
-      (is (= "bd" (get-in (first (:events pat)) [:params :sound])))
-      (is (= "sd" (get-in (second (:events pat)) [:params :sound])))))
+      (is (= :bd (get-in (first (:events pat)) [:params :sound])))
+      (is (= :sd (get-in (second (:events pat)) [:params :sound])))))
 
   (testing "s function accepts a vector of keywords"
     (let [pat (sut/s [:bd :sd])]
       (is (= 2 (count (:events pat))))
-      (is (= "bd" (get-in (first (:events pat)) [:params :sound])))))
+      (is (= :bd (get-in (first (:events pat)) [:params :sound])))))
 
   (testing "s function with underscores in list"
     (let [pat (sut/s [:bd :_ :sd])]
       (is (= 2 (count (:events pat))))
-      (is (= "bd" (get-in (first (:events pat)) [:params :sound])))
-      (is (= "sd" (get-in (second (:events pat)) [:params :sound])))
+      (is (= :bd (get-in (first (:events pat)) [:params :sound])))
+      (is (= :sd (get-in (second (:events pat)) [:params :sound])))
       ;; Check timing for the gap: 3 elements, so sd should be at 2/3
       (is (approx= 0.666 (:time (second (:events pat))))))))
 
 (deftest active-test
   (testing "active function marks events as inactive"
     (let [pat (-> (sut/s [:bd :sd]) (sut/active [0 0]))]
-      (is (= 0 (get-in (first (:events pat)) [:params :active])))
-      (is (= 0 (get-in (second (:events pat)) [:params :active]))))
+      (is (= 0 ((get-in (first (:events pat)) [:params :active]) 0 :active)))
+      (is (= 0 ((get-in (second (:events pat)) [:params :active]) 0 :active))))
 
     (let [pat (-> (sut/s [:bd :sd]) (sut/active [1 0]))]
-      (is (= 1 (get-in (first (:events pat)) [:params :active])))
-      (is (= 0 (get-in (second (:events pat)) [:params :active])))))
+      (is (= 1 ((get-in (first (:events pat)) [:params :active]) 0 :active)))
+      (is (= 0 ((get-in (second (:events pat)) [:params :active]) 0 :active))))))
 
+(deftest trigger-event-respects-active-test
   (testing "trigger-event respects active parameter"
     (let [mock-calls (atom [])]
       (with-redefs [ov/apply-at (fn [& _] (swap! mock-calls
@@ -184,31 +185,33 @@
                     sut/metro (constantly 0)]
         (testing "active event is triggered"
           (reset! mock-calls [])
-          (sut/trigger-event (sut/->Event 0 1 {:sound "bd" :active 1}) 0 1)
+          (sut/trigger-event (sut/->Event 0 1 {:sound :bd :active (constantly 1)}) 0 1)
           (is (= 2 (count @mock-calls)))) ;; log-called and at-metro-called
 
         (testing "inactive event is not triggered"
           (reset! mock-calls [])
-          (sut/trigger-event (sut/->Event 0 1 {:sound "bd" :active 0}) 0 1)
+          (sut/trigger-event (sut/->Event 0 1 {:sound :bd :active (constantly 0)}) 0 1)
           (is (empty? @mock-calls)))
 
         (testing "inactive event with boolean false is not triggered"
           (reset! mock-calls [])
-          (sut/trigger-event (sut/->Event 0 1 {:sound "bd" :active false}) 0 1)
+          (sut/trigger-event (sut/->Event 0 1 {:sound :bd :active (constantly false)}) 0 1)
           (is (empty? @mock-calls)))
 
         (testing "event without active param is triggered"
           (reset! mock-calls [])
-          (sut/trigger-event (sut/->Event 0 1 {:sound "bd"}) 0 1)
-          (is (= 2 (count @mock-calls)))))))) ;; log-called and at-metro-called
+          (sut/trigger-event (sut/->Event 0 1 {:sound :bd}) 0 1)
+          (is (= 2 (count @mock-calls))))))))
 
 (deftest fast-slow-test
   (testing "fast function multiplies cycles"
-    (let [pat {:cycles 1}
-          fast-pat (sut/fast pat 2)]
-      (is (== 2 (:cycles fast-pat)))))
+    (let [pat {:cycles (constantly 1)}
+          fast-pat (sut/fast pat 2)
+          cycles-fn (:cycles fast-pat)]
+      (is (== 2 (cycles-fn 0 :cycles)))))
 
   (testing "slow function divides cycles"
-    (let [pat {:cycles 1}
-          slow-pat (sut/slow pat 2)]
-      (is (== 0.5 (:cycles slow-pat)))))))
+    (let [pat {:cycles (constantly 1)}
+          slow-pat (sut/slow pat 2)
+          cycles-fn (:cycles slow-pat)]
+      (is (== 0.5 (cycles-fn 0 :cycles)))))))

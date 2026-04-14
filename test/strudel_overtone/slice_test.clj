@@ -11,7 +11,7 @@
                     sut/metro (constantly 0)
                     ov/apply-at (fn [ms func & args] (swap! mock-calls conj {:func func :args args}))
                     sut/at-metro (fn [beat synth-var args] (swap! mock-calls conj {:func synth-var :args [args]}))
-                    sut/samples (atom {"break" {:id 1 :duration 4.0}})
+                    sut/samples (atom {:break {:id 1 :duration 4.0}})
                     sut/sample-slices (atom {})
                     sut/sampler-adsr (fn [& args] args)]
 
@@ -20,7 +20,7 @@
 
         (testing "triggering a slice uses source buffer and correct begin/end"
           (reset! mock-calls [])
-          (let [ev (sut/->Event 0 1 {:sound "kick"})]
+          (let [ev (sut/->Event 0 1 {:sound :kick})]
             (sut/trigger-event ev 0 1)
 
             (let [synth-call (second @mock-calls)
@@ -34,7 +34,7 @@
 
         (testing "triggering another slice"
           (reset! mock-calls [])
-          (let [ev (sut/->Event 0 1 {:sound "snare"})]
+          (let [ev (sut/->Event 0 1 {:sound :snare})]
             (sut/trigger-event ev 0 1)
 
             (let [synth-call (second @mock-calls)
@@ -48,7 +48,7 @@
           (reset! mock-calls [])
           (sut/slice-sample! :long-slice :break 0.0 0.5) ; 0.5 * 4.0 = 2.0s
           ;; step duration is 1 beat = 0.5s
-          (let [ev (sut/->Event 0 0.25 {:sound "long-slice"})]
+          (let [ev (sut/->Event 0 0.25 {:sound :long-slice})]
             (sut/trigger-event ev 0 1) ; dur-beats = 1
             (let [synth-call (second @mock-calls)
                   args (first (:args synth-call))
@@ -62,14 +62,14 @@
                :rate 44100.0
                :path "path"
                :size 176400}]
-      (with-redefs [sut/samples (atom {"break" buf})
-                    sut/sample-slices (atom {"kick"
-                                             {:source "break"
+      (with-redefs [sut/samples (atom {:break buf})
+                    sut/sample-slices (atom {:kick
+                                             {:source :break
                                               :begin 0.0
                                               :end 0.1}})]
         (let [info (sut/sample-info :kick)]
           (is (= :slice (:type info)))
-          (is (= "break" (:source info)))
+          (is (= :break (:source info)))
           (is (sut-test/approx= 0.4 (:duration info)))
           (is (= 4.0 (:full-duration info)))
           (is (= 0.0 (:begin info)))
@@ -81,14 +81,14 @@
                :rate 44100.0
                :path "path"
                :size 176400}]
-      (with-redefs [sut/samples (atom {"break" buf})
-                    sut/sample-slices (atom {"kick"
-                                             {:source "break"
+      (with-redefs [sut/samples (atom {:break buf})
+                    sut/sample-slices (atom {:kick
+                                             {:source :break
                                               :begin 1/2
                                               :end 3/4}})]
         (let [info (sut/sample-info :kick)]
           (is (= :slice (:type info)))
-          (is (= "break" (:source info)))
+          (is (= :break (:source info)))
           (is (sut-test/approx= 1.0 (:duration info)))
           (is (= 4.0 (:full-duration info)))
           (is (= 1/2 (:begin info)))
@@ -100,9 +100,9 @@
                :rate 44100.0
                :path "path"
                :size 176400}]
-      (with-redefs [sut/samples (atom {"break" buf})
-                    sut/sample-slices (atom {"kick"
-                                             {:source "break"
+      (with-redefs [sut/samples (atom {:break buf})
+                    sut/sample-slices (atom {:kick
+                                             {:source :break
                                               :begin 0.1
                                               :end 0.0}})]
         (let [info (sut/sample-info :kick)]
@@ -111,10 +111,10 @@
 (deftest slice-ms-test
   (testing "slice-sample-ms! converts ms to fractions correctly"
     (let [buf {:duration 2.0 :n-channels 2 :rate 44100.0 :path "path" :size 88200}]
-      (with-redefs [sut/samples (atom {"break" buf})
+      (with-redefs [sut/samples (atom {:break buf})
                     sut/sample-slices (atom {})]
         ;; 2.0s = 2000ms. Slicing 500ms to 1500ms should be 0.25 to 0.75
         (sut/slice-sample-ms! :ms-slice :break 500 1500)
-        (let [slice (get @sut/sample-slices "ms-slice")]
+        (let [slice (get @sut/sample-slices :ms-slice)]
           (is (sut-test/approx= 0.25 (:begin slice)))
           (is (sut-test/approx= 0.75 (:end slice))))))))
