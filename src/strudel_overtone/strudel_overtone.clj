@@ -1086,98 +1086,109 @@
 
 (defn trigger-event [ev beat dur-beats]
   (let [raw-params (:params ev)
-        params (resolve-params raw-params beat)
+        ;; Use source-time if available to keep random params stable across ribbon loops
+        param-beat (get ev :source-time beat)
+        params (resolve-params raw-params param-beat)
         active (get params :active 1)
         active? (if (number? active) (not (zero? active)) active)]
     (when active?
       (let [sound-param (:sound params)
-            n (:note params)
-            sound-name (or sound-param (if n :saw nil))
-            ;; Check if it's a slice first
-            slice (when sound-name (get @sample-slices sound-name))
-            effective-sound (if slice (:source slice) sound-name)
-            sample-buf (when effective-sound (get @samples effective-sound))
+            n (:note params)]
+        (if (and (sequential? n) (not (string? n)))
+          ;; Handle chords/sequences by triggering each note
+          (doseq [note n]
+            (trigger-event (assoc-in ev [:params :note] note) beat dur-beats))
+          (if (set? n)
+            ;; Handle sets (simultaneous notes)
+            (doseq [note n]
+              (trigger-event (assoc-in ev [:params :note] note) beat dur-beats))
+            (let [sound-name (or sound-param (if n :saw nil))
+                  ;; Check if it's a slice first
+                  slice (when sound-name (get @sample-slices sound-name))
+                  effective-sound (if slice (:source slice) sound-name)
+                  sample-buf (when effective-sound (get @samples effective-sound))
 
-            ;; Adjust begin/end if it's a slice
-            params (if slice
-                     (let [s-begin (:begin slice)
-                           s-end (:end slice)
-                           s-dur (- s-end s-begin)
-                           p-begin (get params :begin 0)
-                           p-end (get params :end 1)]
-                       (assoc params
-                              :begin (+ s-begin (* p-begin s-dur))
-                              :end (+ s-begin (* p-end s-dur))))
-                     params)
+                  ;; Adjust begin/end if it's a slice
+                  params (if slice
+                           (let [s-begin (:begin slice)
+                                 s-end (:end slice)
+                                 s-dur (- s-end s-begin)
+                                 p-begin (get params :begin 0)
+                                 p-end (get params :end 1)]
+                             (assoc params
+                                    :begin (+ s-begin (* p-begin s-dur))
+                                    :end (+ s-begin (* p-end s-dur))))
+                           params)
 
-            note-offset (get params :add 0)
-            amp (let [a (or (:amp params) 1.0)]
-                  (if (string? a)
-                    (try (Double/parseDouble a)
-                         (catch Exception _ 1.0))
-                    a))
-            lpf (let [c (or (:lpf params) 2000)]
-                  (if (string? c)
-                    (try (Double/parseDouble c)
-                         (catch Exception _ 2000))
-                    c))
-            ;; Calculate sustain in seconds
-            step-dur-sec (* dur-beats (/ 60 (ov/metro-bpm metro)))
-            param-sustain (:sustain params)
-            sustain-sec (cond
-                          param-sustain
-                          (if (string? param-sustain)
-                            (try (Double/parseDouble param-sustain) (catch Exception _ 0.1))
-                            param-sustain)
+                  note-offset (get params :add 0)
+                  amp (let [a (or (:amp params) 1.0)]
+                        (if (string? a)
+                          (try (Double/parseDouble a)
+                               (catch Exception _ 1.0))
+                          a))
+                  lpf (let [c (or (:lpf params) 2000)]
+                        (if (string? c)
+                          (try (Double/parseDouble c)
+                               (catch Exception _ 2000))
+                          c))
+                  ;; Calculate sustain in seconds
+                  step-dur-sec (* dur-beats (/ 60 (ov/metro-bpm metro)))
+                  param-sustain (:sustain params)
+                  sustain-sec (cond
+                                param-sustain
+                                (if (string? param-sustain)
+                                  (try (Double/parseDouble param-sustain) (catch Exception _ 0.1))
+                                  param-sustain)
 
-                          (and sample-buf (:end params))
-                          (let [b (get params :begin 0)
-                                e (:end params)
-                                r (get params :rate 1)
-                                abs-r (abs (double r))
-                                dur (:duration sample-buf)
-                                total-dur (* (abs (double (- e b))) dur (/ 1 (max 0.001 abs-r)))
-                                total-dur (min total-dur step-dur-sec)
-                                env (get params :env :adsr)]
-                            (if (= env :perc)
-                              (let [attack (let [a (get params :attack 0)]
-                                             (if (string? a) (try (Double/parseDouble a) (catch Exception _ 0)) a))]
-                                (max 0.001 (- total-dur attack)))
-                              (let [release (let [r (get params :release 0)]
-                                              (if (string? r) (try (Double/parseDouble r) (catch Exception _ 0)) r))]
-                                (max 0.001 (- total-dur release)))))
+                                (and sample-buf (:end params))
+                                (let [b (get params :begin 0)
+                                      e (:end params)
+                                      r (get params :rate 1)
+                                      abs-r (abs (double r))
+                                      dur (:duration sample-buf)
+                                      total-dur (* (abs (double (- e b))) dur (/ 1 (max 0.001 abs-r)))
+                                      total-dur (min total-dur step-dur-sec)
+                                      env (get params :env :adsr)]
+                                  (if (= env :perc)
+                                    (let [attack (let [a (get params :attack 0)]
+                                                   (if (string? a) (try (Double/parseDouble a) (catch Exception _ 0)) a))]
+                                      (max 0.001 (- total-dur attack)))
+                                    (let [release (let [r (get params :release 0)]
+                                                    (if (string? r) (try (Double/parseDouble r) (catch Exception _ 0)) r))]
+                                      (max 0.001 (- total-dur release)))))
 
-                          :else
-                          step-dur-sec)]
+                                :else
+                                step-dur-sec)]
 
-        (when sound-name
-          (let [base (if sample-buf :sampler (get synth-aliases sound-name sound-name))
-                synth-key (get-synth-name base params)
-                synth-var (or
-                           (resolve-synth synth-key)
-                           (resolve-synth base))
-                freq (if n
-                       (resolve-note
-                        (+ (if (keyword? n) (ov/note n) n) note-offset))
-                       nil)
-                reserved #{:sound :note :active :start :duration :env :add :swing}
-                handled #{:amp :lpf :sustain :freq}
-                args (cond-> (reduce-kv (fn [acc k v]
-                                          (if (or (reserved k) (handled k))
-                                            acc
-                                            (conj acc k v)))
-                                        []
-                                        params)
-                       true (conj :amp amp)
-                       freq (conj :freq freq)
-                       lpf (conj :lpf lpf)
-                       sustain-sec (conj :sustain sustain-sec)
-                       sample-buf (conj :buf (:id sample-buf)))]
-            (when synth-var
-              (do
-                (ov/apply-at (metro beat)
-                          (fn [& e] (tel/log! :info {:event (into {} e)})) ev)
-                (at-metro beat synth-var args)))))))))
+              (when sound-name
+                (let [base (if sample-buf :sampler (get synth-aliases sound-name sound-name))
+                      synth-key (get-synth-name base params)
+                      synth-var (or
+                                 (resolve-synth synth-key)
+                                 (resolve-synth base))
+                      freq (if n
+                             (resolve-note
+                              (+ (if (keyword? n) (ov/note n) n) note-offset))
+                             nil)
+                      reserved #{:sound :note :active :start :duration :env :add :swing}
+                      handled #{:amp :lpf :sustain :freq}
+                      args (cond-> (reduce-kv (fn [acc k v]
+                                                (if (or (reserved k) (handled k))
+                                                  acc
+                                                  (conj acc k v)))
+                                              []
+                                              params)
+                             true (conj :amp amp)
+                             freq (conj :freq freq)
+                             lpf (conj :lpf lpf)
+                             sustain-sec (conj :sustain sustain-sec)
+                             sample-buf (conj :buf (:id sample-buf)))]
+                  (when synth-var
+                    (do
+                      (ov/apply-at (metro beat)
+                                (fn [& e] (tel/log! :info {:event (into {} e)})) ev)
+                      (at-metro beat synth-var args))))))))))))
+
 
 (defn- apply-swing [t amount step-size]
   (let [step-idx (long (/ t step-size))]
