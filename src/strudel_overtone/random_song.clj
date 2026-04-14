@@ -67,7 +67,19 @@
                        (gain 0.4)
                        (lpf 2000))))
 
+  ;; Example: Super-random chord progression
+  ;; We generate a large pool of chords and pick 4 of them to loop
+  (let [roots [:c3 :d3 :e3 :f3 :g3 :a3 :b3]
+        types [:major :minor :minor7 :major7]
+        all-chords (for [r roots t types] (set (ov/chord r t)))]
+    (play! :rand-chords (-> (note (choose-n 8 all-chords))
+                            (s :supersaw)
+                            (add (choose [-12 0 12]))
+                            (ribbon 1 2) ;; Capture 4 random chords into a loop
+                            (gain 0.4)
+                            (lpf (sig-range sine 500 5000)))))
+
   (stop!)
 
 
-  )
+  .)
