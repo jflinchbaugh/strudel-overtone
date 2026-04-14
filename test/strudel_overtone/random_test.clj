@@ -39,14 +39,8 @@
       (is (>= (irs 0.0 :amp) 0))
       (is (< (irs 0.0 :amp) 10)))))
 
-(deftest pick-stream-test
-  (testing "pick stream picks from collection"
-    (sut/seed! 0)
-    (let [ps (sut/pick [:a :b :c])]
-      (is (contains? #{:a :b :c} (ps 0.0 :amp)))
-      (is (contains? #{:a :b :c} (ps 1.0 :amp)))))
-
-  (testing "choose is an alias for pick"
+(deftest choose-stream-test
+  (testing "choose stream picks from collection"
     (sut/seed! 0)
     (let [cs (sut/choose [:a :b :c])]
       (is (contains? #{:a :b :c} (cs 0.0 :amp)))

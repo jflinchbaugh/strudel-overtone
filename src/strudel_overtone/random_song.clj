@@ -63,11 +63,12 @@
                 (set (ov/chord :a3 :minor))
                 (set (ov/chord :f3 :major))
                 (set (ov/chord :g3 :major))]]
-    (play! :chords (-> (note (choose-n 6 chords))
+    (play-only!
+      :chords (-> (note (choose-n 6 chords))
                       (add -12)
                       (swing 0.5)
                        (s :ks-stringer)
-                       (ribbon 1 4) ;; Freeze the random 4-chord progression
+                       (ribbon 1 2) ;; Freeze the random 4-chord progression
                        (gain 0.4)
                        (lpf 2000))))
 
