@@ -32,19 +32,23 @@
             (gain 0.4)
             (release (srand 0.1 1.0)) ;; random release times
             (pan sine)
+            (delay-cycles 8)
             (ribbon 2 2)
             (active true))
 
    :chopped (->
-             (note (choose-n 32 [:c4 :e4 :g4 :b4]))
-             (s [:saw])
-             (add (choose [-12 0 12]))
-             (gain (choose [0.3 0.1]))
-             (pan (srand -1 1))
-             (distort (srand 0.0 1.0))
-             (active (choose [0 0 0 0 0 1]))
-             (ribbon 2 2) ;; Loop only the first quarter of the 16-note pattern
-             ))
+              (note (choose-n 32 [:c4 :e4 :g4 :b4]))
+              (delay-cycles 1)
+              (s [:saw])
+              (add (choose [-12 0 12]))
+              (gain (choose [0.3 0.1]))
+              (pan (srand -1 1))
+              (distort (srand 0.0 1.0))
+              (active (choose [0 0 0 0 0 1]))
+              (ribbon 1 2) ;; Loop only the first quarter of the 16-note pattern
+              ))
+
+  (stop!)
 
   ;; Example: Capture the first cycle of a random melody and repeat it
   (play! :frozen-lead (-> (note (choose-n 12 [:c3 :e3 :g3 :b3]))

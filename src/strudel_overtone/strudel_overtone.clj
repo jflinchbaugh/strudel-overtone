@@ -475,10 +475,10 @@
       (+ low (* v (- high low))))))
 
 (defrecord Event [time duration params])
-(defrecord Pattern [events cycles])
+(defrecord Pattern [events cycles delay-cycles])
 
 (defn make-pattern [events]
-  (->Pattern events (constantly 1)))
+  (->Pattern events (constantly 1) 0))
 
 (defn parse-mini
   "Naively parses a collection or single value into a sequence of events.
@@ -913,6 +913,12 @@
                    (range 100)))))
  ;; Pre-generate many cycles
 
+(defn delay-cycles
+  "Delays the start of a pattern by n cycles.
+   Only affects the initial scheduling (when the pattern is first played)."
+  [pattern n]
+  (assoc pattern :delay-cycles n))
+
 
 ;; --- Player ---
 
@@ -1274,7 +1280,8 @@
                                     (update :loops conj key))))
           (when start-loop?
             (let [now (metro)
-                  start-beat (+ now (- quant (mod now quant)))]
+                  delay-beats (* (get pattern :delay-cycles 0) 4)
+                  start-beat (+ now (- quant (mod now quant)) delay-beats)]
               (ov/apply-by (metro start-beat) #'play-loop [key start-beat])))))
       (map first pairs))))
 
