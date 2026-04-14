@@ -51,10 +51,10 @@
   (stop!)
 
   ;; Example: Capture the first cycle of a random melody and repeat it
-  (play! :frozen-lead (-> (note (choose-n 12 [:c3 :e3 :g3 :b3]))
+  (play! :frozen-lead (-> (note (choose-n 8 [:c3 :e3 :g3 :b3]))
                         (add 12)
                           (s :saw)
-                          (ribbon 0 1) ;; Freeze the first 8 random notes
+                          (ribbon 0 4) ;; Freeze the first 8 random notes
                           (gain 0.3)
                           (lpf (sig-range sine 500 2000)))) ;; LPF still moves!
 
@@ -75,12 +75,11 @@
   ;; Example: Super-random chord progression
   ;; We generate a large pool of chords and pick 4 of them to loop
   (let [roots [:c3 :d3 :e3 :f3 :g3 :a3 :b3]
-        types [:major :minor :minor7 :major7]
-        all-chords (for [r roots t types] (set (ov/chord r t)))]
-    (play! :rand-chords (-> (note (choose-n 8 all-chords))
+        types (take-nth 2 [:major :minor :minor7 :major7])
+        all-chords (for [r roots t types] (set (take 3 (ov/chord r t))))]
+    (play! :rand-chords (-> (note (choose-n 2 all-chords))
                             (s :supersaw)
-                            (add (choose [-12 0 12]))
-                            (ribbon 1 2) ;; Capture 4 random chords into a loop
+                            (ribbon 0 4) ;; Capture 4 random chords into a loop
                             (gain 0.4)
                             (lpf (sig-range sine 500 5000)))))
 
