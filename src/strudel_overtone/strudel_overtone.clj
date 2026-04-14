@@ -384,18 +384,13 @@
      (let [r (repeatable-rand t seed)]
        (+ low (* r (- high low)))))))
 
-(defn pick
+(defn choose
   "Returns a repeatable random stream that picks an element from coll."
   [coll]
   (fn [t seed]
     (let [r (repeatable-rand t seed)
           idx (int (* r (count coll)))]
       (nth coll idx))))
-
-(def choose
-  "Alias for pick.
-   Returns a repeatable random stream that picks an element from coll."
-  pick)
 
 (defn wchoose
   "Returns a repeatable random stream that picks from choices based on weights.
