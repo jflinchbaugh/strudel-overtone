@@ -7,13 +7,15 @@
 
   (play!
    :kick (->
-          (s [:kick :kick])
-          (gain 0.6)
-          (pan (srand -0.4 0.4))) ;; subtle random pan
+          (s :dance-kick)
+          (fast 2)
+          (gain (choose [0.5 0.2]))
+          (pan (srand -0.4 0.4))
+          (active (wchoose [[0 0.9] [1 0.1]])))
 
    :snare (->
-           (s [:- :snare])
-           (gain (wchoose [[0.5 0.9] [0.2 0.1]])) ;; mostly loud, occasionally quiet
+           (s [:snare])
+           (gain (wchoose [[0.2 0.9] [0.1 0.1]]))
            (pan (srand -0.5 0.5)))
 
    :hat (->
@@ -24,28 +26,30 @@
 
    :melody (->
             (note (choose [:c3 :e3 :g3 :b3 :c4]))
-            #_(swing (srand 0.0 0.5))
-
+            (swing (srand 0.0 0.5))
             (s [:ks-stringer])
-
-            (fast (choose [16])) ;; randomly change the speed
+            (fast (choose [4 8 16])) ;; randomly change the speed
             (gain 0.4)
             (release (srand 0.1 1.0)) ;; random release times
             (pan sine)
-            (active false))
+            (ribbon 2 2)
+            (active true))
 
    :chopped (->
-             (note (choose-n 16 [:c4 :e4 :g4 :b4]))
+             (note (choose-n 32 [:c4 :e4 :g4 :b4]))
              (s [:saw])
-             (ribbon 3 0.25) ;; Loop only the first quarter of the 16-note pattern
-             (fast 1)        ;; Speed it up to fill the cycle
-             (gain 0.3)
-             (pan (srand -1 1))))
+             (add (choose [-12 0 12]))
+             (gain (choose [0.3 0.1]))
+             (pan (srand -1 1))
+             (distort (srand 0.0 1.0))
+             (active (choose [0 0 0 0 0 1]))
+             (ribbon 1 2) ;; Loop only the first quarter of the 16-note pattern
+             ))
 
   ;; Example: Capture the first cycle of a random melody and repeat it
   (play! :frozen-lead (-> (note (choose-n 8 [:c3 :e3 :g3 :b3]))
-                          (s :saw)
-                          (ribbon 2 0.5) ;; Freeze the first 8 random notes
+                        (s :saw)
+                        (ribbon 0.5 2) ;; Freeze the first 8 random notes
                           (gain 0.3)
                           (lpf (sig-range sine 500 2000)))) ;; LPF still moves!
 

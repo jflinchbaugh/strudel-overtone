@@ -89,7 +89,7 @@
 (deftest ribbon-performance-test
   (testing "play-loop should only schedule events for the current cycle"
     (let [pat (-> (sut/s [:bd]) (sut/ribbon 0 0.25))
-          player-state (atom {:playing? true 
+          player-state (atom {:playing? true
                              :patterns {:test pat}
                              :loops #{:test}})
           trigger-calls (atom [])]
