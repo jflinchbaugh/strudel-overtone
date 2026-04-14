@@ -429,6 +429,12 @@
   [n coll]
   (take n (chosen-from coll)))
 
+(defn rtake
+  "Manually get some values from a random stream function.
+  Get n values for id usage from rand-f."
+  [n id rand-f]
+  (for [t (range n)] (rand-f t id)))
+
 ;; --- Signals ---
 
 (defn- tau [t] (* 2 Math/PI t))

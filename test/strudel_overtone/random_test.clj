@@ -72,6 +72,18 @@
       (let [notes (map (fn [f] (f 0.0 :note)) cf)]
         (is (every? #(contains? #{:c2 :e2 :g2} %) notes))))))
 
+(deftest rtake-test
+  (testing "rtake from a random sequence"
+    (is (= 3 (count (sut/rtake 3 :this (sut/irand 10))))
+      "take 3 values from the stream")
+    (is (= (sut/rtake 5 :this (sut/irand 10))
+          (sut/rtake 5 :this (sut/irand 10)))
+      "reproducible")
+    (is (not= (sut/rtake 5 :this (sut/irand 10))
+           (sut/rtake 5 :that (sut/irand 10)))
+      "different ids get different results")
+    ))
+
 (deftest signal-test
   (testing "sine signal"
     (is (approx= 0.5 (sut/sine 0.0 nil)))

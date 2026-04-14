@@ -81,5 +81,6 @@
 
   (stop!)
 
+  (drop 4 (rtake 6 :things (irand 0 10)))
 
   .)
