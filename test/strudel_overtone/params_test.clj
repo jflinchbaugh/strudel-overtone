@@ -47,7 +47,7 @@
                       (sut/resonance 0.2))
               ev (first (:events pat))]
 
-          (sut/trigger-event ev 0 1)
+          (sut/trigger-event :test-key ev 0 1)
 
           ;; Filter for the synth call (ignore log call)
           (let [synth-call (second @mock-calls) ;; first is log, second is synth

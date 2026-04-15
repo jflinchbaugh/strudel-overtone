@@ -28,7 +28,7 @@
                       (sut/duck-trigger 1.0))
               ev (first (:events pat))]
 
-          (sut/trigger-event ev 0 1)
+          (sut/trigger-event :test-key ev 0 1)
 
           (let [synth-call (second @mock-calls)
                 args (:args synth-call)

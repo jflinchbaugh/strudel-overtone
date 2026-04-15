@@ -16,6 +16,9 @@
 
 (defonce duck-bus (ov/control-bus))
 
+(defmacro with-glide [freq & body]
+  `(let [~'actual-f (ov/line:kr ~'slide-from ~freq ~'slide)]
+     ~@body))
 
 (defmacro def-strudel-synth [name extra-args & body]
   (let [common-args '{amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
@@ -26,7 +29,9 @@
                       phaser-hz 0 phaser-depth 0
                       hpf 0 bpf -1 room 0 delay 0 repeats 4
                       duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2
-                      room-size 0.5 damp 0.5}
+                      room-size 0.5 damp 0.5
+                      slide 0 slide-from -1
+                      legato 1}
         adsr-defaults '{attack 0.01 decay 0.1 s-level 0.5 release 0.3}
         perc-defaults '{attack 0.01}
         ;; Helper to build the synth definition
@@ -224,24 +229,28 @@
   (ov/bpf (ov/white-noise) freq resonance))
 
 (def-strudel-synth saw [freq 440 detune 0 vibrato 0]
-  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))
-        f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
-    (ov/saw f-vib)))
+  (with-glide freq
+    (let [f-raw (* actual-f (ov/pow 2 (/ detune 1200)))
+          f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
+      (ov/saw f-vib))))
 
 (def-strudel-synth sine [freq 440 detune 0 vibrato 0]
-  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))
-        f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
-    (ov/sin-osc f-vib)))
+  (with-glide freq
+    (let [f-raw (* actual-f (ov/pow 2 (/ detune 1200)))
+          f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
+      (ov/sin-osc f-vib))))
 
 (def-strudel-synth square [freq 440 detune 0 vibrato 0 width 0.5]
-  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))
-        f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
-    (ov/pulse f-vib width)))
+  (with-glide freq
+    (let [f-raw (* actual-f (ov/pow 2 (/ detune 1200)))
+          f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
+      (ov/pulse f-vib width))))
 
 (def-strudel-synth tri [freq 440 detune 0 vibrato 0]
-  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))
-        f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
-    (ov/lf-tri f-vib)))
+  (with-glide freq
+    (let [f-raw (* actual-f (ov/pow 2 (/ detune 1200)))
+          f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
+      (ov/lf-tri f-vib))))
 
 (def-strudel-synth fm
   [freq 440
@@ -250,12 +259,13 @@
    carrier-ratio 1
    modulator-ratio 2
    mod-index 5]
-  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))
-        f-vib (ov/vibrato:kr f-raw vibrato 0.02)
-        modulator (ov/sin-osc (* f-vib modulator-ratio))
-        carrier (ov/sin-osc (+ (* f-vib carrier-ratio)
-                               (* modulator mod-index f-vib)))]
-    carrier))
+  (with-glide freq
+    (let [f-raw (* actual-f (ov/pow 2 (/ detune 1200)))
+          f-vib (ov/vibrato:kr f-raw vibrato 0.02)
+          modulator (ov/sin-osc (* f-vib modulator-ratio))
+          carrier (ov/sin-osc (+ (* f-vib carrier-ratio)
+                                 (* modulator mod-index f-vib)))]
+      carrier)))
 
 ;; --- Noise Synths ---
 
@@ -291,30 +301,32 @@
     (ov/lf-noise2 f-raw)))
 
 (def-strudel-synth tb303 [freq 440 wave 1 env-amount 1000]
-  (let [freqs [freq (* 1.01 freq)]
-        waves [(ov/saw freqs)
-               (ov/pulse freqs 0.5)
-               (ov/lf-tri freqs)]
-        selector (ov/select wave waves)
-        fil-env (ov/env-gen (ov/perc attack sustain))
-        fil-lpf (s-max 20 (+ lpf (* env-amount fil-env)))]
-    (ov/rlpf selector fil-lpf (ov/lin-lin resonance 0 1 0.9 0.05))))
+  (with-glide freq
+    (let [freqs [actual-f (* 1.01 actual-f)]
+          waves [(ov/saw freqs)
+                 (ov/pulse freqs 0.5)
+                 (ov/lf-tri freqs)]
+          selector (ov/select wave waves)
+          fil-env (ov/env-gen (ov/perc attack sustain))
+          fil-lpf (s-max 20 (+ lpf (* env-amount fil-env)))]
+      (ov/rlpf selector fil-lpf (ov/lin-lin resonance 0 1 0.9 0.05)))))
 
 (def-strudel-synth supersaw [freq 440]
-  (let [input (ov/lf-saw freq)
-        shift1 (ov/lf-saw 4)
-        shift2 (ov/lf-saw 7)
-        shift3 (ov/lf-saw 5)
-        shift4 (ov/lf-saw 2)
-        comp1 (> input shift1)
-        comp2 (> input shift2)
-        comp3 (> input shift3)
-        comp4 (> input shift4)]
-    (ov/leak-dc:ar
-     (* (- (+ (- input comp1)
-              (- input comp2)
-              (- input comp3)
-              (- input comp4)) input) 0.25))))
+  (with-glide freq
+    (let [input (ov/lf-saw actual-f)
+          shift1 (ov/lf-saw 4)
+          shift2 (ov/lf-saw 7)
+          shift3 (ov/lf-saw 5)
+          shift4 (ov/lf-saw 2)
+          comp1 (> input shift1)
+          comp2 (> input shift2)
+          comp3 (> input shift3)
+          comp4 (> input shift4)]
+      (ov/leak-dc:ar
+       (* (- (+ (- input comp1)
+                (- input comp2)
+                (- input comp3)
+                (- input comp4)) input) 0.25)))))
 
 (def-strudel-synth mooger
   [freq 440
@@ -322,17 +334,19 @@
    osc2 1
    osc1-level 0.5
    osc2-level 0.5]
-  (let [osc-bank-1 [(ov/saw freq) (ov/sin-osc freq) (ov/pulse freq)]
-        osc-bank-2 [(ov/saw freq) (ov/sin-osc freq) (ov/pulse freq)]
-        s1 (* osc1-level (ov/select osc1 osc-bank-1))
-        s2 (* osc2-level (ov/select osc2 osc-bank-2))]
-    (ov/moog-ff (+ s1 s2) lpf (ov/lin-lin resonance 0 1 3 0))))
+  (with-glide freq
+    (let [osc-bank-1 [(ov/saw actual-f) (ov/sin-osc actual-f) (ov/pulse actual-f)]
+          osc-bank-2 [(ov/saw actual-f) (ov/sin-osc actual-f) (ov/pulse actual-f)]
+          s1 (* osc1-level (ov/select osc1 osc-bank-1))
+          s2 (* osc2-level (ov/select osc2 osc-bank-2))]
+      (ov/moog-ff (+ s1 s2) lpf (ov/lin-lin resonance 0 1 3 0)))))
 
 (def-strudel-synth ks-stringer [freq 440 coef 0.5]
-  (let [noize (* 0.8 (ov/white-noise))
-        trig (ov/impulse:kr 0)
-        delay-time (/ 1.0 freq)]
-    (ov/pluck noize trig delay-time delay-time 10 coef)))
+  (with-glide freq
+    (let [noize (* 0.8 (ov/white-noise))
+          trig (ov/impulse:kr 0)
+          delay-time (/ 1.0 actual-f)]
+      (ov/pluck noize trig delay-time delay-time 10 coef))))
 
 (def-strudel-synth dub-kick [freq 80]
   (let [lpf-env (ov/perc 0.001 1 freq -20)
@@ -672,6 +686,11 @@
    If not set, it defaults to the duration of the step."
   [pattern val] (set-param pattern :sustain val))
 
+(defn legato
+  "Sets the note legato (duration multiplier).
+   Values: 1.0 (standard), >1.0 (overlapping), <1.0 (staccato)."
+  [pattern val] (set-param pattern :legato val))
+
 (defn release
   "Sets the envelope release time.
    Values: Time in seconds."
@@ -920,6 +939,12 @@
   [pattern n]
   (assoc pattern :delay-cycles n))
 
+(defn glide
+  "Adds a frequency slide (glide/portamento) to the pattern.
+   n: glide time in cycles (relative to cycle duration)"
+  [pattern n]
+  (set-param pattern :slide n))
+
 ;; --- Player ---
 
 (defonce metro (ov/metronome 120))
@@ -930,11 +955,11 @@
   ([] (/ (ov/metro-bpm metro) 4))
   ([n] (metro :bpm (* n 4)) n))
 
-(defn slide-cpm
+(defn glide-cpm
   "Smoothly transitions the CPM to a new value over a duration (in cycles).
    Default resolution is 1 step per cycle."
   ([target-cpm dur-cycles]
-   (slide-cpm target-cpm dur-cycles 1))
+   (glide-cpm target-cpm dur-cycles 1))
   ([target-cpm dur-cycles steps-per-cycle]
    (let [dur-beats (* dur-cycles 4)
          start-cpm (cpm)
@@ -1054,7 +1079,7 @@
         start-pos (* begin (ov/buf-frames buf))]
     (ov/play-buf 2 buf rate-s 1 start-pos loop? :action ov/NO-ACTION)))
 
-(defonce player-state (atom {:playing? false :patterns {} :loops #{}}))
+(defonce player-state (atom {:playing? false :patterns {} :loops #{} :last-freq {}}))
 
 (defn- resolve-note [n]
   (ov/midi->hz (ov/note n)))
@@ -1091,6 +1116,11 @@
              {}
              params))
 
+(defn- try-parse-number [v]
+  (if (string? v)
+    (try (Double/parseDouble v) (catch Exception _ 0))
+    v))
+
 (defn- adjust-slice-params [params sound-name]
   (if-let [slice (get @sample-slices sound-name)]
     (let [s-begin (:begin slice)
@@ -1104,7 +1134,8 @@
     params))
 
 (defn- calculate-sustain [params sample-buf dur-beats]
-  (let [step-dur-sec (* dur-beats (/ 60 (ov/metro-bpm metro)))
+  (let [legato (try-parse-number (get params :legato 1.0))
+        step-dur-sec (* dur-beats (/ 60 (ov/metro-bpm metro)) legato)
         param-sustain (:sustain params)]
     (cond
       param-sustain
@@ -1132,7 +1163,7 @@
       :else
       step-dur-sec)))
 
-(defn- trigger-single-event [ev params beat dur-beats]
+(defn- trigger-single-event [key ev params beat dur-beats]
   (let [sound-param (:sound params)
         n (:note params)
         sound-name (or sound-param (if n :saw nil))
@@ -1143,26 +1174,35 @@
         note-offset (get params :add 0)
         amp (try-parse-number (or (:amp params) 1.0))
         lpf (try-parse-number (or (:lpf params) 2000))
-        sustain-sec (calculate-sustain params sample-buf dur-beats)]
+        sustain-sec (calculate-sustain params sample-buf dur-beats)
+        slide (try-parse-number (get params :slide 0))
+        cycle-sec (* 4 (/ 60 (ov/metro-bpm metro)))]
     (when sound-name
       (let [base (if sample-buf :sampler (get synth-aliases sound-name sound-name))
             synth-key (get-synth-name base params)
             synth-var (or (resolve-synth synth-key) (resolve-synth base))
             freq (when n (resolve-note (+ (if (keyword? n) (ov/note n) n) note-offset)))
-            reserved #{:sound :note :active :start :duration :env :add :swing}
-            handled #{:amp :lpf :sustain :freq}
+            last-f (get-in @player-state [:last-freq key])
+            has-glide (and (pos? slide) last-f freq)
+            effective-slide-from (if has-glide last-f (or freq 440))
+            effective-slide-time (if has-glide (min sustain-sec (* slide cycle-sec)) 0.001)
+            reserved #{:sound :note :active :start :duration :env :add :swing :slide :legato}
+            handled #{:amp :lpf :sustain :freq :slide-from}
             args (cond-> (reduce-kv (fn [acc k v] (if (or (reserved k) (handled k)) acc (conj acc k v))) [] params)
                    true (conj :amp amp)
                    freq (conj :freq freq)
                    lpf (conj :lpf lpf)
                    sustain-sec (conj :sustain sustain-sec)
+                   true (conj :slide effective-slide-time)
+                   true (conj :slide-from effective-slide-from)
                    sample-buf (conj :buf (:id sample-buf)))]
+        (when freq (swap! player-state assoc-in [:last-freq key] freq))
         (when synth-var
           (let [log-data (assoc (into {} ev) :params params)]
             (ov/apply-at (metro beat) (fn [& _] (tel/log! :info {:event log-data})))
             (at-metro beat synth-var args)))))))
 
-(defn trigger-event [ev beat dur-beats]
+(defn trigger-event [key ev beat dur-beats]
   (let [raw-params (:params ev)
         ;; Use source-time if available to keep random params stable across ribbon loops
         param-beat (get ev :source-time beat)
@@ -1174,14 +1214,14 @@
         (cond
           (and (sequential? n) (not (string? n)))
           (doseq [note n]
-            (trigger-event (assoc-in ev [:params :note] note) beat dur-beats))
+            (trigger-event key (assoc-in ev [:params :note] note) beat dur-beats))
 
           (set? n)
           (doseq [note n]
-            (trigger-event (assoc-in ev [:params :note] note) beat dur-beats))
+            (trigger-event key (assoc-in ev [:params :note] note) beat dur-beats))
 
           :else
-          (trigger-single-event ev params beat dur-beats))))))
+          (trigger-single-event key ev params beat dur-beats))))))
 
 (defn- apply-swing [t amount step-size]
   (let [step-idx (long (/ t step-size))]
@@ -1236,7 +1276,7 @@
                         rel-dur (:duration ev)
                         ev-beat (+ beat (* swung-start cycle-dur))
                         ev-dur-beats (* rel-dur cycle-dur)]
-                    (trigger-event ev ev-beat ev-dur-beats)))))
+                    (trigger-event key ev ev-beat ev-dur-beats)))))
 
             (ov/apply-by (metro next-beat) #'play-loop [key next-beat]))
           ;; Pattern removed, loop dies
@@ -1639,7 +1679,7 @@
 
   (slice-sample! :drone-slice :drone 0.35 0.55)
 
-  (slide-cpm 20 4)
+  (glide-cpm 20 4)
 
   (play-only!
    :kick (-> (s [:dub-kick :- :dub-kick :-]))
@@ -1686,7 +1726,7 @@
 
   (slice-sample! :storm-beat :storm 900 1500)
 
-  (slide-cpm 40 4)
+  (glide-cpm 40 4)
 
   (play-only!
    :intro (->

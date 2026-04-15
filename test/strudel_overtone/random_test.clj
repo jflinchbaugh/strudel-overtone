@@ -112,7 +112,7 @@
                     sut/metro (constantly 0)]
         (sut/seed! 0)
         (let [ev (sut/->Event 0 1 {:sound "saw" :amp (sut/srand 0.5 0.6)})]
-          (sut/trigger-event ev 10.0 1)
+          (sut/trigger-event :test-key ev 10.0 1)
           (let [args (:args (second @mock-calls))
                 amp (:amp args)]
             (is (>= amp 0.5))
@@ -129,6 +129,6 @@
         (sut/seed! 0)
         ;; choose that returns "kick"
         (let [ev (sut/->Event 0 1 {:sound (sut/choose ["kick" "kick"])})]
-          (sut/trigger-event ev 10.0 1)
+          (sut/trigger-event :test-key ev 10.0 1)
           (let [synth (:synth (second @mock-calls))]
             (is (fn? synth))))))))

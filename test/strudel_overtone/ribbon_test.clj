@@ -27,7 +27,7 @@
       (with-redefs [sut/player-state player-state
                     sut/metro (fn ([] 0) ([b] (* b 1000)))
                     ov/apply-by (fn [& _] nil)
-                    sut/trigger-event (fn [ev beat dur]
+                    sut/trigger-event (fn [key ev beat dur]
                                         (let [note (get-in ev [:params :note])
                                               resolved-note (if (fn? note) (note beat :note) note)]
                                           (swap! results conj resolved-note)))]
@@ -55,7 +55,7 @@
       (with-redefs [sut/player-state player-state
                     sut/metro (fn ([] 0) ([b] (* b 1000)))
                     ov/apply-by (fn [& _] nil)
-                    sut/trigger-event (fn [ev beat dur]
+                    sut/trigger-event (fn [key ev beat dur]
                                         (let [pan (get-in ev [:params :pan])
                                               resolved-pan (if (fn? pan) (pan beat :pan) pan)]
                                           (swap! results conj resolved-pan)))]
@@ -96,7 +96,7 @@
       (with-redefs [sut/player-state player-state
                     sut/metro (fn ([] 0) ([b] (* b 1000)))
                     ov/apply-by (fn [& _] nil)
-                    sut/trigger-event (fn [ev beat dur]
+                    sut/trigger-event (fn [key ev beat dur]
                                         (swap! trigger-calls conj beat))]
 
         (sut/play-loop :test 0)

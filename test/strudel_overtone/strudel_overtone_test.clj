@@ -117,7 +117,7 @@
                                   (swap! mock-calls
                                     conj {:func func :args args}))
                     ov/apply-by (fn [& _] nil)
-                    sut/trigger-event (fn [ev b d]
+                    sut/trigger-event (fn [key ev b d]
                                         (swap! mock-calls
                                           conj {:event ev
                                                 :sound (get-in ev [:params
@@ -185,22 +185,22 @@
                     sut/metro (constantly 0)]
         (testing "active event is triggered"
           (reset! mock-calls [])
-          (sut/trigger-event (sut/->Event 0 1 {:sound :bd :active (constantly 1)}) 0 1)
+          (sut/trigger-event :test-key (sut/->Event 0 1 {:sound :bd :active (constantly 1)}) 0 1)
           (is (= 2 (count @mock-calls)))) ;; log-called and at-metro-called
 
         (testing "inactive event is not triggered"
           (reset! mock-calls [])
-          (sut/trigger-event (sut/->Event 0 1 {:sound :bd :active (constantly 0)}) 0 1)
+          (sut/trigger-event :test-key (sut/->Event 0 1 {:sound :bd :active (constantly 0)}) 0 1)
           (is (empty? @mock-calls)))
 
         (testing "inactive event with boolean false is not triggered"
           (reset! mock-calls [])
-          (sut/trigger-event (sut/->Event 0 1 {:sound :bd :active (constantly false)}) 0 1)
+          (sut/trigger-event :test-key (sut/->Event 0 1 {:sound :bd :active (constantly false)}) 0 1)
           (is (empty? @mock-calls)))
 
         (testing "event without active param is triggered"
           (reset! mock-calls [])
-          (sut/trigger-event (sut/->Event 0 1 {:sound :bd}) 0 1)
+          (sut/trigger-event :test-key (sut/->Event 0 1 {:sound :bd}) 0 1)
           (is (= 2 (count @mock-calls))))))))
 
 (deftest fast-slow-test

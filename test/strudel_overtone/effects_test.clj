@@ -39,7 +39,7 @@
                       (sut/fshift -50))
               ev (first (:events pat))]
 
-          (sut/trigger-event ev 0 1)
+          (sut/trigger-event :test-key ev 0 1)
 
           (let [synth-call (second @mock-calls)
                 args-map (apply hash-map (first (:args synth-call)))]

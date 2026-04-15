@@ -83,6 +83,38 @@
                             (gain 0.4)
                             (lpf (sig-range sine 500 5000)))))
 
+  ;; Example: Acid bassline with glide (portamento)
+  (play! :acid (-> (note (choose-n 3 [:c2 :c3 :g2 :a2]))
+                   (s :tb303)
+                   (attack 1)
+                   (decay 1)
+                   (s-level 1)
+                   (sustain 1)
+                   (glide 1/3) ;; Slide between notes over 0.3 cycles
+                   #_(legato 1.1) ;; Overlap notes slightly for better glide
+                   (lpf (sig-range sine 200 2000))
+                   (resonance 0.8)
+                   (gain 0.3)))
+
+  ;; Example: Liquid Lead with smooth blending
+  ;; Use s-level 1.0 and legato > 1 to blend notes together
+  (play! :liquid (-> (note (choose [:c3 :d3 :f3 :g3]))
+                     (s :tb303)
+                     (glide 0.5)    ;; 20% of a cycle for the pitch slide
+                     (legato 1.1)   ;; 10% overlap between notes
+                     (s-level 1.0)  ;; No volume drop during the note
+                     (attack 0.05)  ;; Soften the start of each note
+                     (decay 0)      ;; Immediate sustain
+                     (gain 0.3)))
+
+  ;; Example: Plucky Glide with percussive envelope
+  (play! :plucky-glide (-> (note (choose [:c2 :c2 :c3 :g2]))
+                           (s :tb303)
+                           (env :perc)
+                           (glide 0.1)
+                           (sustain 0.4) ;; Fixed length in seconds
+                           (gain 0.4)))
+
   (stop!)
 
   (drop 4 (rtake 6 :things (irand 0 10)))

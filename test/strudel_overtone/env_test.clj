@@ -43,6 +43,6 @@
                                             (if (= name :saw-synth-perc)
                                               #'sut/saw-perc
                                               nil))]
-             (sut/trigger-event ev 0 1)
+             (sut/trigger-event :test-key ev 0 1)
              (let [synth-call (second @mock-calls)]
                (is (= #'sut/saw-perc (:func synth-call))))))))))

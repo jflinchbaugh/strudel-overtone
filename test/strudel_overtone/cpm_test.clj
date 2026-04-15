@@ -18,8 +18,8 @@
         ;; Test getting CPM
         (is (= 60.0 (double (sut/cpm))))))))
 
-(deftest slide-cpm-test
-  (testing "slide-cpm schedules updates"
+(deftest glide-cpm-test
+  (testing "glide-cpm schedules updates"
     (let [bpm-atom (atom 120)
           tasks (atom [])
           current-beat 100
@@ -37,7 +37,7 @@
         (sut/cpm 30)
 
         ;; Fade to 60 CPM over 1 cycle, 8 steps per cycle (8 steps total)
-        (sut/slide-cpm 60 1 8)
+        (sut/glide-cpm 60 1 8)
 
         (is (= 8 (count @tasks)))
 

@@ -5,7 +5,7 @@
 (comment
   (cpm)
 
-  (slide-cpm 32 8)
+  (glide-cpm 32 8)
 
   (playing)
   (stop!)

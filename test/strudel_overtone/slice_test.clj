@@ -21,7 +21,7 @@
         (testing "triggering a slice uses source buffer and correct begin/end"
           (reset! mock-calls [])
           (let [ev (sut/->Event 0 1 {:sound :kick})]
-            (sut/trigger-event ev 0 1)
+            (sut/trigger-event :test-key ev 0 1)
 
             (let [synth-call (second @mock-calls)
                   args (first (:args synth-call))
@@ -35,7 +35,7 @@
         (testing "triggering another slice"
           (reset! mock-calls [])
           (let [ev (sut/->Event 0 1 {:sound :snare})]
-            (sut/trigger-event ev 0 1)
+            (sut/trigger-event :test-key ev 0 1)
 
             (let [synth-call (second @mock-calls)
                   args (first (:args synth-call))
@@ -49,7 +49,7 @@
           (sut/slice-sample! :long-slice :break 0.0 0.5) ; 0.5 * 4.0 = 2.0s
           ;; step duration is 1 beat = 0.5s
           (let [ev (sut/->Event 0 0.25 {:sound :long-slice})]
-            (sut/trigger-event ev 0 1) ; dur-beats = 1
+            (sut/trigger-event :test-key ev 0 1) ; dur-beats = 1
             (let [synth-call (second @mock-calls)
                   args (first (:args synth-call))
                   args-map (apply hash-map args)]
