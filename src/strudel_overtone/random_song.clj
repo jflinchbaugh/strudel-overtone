@@ -75,8 +75,8 @@
   ;; Example: Super-random chord progression
   ;; We generate a large pool of chords and pick 4 of them to loop
   (let [roots [:c3 :d3 :e3 :f3 :g3 :a3 :b3]
-        types (take-nth 1 [:major :minor :minor7 :major7])
-        all-chords (for [r roots t types] (set (take 2 (ov/chord r t))))]
+        types (take 10 [:major :minor :minor7 :major7])
+        all-chords (for [r roots t types] (set (take 5 (ov/chord r t))))]
     (play! :rand-chords (-> (note (choose-n 2 all-chords))
                             (s :sine)
                             (ribbon 0 4) ;; Capture 4 random chords into a loop
@@ -133,6 +133,17 @@
                         (attack 0.05)
                         (decay 0)
                         (gain 0.2)))
+
+  ;; Example: Monophonic chords (paraphonic)
+  ;; Each note in the chord is tracked as a separate monophonic voice
+  (play! :mono-chords (-> (note (choose-n 3 [:c2 :e2 :g2 :a2 :c3 :e3 :g3]))
+                          (s :saw)
+                          (mono)
+                          (glide 0.2)
+                          (s-level 1.0)
+                          (attack 0.05)
+                          (gain 0.15)
+                          (lpf 1000)))
 
   (stop!)
 
