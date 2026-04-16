@@ -80,8 +80,6 @@
     (play! :rand-chords (-> (note (choose-n 2 all-chords))
                             (s :sine)
                             (ribbon 0 4) ;; Capture 4 random chords into a loop
-                            (mono)
-                            (gain 0.4)
                             (lpf (sig-range sine 500 5000)))))
 
   (playing)
@@ -150,5 +148,14 @@
   (ov/stop)
 
   (drop 4 (rtake 6 :things (irand 0 10)))
+
+  (play-only! :swoosh (->
+                        (note [:a3 :a3 :a3])
+                        (s [:sine :sine :sine])
+                        (mono)
+                        (glide 0.5)
+                        (pan [1 -1])))
+
+  (stop!)
 
   .)

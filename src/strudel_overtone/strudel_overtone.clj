@@ -38,6 +38,9 @@
                       gate 1}
         adsr-defaults '{attack 0.01 decay 0.1 s-level 0.5 release 0.3}
         perc-defaults '{attack 0.01}
+        ;; Helper to building smoothed parameters for mono mode
+        varlag-param (fn [name]
+                       `(ov/select:kr ~'monophonic [~name (ov/varlag ~name ~'slide)]))
         ;; Helper to build the synth definition
         make-synth (fn [suffix env-gen-form env-defaults]
                      (let [extra-map (apply hash-map extra-args)
@@ -51,7 +54,19 @@
                                            [] final-args-map)]
                        `(ov/defsynth ~(symbol (str (clojure.core/name name) suffix))
                           ~final-args-vec
-                          (let [~'env ~env-gen-form
+                          (let [;; Smoothed parameters for mono mode
+                                ~'lpf ~(varlag-param 'lpf)
+                                ~'resonance ~(varlag-param 'resonance)
+                                ~'amp ~(varlag-param 'amp)
+                                ~'pan ~(varlag-param 'pan)
+                                ~'hpf ~(varlag-param 'hpf)
+                                ~'bpf ~(varlag-param 'bpf)
+                                ~'crush ~(varlag-param 'crush)
+                                ~'distort ~(varlag-param 'distort)
+                                ~'fshift ~(varlag-param 'fshift)
+                                ~'pshift ~(varlag-param 'pshift)
+
+                                ~'env ~env-gen-form
                                 ;; Trigger Sidechain
                                 _# (let [trig-env# (ov/env-gen
                                                     (ov/perc
