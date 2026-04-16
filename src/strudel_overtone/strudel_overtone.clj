@@ -1202,18 +1202,27 @@
       (ov/ctl inst :gate 0)
       (catch Exception _ nil))))
 
-(defn- update-mono-inst [inst args]
+(defn update-mono-inst [inst args]
   (when (ov/node-active? inst)
     (gate-off inst)
     (apply ov/ctl inst :gate 1 args)))
 
-(defn- start-mono-inst [key voice-idx synth-var args old-inst]
+(defn start-mono-inst [key voice-idx synth-var args old-inst]
   (gate-off old-inst)
   (let [new-inst (apply synth-var args)]
     (swap! player-state assoc-in [:active-synths [key voice-idx]]
            {:inst new-inst :synth synth-var})))
 
-(defn- trigger-single-event [key ev params beat dur-beats voice-idx]
+(defn at-metro-mono [beat key voice-idx synth-var args]
+  (ov/apply-at (metro beat)
+               (fn [& _]
+                 (when (contains? (:loops @player-state) key)
+                   (let [existing (get-in @player-state [:active-synths [key voice-idx]])]
+                     (if (and existing (= (:synth existing) synth-var))
+                       (update-mono-inst (:inst existing) args)
+                       (start-mono-inst key voice-idx synth-var args (:inst existing))))))))
+
+(defn trigger-single-event [key ev params beat dur-beats voice-idx]
   (let [sound-param (:sound params)
         n (:note params)
         sound-name (or sound-param (if n :saw nil))
@@ -1259,22 +1268,15 @@
         (when synth-var
           (let [log-data (assoc (into {} ev) :params params)]
             (if monophonic
-              (ov/apply-at (metro beat)
-                           (fn [& _]
-                             ;; For monophonic, only trigger if the loop is still active
-                             ;; to prevent "orphaned" synths after (stop!)
-                             (when (contains? (:loops @player-state) key)
-                               (tel/log! :info {:event log-data})
-                               (let [existing (get-in @player-state [:active-synths [key voice-idx]])]
-                                 (if (and existing (= (:synth existing) synth-var))
-                                   (update-mono-inst (:inst existing) args)
-                                   (start-mono-inst key voice-idx synth-var args (:inst existing)))))))
+              (do
+                (ov/apply-at (metro beat) (fn [& _] (when (contains? (:loops @player-state) key) (tel/log! :info {:event log-data}))))
+                (at-metro-mono beat key voice-idx synth-var args))
               (do
                 (ov/apply-at (metro beat) (fn [& _] (tel/log! :info {:event log-data})))
                 ;; If we were monophonic but now polyphonic, gate off the old synth
                 (when-let [existing (get-in @player-state [:active-synths [key voice-idx]])]
                   (ov/apply-at (metro beat)
-                               (fn [& _] 
+                               (fn [& _]
                                  (gate-off (:inst existing))
                                  (swap! player-state update :active-synths dissoc [key voice-idx]))))
                 (at-metro beat synth-var args)))))))))
@@ -1334,7 +1336,7 @@
                 num-cycles (if (seq events)
                              (inc (long (apply max (map :time events))))
                              1)
-                ;; Since play-loop is quantized and incremental, we can 
+                ;; Since play-loop is quantized and incremental, we can
                 ;; rely on beat being a multiple of cycle-dur
                 cycle-total (Math/round (double (/ beat cycle-dur)))
                 cycle-idx (mod cycle-total num-cycles)]
