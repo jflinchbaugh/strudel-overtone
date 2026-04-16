@@ -17,7 +17,9 @@
 (defonce duck-bus (ov/control-bus))
 
 (defmacro with-glide [freq & body]
-  `(let [~'actual-f (ov/line:kr ~'slide-from ~freq ~'slide)]
+  `(let [~'actual-f (ov/select:kr ~'monophonic
+                                 [(ov/line:kr ~'slide-from ~freq ~'slide)
+                                  (ov/varlag ~freq ~'slide)])]
      ~@body))
 
 (defmacro def-strudel-synth [name extra-args & body]
@@ -31,7 +33,9 @@
                       duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2
                       room-size 0.5 damp 0.5
                       slide 0 slide-from -1
-                      legato 1}
+                      legato 1
+                      monophonic 0
+                      gate 1}
         adsr-defaults '{attack 0.01 decay 0.1 s-level 0.5 release 0.3}
         perc-defaults '{attack 0.01}
         ;; Helper to build the synth definition
@@ -190,12 +194,18 @@
                                      ~'actual-pan))))))]
     `(do
        ~(make-synth "-adsr"
-                    `(ov/env-gen (ov/adsr ~'attack ~'decay ~'s-level ~'release)
-                                 :gate (ov/line:kr 1 0 ~'sustain)
-                                 :action ov/NO-ACTION)
+                    `(let [auto-gate# (ov/line:kr 1 0 ~'sustain)
+                           effective-gate# (ov/select:kr ~'monophonic [auto-gate# ~'gate])]
+                       (ov/env-gen (ov/adsr ~'attack ~'decay ~'s-level ~'release)
+                                   :gate effective-gate#
+                                   :action ov/FREE))
                     adsr-defaults)
        ~(make-synth "-perc"
-                    `(ov/env-gen (ov/perc ~'attack ~'sustain) :action ov/NO-ACTION)
+                    `(let [auto-gate# (ov/line:kr 1 0 ~'sustain)
+                           effective-gate# (ov/select:kr ~'monophonic [auto-gate# ~'gate])]
+                       (ov/env-gen (ov/perc ~'attack ~'sustain)
+                                   :gate effective-gate#
+                                   :action ov/FREE))
                     perc-defaults))))
 
 ;; --- Logging ---
@@ -343,10 +353,14 @@
 
 (def-strudel-synth ks-stringer [freq 440 coef 0.5]
   (with-glide freq
-    (let [noize (* 0.8 (ov/white-noise))
-          trig (ov/impulse:kr 0)
-          delay-time (/ 1.0 actual-f)]
-      (ov/pluck noize trig delay-time delay-time 10 coef))))
+    (let [noise (* 0.8 (ov/white-noise))
+          ;; Excitation burst
+          burst (* noise (ov/env-gen (ov/perc 0.001 0.01)))
+          ;; Waveguide string modeling
+          delay-time (/ 1.0 actual-f)
+          ;; Use comb-l for a delay line that supports real-time modulation of delay-time
+          string (ov/comb-l burst 0.1 delay-time (ov/lin-lin coef -1 1 0.1 10))]
+      string)))
 
 (def-strudel-synth dub-kick [freq 80]
   (let [lpf-env (ov/perc 0.001 1 freq -20)
@@ -690,6 +704,16 @@
   "Sets the note legato (duration multiplier).
    Values: 1.0 (standard), >1.0 (overlapping), <1.0 (staccato)."
   [pattern val] (set-param pattern :legato val))
+
+(defn monophonic
+  "Enables monophonic mode for the pattern.
+   In monophonic mode, a single synth instance is used and its parameters
+   (like frequency) are updated for each note, rather than triggering
+   a new synth instance."
+  ([pattern] (set-param pattern :monophonic 1))
+  ([pattern val] (set-param pattern :monophonic val)))
+
+(def mono monophonic)
 
 (defn release
   "Sets the envelope release time.
@@ -1091,7 +1115,11 @@
    :cp :clap})
 
 (def ^:private percussive-synths
-  #{:kick :snare :hat :clap :bd :sd :hh :cp :dub-kick :dance-kick})
+  #{:kick :snare :hat :clap :bd :sd :hh :cp :dub-kick :dance-kick :ks-stringer})
+
+(defn- supports-mono? [sound-name]
+  (not (or (percussive-synths sound-name)
+           (#{:sampler :white :pink :brown} sound-name))))
 
 (defn- get-synth-name [sound params]
   (let [base (get synth-aliases sound sound)
@@ -1133,11 +1161,17 @@
              :end (+ s-begin (* p-end s-dur))))
     params))
 
-(defn- calculate-sustain [params sample-buf dur-beats]
+(defn- calculate-sustain [params sample-buf dur-beats monophonic?]
   (let [legato (try-parse-number (get params :legato 1.0))
         step-dur-sec (* dur-beats (/ 60 (ov/metro-bpm metro)) legato)
-        param-sustain (:sustain params)]
+        param-sustain (:sustain params)
+        env (get params :env :adsr)]
     (cond
+      ;; For monophonic ADSR, we want the synth to stay alive indefinitely
+      ;; until gated off by the next note or the loop stopping.
+      (and monophonic? (= env :adsr))
+      9999
+
       param-sustain
       (if (string? param-sustain)
         (try (Double/parseDouble param-sustain) (catch Exception _ 0.1))
@@ -1150,8 +1184,7 @@
             abs-r (abs (double r))
             dur (:duration sample-buf)
             total-dur (* (abs (double (- e b))) dur (/ 1 (max 0.001 abs-r)))
-            total-dur (min total-dur step-dur-sec)
-            env (get params :env :adsr)]
+            total-dur (min total-dur step-dur-sec)]
         (if (= env :perc)
           (let [attack (let [a (get params :attack 0)]
                          (if (string? a) (try (Double/parseDouble a) (catch Exception _ 0)) a))]
@@ -1162,6 +1195,23 @@
 
       :else
       step-dur-sec)))
+
+(defn- gate-off [inst]
+  (when (and inst (ov/node-active? inst))
+    (try
+      (ov/ctl inst :gate 0)
+      (catch Exception _ nil))))
+
+(defn- update-mono-inst [inst args]
+  (when (ov/node-active? inst)
+    (gate-off inst)
+    (apply ov/ctl inst :gate 1 args)))
+
+(defn- start-mono-inst [key synth-var args old-inst]
+  (gate-off old-inst)
+  (let [new-inst (apply synth-var args)]
+    (swap! player-state assoc-in [:active-synths key]
+           {:inst new-inst :synth synth-var})))
 
 (defn- trigger-single-event [key ev params beat dur-beats]
   (let [sound-param (:sound params)
@@ -1174,11 +1224,13 @@
         note-offset (get params :add 0)
         amp (try-parse-number (or (:amp params) 1.0))
         lpf (try-parse-number (or (:lpf params) 2000))
-        sustain-sec (calculate-sustain params sample-buf dur-beats)
         slide (try-parse-number (get params :slide 0))
-        cycle-sec (* 4 (/ 60 (ov/metro-bpm metro)))]
+        cycle-sec (* 4 (/ 60 (ov/metro-bpm metro)))
+        monophonic-param (not (zero? (get params :monophonic 0)))]
     (when sound-name
       (let [base (if sample-buf :sampler (get synth-aliases sound-name sound-name))
+            monophonic (and monophonic-param (supports-mono? base))
+            sustain-sec (calculate-sustain params sample-buf dur-beats monophonic)
             synth-key (get-synth-name base params)
             synth-var (or (resolve-synth synth-key) (resolve-synth base))
             freq (when n (resolve-note (+ (if (keyword? n) (ov/note n) n) note-offset)))
@@ -1186,21 +1238,46 @@
             has-glide (and (pos? slide) last-f freq)
             effective-slide-from (if has-glide last-f (or freq 440))
             effective-slide-time (if has-glide (min sustain-sec (* slide cycle-sec)) 0.001)
-            reserved #{:sound :note :active :start :duration :env :add :swing :slide :legato}
-            handled #{:amp :lpf :sustain :freq :slide-from}
+            reserved #{:sound :note :active :start :duration :env :add :swing :slide :legato :monophonic :gate}
+            handled #{:amp :lpf :sustain :freq :slide-from :gate :monophonic}
             args (cond-> (reduce-kv (fn [acc k v] (if (or (reserved k) (handled k)) acc (conj acc k v))) [] params)
                    true (conj :amp amp)
-                   freq (conj :freq freq)
+                   true (conj :freq (or freq 440))
                    lpf (conj :lpf lpf)
                    sustain-sec (conj :sustain sustain-sec)
                    true (conj :slide effective-slide-time)
                    true (conj :slide-from effective-slide-from)
-                   sample-buf (conj :buf (:id sample-buf)))]
+                   true (conj :gate 1)
+                   true (conj :monophonic (if monophonic 1 0))
+                   sample-buf (conj :buf (:id sample-buf)))
+            ;; Filter out any nils (e.g. if lpf or sample-buf was nil)
+            args (->> (partition 2 args)
+                      (filter (fn [[k v]] (and (some? k) (some? v))))
+                      (apply concat)
+                      vec)]
         (when freq (swap! player-state assoc-in [:last-freq key] freq))
         (when synth-var
           (let [log-data (assoc (into {} ev) :params params)]
-            (ov/apply-at (metro beat) (fn [& _] (tel/log! :info {:event log-data})))
-            (at-metro beat synth-var args)))))))
+            (if monophonic
+              (ov/apply-at (metro beat)
+                           (fn [& _]
+                             ;; For monophonic, only trigger if the loop is still active
+                             ;; to prevent "orphaned" synths after (stop!)
+                             (when (contains? (:loops @player-state) key)
+                               (tel/log! :info {:event log-data})
+                               (let [existing (get-in @player-state [:active-synths key])]
+                                 (if (and existing (= (:synth existing) synth-var))
+                                   (update-mono-inst (:inst existing) args)
+                                   (start-mono-inst key synth-var args (:inst existing)))))))
+              (do
+                (ov/apply-at (metro beat) (fn [& _] (tel/log! :info {:event log-data})))
+                ;; If we were monophonic but now polyphonic, gate off the old synth
+                (when-let [existing (get-in @player-state [:active-synths key])]
+                  (ov/apply-at (metro beat)
+                               (fn [& _] 
+                                 (gate-off (:inst existing))
+                                 (swap! player-state update :active-synths dissoc key))))
+                (at-metro beat synth-var args)))))))))
 
 (defn trigger-event [key ev beat dur-beats]
   (let [raw-params (:params ev)
@@ -1280,9 +1357,17 @@
 
             (ov/apply-by (metro next-beat) #'play-loop [key next-beat]))
           ;; Pattern removed, loop dies
-          (swap! player-state update :loops disj key)))
+          (do
+            (when-let [active (get-in @player-state [:active-synths key])]
+              (gate-off (:inst active))
+              (swap! player-state update :active-synths dissoc key))
+            (swap! player-state update :loops disj key))))
       ;; Stopped, loop dies
-      (swap! player-state update :loops disj key))))
+      (do
+        (when-let [active (get-in @player-state [:active-synths key])]
+          (gate-off (:inst active))
+          (swap! player-state update :active-synths dissoc key))
+        (swap! player-state update :loops disj key)))))
 
 (defn playing
   "Returns a list of the names of the currently playing patterns.
@@ -1317,13 +1402,27 @@
   (let [pairs (if (= 1 (count args))
                 [[:main (first args)]]
                 (partition 2 args))
-        new-keys (set (map first pairs))]
+        new-keys (set (map first pairs))
+        active-synths (:active-synths @player-state)]
+    ;; Gate off synths that are being removed
+    (doseq [[key active] active-synths]
+      (when-not (new-keys key)
+        (gate-off (:inst active))))
+    (swap! player-state update :active-synths select-keys new-keys)
     (swap! player-state update :patterns select-keys new-keys)
     (apply play! args)))
 
 (defn stop!
-  ([] (swap! player-state assoc :playing? false :patterns {} :loops #{}))
-  ([key] (swap! player-state update :patterns dissoc key)))
+  ([]
+   (doseq [active (vals (:active-synths @player-state))]
+     (gate-off (:inst active)))
+   (swap! player-state assoc :playing? false :patterns {} :loops #{} :active-synths {}))
+  ([key]
+   (when-let [active (get-in @player-state [:active-synths key])]
+     (gate-off (:inst active))
+     (swap! player-state update :active-synths dissoc key))
+   (swap! player-state update :patterns dissoc key)
+   (swap! player-state update :loops disj key)))
 
 ;; --- Main / Entry ---
 
@@ -1781,9 +1880,7 @@
 
   (sample-info :storm)
 
-  (sample-info :storm-beat)
-
-  .)
+  (sample-info :storm-beat))
 
 
 

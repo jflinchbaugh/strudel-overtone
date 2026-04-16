@@ -24,6 +24,7 @@
             (let [args (first @trigger-calls)]
               (is (= 0.001 (:slide args))) ;; No last-freq, so slide is minimal
               (is (= freq (:slide-from args))) ;; slide-from is itself
+              (is (= 1 (:gate args)))
               (is (= freq (get-in @player-state [:last-freq :p1]))))))
 
         (testing "second note has slide-from matching first note"
@@ -35,4 +36,5 @@
             (let [args (first @trigger-calls)]
               (is (= 0.2 (:slide args)))
               (is (= prev-freq (:slide-from args)))
+              (is (= 1 (:gate args)))
               (is (= (ov/midi->hz (ov/note :g3)) (get-in @player-state [:last-freq :p1]))))))))))

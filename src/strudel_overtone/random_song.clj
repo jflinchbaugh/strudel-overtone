@@ -75,13 +75,20 @@
   ;; Example: Super-random chord progression
   ;; We generate a large pool of chords and pick 4 of them to loop
   (let [roots [:c3 :d3 :e3 :f3 :g3 :a3 :b3]
-        types (take-nth 2 [:major :minor :minor7 :major7])
-        all-chords (for [r roots t types] (set (take 3 (ov/chord r t))))]
+        types (take-nth 1 [:major :minor :minor7 :major7])
+        all-chords (for [r roots t types] (set (take 2 (ov/chord r t))))]
     (play! :rand-chords (-> (note (choose-n 2 all-chords))
-                            (s :supersaw)
+                            (s :sine)
                             (ribbon 0 4) ;; Capture 4 random chords into a loop
+                            (mono)
                             (gain 0.4)
                             (lpf (sig-range sine 500 5000)))))
+
+  (playing)
+
+  (stop!)
+
+  (ov/stop)
 
   ;; Example: Acid bassline with glide (portamento)
   (play! :acid (-> (note (choose-n 3 [:c2 :c3 :g2 :a2]))
@@ -100,7 +107,8 @@
   ;; Use s-level 1.0 and legato > 1 to blend notes together
   (play! :liquid (-> (note (choose [:c3 :d3 :f3 :g3]))
                      (s :tb303)
-                     (glide 0.5)    ;; 20% of a cycle for the pitch slide
+                     (mono)
+                     (glide 0.05)   ;; 20% of a cycle for the pitch slide
                      (legato 1.1)   ;; 10% overlap between notes
                      (s-level 1.0)  ;; No volume drop during the note
                      (attack 0.05)  ;; Soften the start of each note
@@ -108,14 +116,27 @@
                      (gain 0.3)))
 
   ;; Example: Plucky Glide with percussive envelope
-  (play! :plucky-glide (-> (note (choose [:c2 :c2 :c3 :g2]))
-                           (s :tb303)
-                           (env :perc)
+  (play! :plucky-glide (-> (note (choose-n 4 [:c2 :c2 :c3 :g2]))
+                           (s :bd)
+                           (mono)
                            (glide 0.1)
-                           (sustain 0.4) ;; Fixed length in seconds
                            (gain 0.4)))
 
+  ;; Example: Monophonic lead
+  ;; A single synth instance is reused, updating frequency for each note
+  (play! :mono-lead (-> (note (choose [:c3 :d3 :e3 :g3 :a3]))
+                        (s :ks-stringer)
+                        (mono)
+                        (glide 0.1)
+                        (legato 1.0)
+                        (s-level 1.0)
+                        (attack 0.05)
+                        (decay 0)
+                        (gain 0.2)))
+
   (stop!)
+
+  (ov/stop)
 
   (drop 4 (rtake 6 :things (irand 0 10)))
 
