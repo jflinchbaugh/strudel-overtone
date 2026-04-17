@@ -8,13 +8,32 @@
     (let [pat (-> (sut/s [:bd :sd :hh :cp])
                   (sut/ribbon 0 0.5)) ;; first half: :bd and :sd
           evs (:events pat)]
-      ;; ribbon generates 100 cycles. Each cycle has 2 events.
-      (is (= 200 (count evs)))
+      ;; ribbon now only generates one iteration
+      (is (= 2 (count evs)))
       (is (= :bd (get-in (first evs) [:params :sound])))
       (is (= :sd (get-in (second evs) [:params :sound])))
-      ;; check that it repeats
-      (is (= :bd (get-in (nth evs 2) [:params :sound])))
-      (is (= :sd (get-in (nth evs 3) [:params :sound]))))))
+      
+      ;; check that it repeats in play-loop
+      (let [player-state (atom {:playing? true :patterns {:test pat} :loops #{:test}})
+            trigger-calls (atom [])]
+        (with-redefs [sut/player-state player-state
+                      sut/metro (fn ([] 0) ([b] (* b 1000)))
+                      ov/apply-by (fn [& _] nil)
+                      sut/trigger-event (fn [key ev beat dur]
+                                          (swap! trigger-calls conj (get-in ev [:params :sound])))]
+          
+          ;; cycle-idx (mod 0 0.5) = 0.0
+          ;; schedules t in [0, 0.5)
+          ;; plus second iteration starting at 0.5
+          (sut/play-loop :test 0)
+          (is (= [:bd :sd :bd :sd] @trigger-calls))
+
+          (reset! trigger-calls [])
+          ;; beat 2 is cycle 0.5
+          ;; but play-loop is quantized to 1-cycle (4 beats) intervals by default
+          ;; so let's check beat 4
+          (sut/play-loop :test 4)
+          (is (= [:bd :sd :bd :sd] @trigger-calls) "Should repeat in next 1-cycle block"))))))
 
 (deftest ribbon-freezes-randomness-test
   (testing "ribbon should freeze random values present before the ribbon"
@@ -86,20 +105,16 @@
         (is (= n10 ((get-in ev10 [:params :note]) 0 :note)))
         (is (= n10 ((get-in ev10 [:params :note]) 100.0 :note)))))))
 
-(deftest ribbon-performance-test
-  (testing "play-loop should only schedule events for the current cycle"
-    (let [pat (-> (sut/s [:bd]) (sut/ribbon 0 0.25))
-          player-state (atom {:playing? true
-                             :patterns {:test pat}
-                             :loops #{:test}})
-          trigger-calls (atom [])]
-      (with-redefs [sut/player-state player-state
-                    sut/metro (fn ([] 0) ([b] (* b 1000)))
-                    ov/apply-by (fn [& _] nil)
-                    sut/trigger-event (fn [key ev beat dur]
-                                        (swap! trigger-calls conj beat))]
-
-        (sut/play-loop :test 0)
-        ;; ribbon 0.25 on 1 cycle pattern = 4 events per cycle
-        (is (= 4 (count @trigger-calls)) 
-            "Should only trigger events for the current cycle [0, 1)")))))
+(deftest ribbon-gain-repeat-test
+  (testing "gain after ribbon should repeat if ribbon is longer than gain pattern"
+    (let [pat (-> (sut/s [:saw])
+                  (sut/note [:c3 :e3 :g3 :b3])
+                  (sut/ribbon 0 2)
+                  (sut/gain [0.1 0.2 0.3 0.4]))
+          events (:events pat)]
+      (is (= 8 (count events)))
+      (let [gains (map (fn [ev] 
+                         (let [amp (get-in ev [:params :amp])]
+                           (if (fn? amp) (amp 0 :amp) amp))) 
+                       (sort-by :time events))]
+        (is (= [0.1 0.2 0.3 0.4 0.1 0.2 0.3 0.4] (vec gains)))))))

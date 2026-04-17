@@ -4,10 +4,13 @@
 ;; --- Data Structures ---
 
 (defrecord Event [time duration params])
-(defrecord Pattern [events cycles delay-cycles])
+(defrecord Pattern [events cycles delay-cycles length])
 
 (defn make-pattern [events]
-  (->Pattern events (constantly 1) 0))
+  (let [num-cycles (if (seq events)
+                     (inc (long (apply max (map :time events))))
+                     1)]
+    (->Pattern events (constantly 1) 0 num-cycles)))
 
 ;; --- Randomness ---
 
@@ -211,22 +214,41 @@
 
 (defn- combine-patterns [base-pat new-pat key]
   (let [base-events (:events base-pat)
-        new-events (:events new-pat)]
+        new-events (:events new-pat)
+        new-len (or (:length new-pat) 1.0)
+        max-base-t (if (seq base-events)
+                     (apply max (map (fn [e] (+ (:time e) (:duration e))) base-events))
+                     0)
+        ;; Unroll new-events to cover the range of base-events
+        unroll-count (long (Math/ceil (/ max-base-t (double new-len))))
+        unrolled-new (if (> unroll-count 1)
+                       (mapcat (fn [i]
+                                 (map (fn [ev]
+                                        (update ev :time + (* i new-len)))
+                                      new-events))
+                               (range unroll-count))
+                       new-events)]
     (assoc base-pat :events
            (mapcat (fn [be]
-                     (let [mid (+ (:time be) (/ (:duration be) 2))
+                     (let [b-start (:time be)
+                           b-end (+ b-start (:duration be))
                            matches (filter (fn [ne]
-                                             (let [s (:time ne)
-                                                   e (+ s (:duration ne))]
-                                               (and (<= s mid) (< mid e))))
-                                           new-events)]
+                                             (let [n-start (:time ne)
+                                                   n-end (+ n-start (:duration ne))]
+                                               (and (< n-start b-end) (> n-end b-start))))
+                                           unrolled-new)]
                        (if (seq matches)
-                         (map
-                          (fn [match]
-                            (assoc-in be
-                                      [:params key]
-                                      (get-in match [:params key])))
-                          matches)
+                         (map (fn [match]
+                                (let [n-start (:time match)
+                                      n-end (+ n-start (:duration match))
+                                      i-start (max b-start n-start)
+                                      i-end (min b-end n-end)
+                                      i-dur (- i-end i-start)]
+                                  (assoc be
+                                         :time i-start
+                                         :duration i-dur
+                                         :params (assoc (:params be) key (get-in match [:params key])))))
+                              matches)
                          [be])))
                    base-events))))
 
@@ -586,26 +608,26 @@
                                  (let [t (:time ev)]
                                    (and (>= t offset) (< t end))))
                                unrolled-events)]
-    (assoc pattern :events
-           (mapcat (fn [i]
-                     (map (fn [ev]
-                            (let [orig-t (:time ev)
-                                  new-t (+ (* i len) (- orig-t offset))]
-                              (-> ev
-                                  (assoc :time new-t)
-                                  (update :params
-                                          (fn [ps]
-                                            (reduce-kv (fn [m k v]
-                                                         (assoc m k
-                                                                (if (fn? v)
-                                                             ;; Freeze the time for existing functions
-                                                             ;; using a stable t derived from orig-t.
-                                                             ;; We use * 4.0 to match the beat scale.
-                                                                  (fn [_t k] (v (* orig-t 4.0) k))
-                                                                  v)))
-                                                       {} ps))))))
-                          segment-events))
-                   (range 100))))) ;; Pre-generate many cycles
+    (assoc pattern
+           :length len
+           :events
+           (map (fn [ev]
+                  (let [orig-t (:time ev)
+                        new-t (- orig-t offset)]
+                    (-> ev
+                        (assoc :time new-t)
+                        (update :params
+                                (fn [ps]
+                                  (reduce-kv (fn [m k v]
+                                               (assoc m k
+                                                      (if (fn? v)
+                                                 ;; Freeze the time for existing functions
+                                                 ;; using a stable t derived from orig-t.
+                                                 ;; We use * 4.0 to match the beat scale.
+                                                        (fn [_t k] (v (* orig-t 4.0) k))
+                                                        v)))
+                                             {} ps))))))
+                segment-events))))
 
 (defn rev
   "Reverses the events within a cycle (0 to 1 range)."

@@ -54,10 +54,25 @@
   ;; Example: Capture the first cycle of a random melody and repeat it
   (play! :frozen-lead (-> (note (choose-n 8 [:c3 :e3 :g3 :b3]))
                         (add 12)
-                          (s :saw)
-                          (ribbon 0 4) ;; Freeze the first 8 random notes
-                          (gain 0.3)
-                          (lpf (sig-range sine 500 2000)))) ;; LPF still moves!
+                        (s :saw)
+                        (ribbon 2 2)
+                        (gain (choose-n 2 [1/4 1/4 1/16]))
+                        #_(lpf (sig-range sine 500 2000)))
+
+    ) ;; LPF still moves!
+
+
+  (play! :test (->
+                 (s [:saw])
+                 (mono)
+                 (note (choose-n 4 [:c3 :e3 :g3 :b3]))
+                 (glide 0.1)
+                 (ribbon 0 2)
+                 (gain (choose-n 8 [1/4 1/2 1/4]))
+                 ))
+
+
+  (stop!)
 
   ;; Example: Random chord progression with ks-stringer
   (let [chords [(set (ov/chord :c3 :major))
@@ -104,14 +119,10 @@
 
   ;; Example: Liquid Lead with smooth blending
   ;; Use s-level 1.0 and legato > 1 to blend notes together
-  (play! :liquid (-> (note (choose [:c3 :d3 :f3 :g3]))
-                     (s :tb303)
+  (play! :liquid (-> (note (choose-n 2 [:c3 :d3 :f3 :g3]))
+                     (s [:saw])
                      (mono)
-                     (glide 0.05)   ;; 20% of a cycle for the pitch slide
-                     (legato 1.1)   ;; 10% overlap between notes
-                     (s-level 1.0)  ;; No volume drop during the note
-                     (attack 0.05)  ;; Soften the start of each note
-                     (decay 0)      ;; Immediate sustain
+                     (glide 0.2)   ;; 20% of a cycle for the pitch slide
                      (gain 0.3)))
 
   ;; Example: Plucky Glide with percussive envelope
@@ -155,10 +166,12 @@
                         (s :sine)
                         (mono)
                         (glide 1.0)
-                        (pan (sine))))
+                        (pan sine)))
 
   (stop!)
 
   (ov/stop)
+
+  (play-only! (-> (s [:saw]) (glide 0.5) (gain [0.5 1 0.5]) (mono)))
 
   .)

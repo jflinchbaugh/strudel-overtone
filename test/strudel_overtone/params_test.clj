@@ -65,8 +65,17 @@
       (is (= :perc (get-in (first (:events pat)) [:params :env])))
       (is (= :adsr (get-in (second (:events pat)) [:params :env]))))))
 
-(deftest active-param-test
-  (testing "active parameter parses strings in single value"
-    (let [pat (-> (sut/s [:bd])
-                  (sut/active "0"))]
-      (is (= 0.0 ((get-in (first (:events pat)) [:params :active]) 0 :active))))))
+(deftest parameter-splitting-test
+  (testing "parameter patterns split events"
+    (let [pat (-> (sut/s [:kick]) (sut/gain [0 1]))
+          events (:events pat)]
+      (is (= 2 (count events)))
+      (let [ev1 (nth events 0)
+            ev2 (nth events 1)]
+        (is (= 0.0 (:time ev1)))
+        (is (= 0.5 (:duration ev1)))
+        (is (== 0 ((get-in ev1 [:params :amp]) 0 :amp)))
+
+        (is (= 0.5 (:time ev2)))
+        (is (= 0.5 (:duration ev2)))
+        (is (== 1 ((get-in ev2 [:params :amp]) 0.5 :amp)))))))

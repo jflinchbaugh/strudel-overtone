@@ -418,7 +418,7 @@
 ;; --- Pattern records ---
 
 (defn ->Event [time duration params] (p/->Event time duration params))
-(defn ->Pattern [events cycles delay-cycles] (p/->Pattern events cycles delay-cycles))
+(defn ->Pattern [events cycles delay-cycles length] (p/->Pattern events cycles delay-cycles length))
 (def make-pattern p/make-pattern)
 (def parse-mini p/parse-mini)
 
@@ -868,31 +868,44 @@
                           0.125)
                 ;; Calculate which cycle of the pattern we are on
                 ;; (Some functions like ribbon create multi-cycle event lists)
-                num-cycles (if (seq events)
-                             (inc (long (apply max (map :time events))))
-                             1)
+                num-cycles (or (:length pat)
+                               (if (seq events)
+                                 (inc (long (apply max (map :time events))))
+                                 1))
                 ;; Since play-loop is quantized and incremental, we can
                 ;; rely on beat being a multiple of cycle-dur
                 cycle-total (Math/round (double (/ beat cycle-dur)))
-                cycle-idx (mod cycle-total num-cycles)]
+                
+                ;; If num-cycles is < 1, we might need to play multiple iterations of the pattern
+                ;; within this one-cycle (cycle-dur) window.
+                num-iterations (if (< num-cycles 1)
+                                 (long (/ 1 num-cycles))
+                                 1)]
 
-            ;; Schedule events for this cycle
-            (doseq [ev events]
-              (let [t (:time ev)]
-                (when (and (>= t cycle-idx) (< t (inc cycle-idx)))
-                  (let [rel-t (- t cycle-idx)
-                        swing-raw (get-in ev [:params :swing] 0)
-                        swing-amount (if (fn? swing-raw) (swing-raw beat :swing) swing-raw)
-                        swung-start (if (zero? swing-amount)
-                                      rel-t
-                                      (apply-swing rel-t swing-amount min-dur))
-                        ;; Assoc effective start time for logging/debugging
-                        ev (assoc ev :effective-time swung-start)
+             ;; Schedule events for this cycle
+             (doseq [i (range num-iterations)]
+               (let [cycle-idx (mod (+ cycle-total i) num-cycles)]
+                 (doseq [ev events]
+                   (let [t (:time ev)]
+                     ;; Support fractional pattern lengths by checking the intersection 
+                     ;; of the event's interval with the current cycle block.
+                     (when (and (>= t cycle-idx) (< t (min (+ cycle-idx 1.0) num-cycles)))
+                       (let [rel-t (- t cycle-idx)
+                             ;; offset rel-t by the iteration
+                             rel-t-iter (+ rel-t (* i num-cycles))
 
-                        rel-dur (:duration ev)
-                        ev-beat (+ beat (* swung-start cycle-dur))
-                        ev-dur-beats (* rel-dur cycle-dur)]
-                    (trigger-event key ev ev-beat ev-dur-beats)))))
+                             swing-raw (get-in ev [:params :swing] 0)
+                             swing-amount (if (fn? swing-raw) (swing-raw beat :swing) swing-raw)
+                             swung-start (if (zero? swing-amount)
+                                           rel-t-iter
+                                           (apply-swing rel-t-iter swing-amount min-dur))
+                             ;; Assoc effective start time for logging/debugging
+                             ev (assoc ev :effective-time swung-start)
+
+                             rel-dur (:duration ev)
+                             ev-beat (+ beat (* swung-start cycle-dur))
+                             ev-dur-beats (* rel-dur cycle-dur)]
+                         (trigger-event key ev ev-beat ev-dur-beats)))))))
 
             (ov/apply-by (metro next-beat) #'play-loop [key next-beat]))
           ;; Pattern removed, loop dies
