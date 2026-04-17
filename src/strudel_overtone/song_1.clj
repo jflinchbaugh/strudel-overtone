@@ -15,8 +15,8 @@
    :plucks (->
             (note (choose-n 8 (ov/chord :c6 :minor7)))
             (add 0)
-            (ribbon 6 1)
-            (room (overlay [0.9 0.6 0.1]))
+            (ribbon 9 2)
+            (room (overlay [0.9 0.6 0.3]))
             (s :ks-stringer)
             #_(echo-delay 0.02)
             (crush (overlay [0.1 0.3 0.6]))
@@ -25,7 +25,7 @@
             #_(pan-hz 1)
             #_(pan-depth 0.9)
             (duck-trigger 1)
-            #_(swing [1/8])
+            (swing [1/32])
             (gain 0.6)))
 
   (play-only!
@@ -46,16 +46,16 @@
          (swing 0/3)
          (duck 0.9))
    :pad (->
-         (note [:c3 [:b2 :d3 :d2]])
+         (note [:c3 [:b2 :c3 :d2]])
          (mono)
-         (fast 1/2)
+         (fast 1)
          (s [#{:mooger}])
          (resonance 3)
          (distort 0.5)
          (add [-12 -12])
          (attack 1.2)
          (release 0.01)
-         (gain [0.3 0.3])
+         (gain [0.2 0.1])
          (s-level 1)
          (duck 0.8)))
 

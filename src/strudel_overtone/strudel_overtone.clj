@@ -971,17 +971,12 @@
 
 (defn stop!
   ([]
-   (doseq [active (vals (:active-synths @player-state))]
-     (gate-off (:inst active)))
-   (swap! player-state assoc :playing? false :patterns {} :loops #{} :active-synths {}))
+   (swap! player-state assoc :playing? false :patterns {} :loops #{}))
   ([key]
-   (let [active-synths (:active-synths @player-state)]
-     (doseq [[k active] active-synths]
-       (when (or (= k key) (and (vector? k) (= (first k) key)))
-         (gate-off (:inst active))
-         (swap! player-state update :active-synths dissoc k))))
-   (swap! player-state update :patterns dissoc key)
-   (swap! player-state update :loops disj key)))
+   (swap! player-state (fn [s]
+                         (-> s
+                             (update :patterns dissoc key)
+                             (update :loops disj key))))))
 
 ;; --- Main / Entry ---
 

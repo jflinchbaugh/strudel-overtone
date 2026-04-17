@@ -21,12 +21,21 @@
             (is (= 2 (count @single-event-calls)))
             (is (= #{0 1} (set @single-event-calls)))))
 
-        (testing "stop! gates off all indexed voices"
+        (testing "stop! defers gating for all indexed voices"
           (let [gate-calls (atom [])]
             ;; Manually populate active-synths to test stop! logic
-            (swap! player-state assoc :active-synths {[:p1 0] {:inst {:id 1}}
-                                                     [:p1 1] {:inst {:id 2}}})
-            (with-redefs [strudel-overtone.strudel-overtone/gate-off (fn [inst] (swap! gate-calls conj inst))]
+            (swap! player-state assoc :loops #{:p1}
+                           :active-synths {[:p1 0] {:inst {:id 1}}
+                                          [:p1 1] {:inst {:id 2}}})
+            (with-redefs [strudel-overtone.strudel-overtone/gate-off (fn [inst] (swap! gate-calls conj inst))
+                          sut/metro (constantly 0)
+                          ov/apply-by (fn [& _] nil)]
               (sut/stop! :p1)
+              ;; Should NOT be gated yet
+              (is (= 0 (count @gate-calls)))
+
+              ;; Simulate play-loop running its final cleanup iteration
+              (sut/play-loop :p1 0)
+
               (is (= 2 (count @gate-calls)))
               (is (empty? (:active-synths @player-state))))))))))
