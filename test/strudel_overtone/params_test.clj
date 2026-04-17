@@ -79,3 +79,15 @@
         (is (= 0.5 (:time ev2)))
         (is (= 0.5 (:duration ev2)))
         (is (== 1 ((get-in ev2 [:params :amp]) 0.5 :amp)))))))
+
+(deftest overlay-test
+  (testing "overlay should apply parameters without splitting base events"
+    (let [pat (-> (sut/s [:kick])
+                  (sut/gain (sut/overlay [0.1 0.2])))
+          events (:events pat)]
+      (is (= 1 (count events)) "Base event should not be split")
+      (let [ev (first events)
+            amp-fn (get-in ev [:params :amp])]
+        (is (= 0.0 (:time ev)))
+        (is (= 1.0 (:duration ev)))
+        (is (== 0.1 (amp-fn 0 :amp)) "Should sample first value at start time")))))

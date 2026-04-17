@@ -5,6 +5,13 @@
 
 (defrecord Event [time duration params])
 (defrecord Pattern [events cycles delay-cycles length])
+(defrecord Overlay [val])
+
+(defn overlay
+  "Wraps a parameter value (like a pattern vector) to indicate it should
+   be applied as an overlay, without splitting existing events."
+  [val]
+  (->Overlay val))
 
 (defn make-pattern [events]
   (let [num-cycles (if (seq events)
@@ -212,55 +219,72 @@
                          {key res}))))
           parsed)))
 
-(defn- combine-patterns [base-pat new-pat key]
-  (let [base-events (:events base-pat)
-        new-events (:events new-pat)
-        new-len (or (:length new-pat) 1.0)
-        max-base-t (if (seq base-events)
-                     (apply max (map (fn [e] (+ (:time e) (:duration e))) base-events))
-                     0)
-        ;; Unroll new-events to cover the range of base-events
-        unroll-count (long (Math/ceil (/ max-base-t (double new-len))))
-        unrolled-new (if (> unroll-count 1)
-                       (mapcat (fn [i]
-                                 (map (fn [ev]
-                                        (update ev :time + (* i new-len)))
-                                      new-events))
-                               (range unroll-count))
-                       new-events)]
-    (assoc base-pat :events
-           (mapcat (fn [be]
+(defn- combine-patterns
+  ([base-pat new-pat key] (combine-patterns base-pat new-pat key false))
+  ([base-pat new-pat key overlay?]
+   (let [base-events (:events base-pat)
+         new-events (:events new-pat)
+         new-len (or (:length new-pat) 1.0)
+         max-base-t (if (seq base-events)
+                      (apply max (map (fn [e] (+ (:time e) (:duration e))) base-events))
+                      0)
+         ;; Unroll new-events to cover the range of base-events
+         unroll-count (long (Math/ceil (/ max-base-t (double new-len))))
+         unrolled-new (if (> unroll-count 1)
+                        (mapcat (fn [i]
+                                  (map (fn [ev]
+                                         (update ev :time + (* i new-len)))
+                                       new-events))
+                                (range unroll-count))
+                        new-events)]
+     (assoc base-pat :events
+            (if overlay?
+              (map (fn [be]
                      (let [b-start (:time be)
-                           b-end (+ b-start (:duration be))
-                           matches (filter (fn [ne]
-                                             (let [n-start (:time ne)
-                                                   n-end (+ n-start (:duration ne))]
-                                               (and (< n-start b-end) (> n-end b-start))))
-                                           unrolled-new)]
-                       (if (seq matches)
-                         (map (fn [match]
-                                (let [n-start (:time match)
-                                      n-end (+ n-start (:duration match))
-                                      i-start (max b-start n-start)
-                                      i-end (min b-end n-end)
-                                      i-dur (- i-end i-start)]
-                                  (assoc be
-                                         :time i-start
-                                         :duration i-dur
-                                         :params (assoc (:params be) key (get-in match [:params key])))))
-                              matches)
-                         [be])))
-                   base-events))))
+                           match (first (filter (fn [ne]
+                                                  (let [n-start (:time ne)
+                                                        n-end (+ n-start (:duration ne))]
+                                                    (and (<= n-start b-start) (< b-start n-end))))
+                                                unrolled-new))]
+                       (if match
+                         (assoc-in be [:params key] (get-in match [:params key]))
+                         be)))
+                   base-events)
+              (mapcat (fn [be]
+                        (let [b-start (:time be)
+                              b-end (+ b-start (:duration be))
+                              matches (filter (fn [ne]
+                                                (let [n-start (:time ne)
+                                                      n-end (+ n-start (:duration ne))]
+                                                  (and (< n-start b-end) (> n-end b-start))))
+                                              unrolled-new)]
+                          (if (seq matches)
+                            (map (fn [match]
+                                   (let [n-start (:time match)
+                                         n-end (+ n-start (:duration match))
+                                         i-start (max b-start n-start)
+                                         i-end (min b-end n-end)
+                                         i-dur (- i-end i-start)]
+                                     (assoc be
+                                            :time i-start
+                                            :duration i-dur
+                                            :params (assoc (:params be) key (get-in match [:params key])))))
+                                 matches)
+                            [be])))
+                      base-events))))))
 
 (defn set-param
   ([pattern key val] (set-param pattern key val try-parse-number))
   ([pattern key val transform-fn]
-   (if (sequential? val)
-     (combine-patterns
-      pattern
-      (make-pattern (make-event-list val key (comp wrap-number-fn transform-fn)))
-      key)
-     (with-param pattern key (wrap-number-fn (transform-fn val))))))
+   (let [overlay? (instance? Overlay val)
+         v (if overlay? (:val val) val)]
+     (if (sequential? v)
+       (combine-patterns
+        pattern
+        (make-pattern (make-event-list v key (comp wrap-number-fn transform-fn)))
+        key
+        overlay?)
+       (with-param pattern key (wrap-number-fn (transform-fn v)))))))
 
 ;; --- DSL Modifiers ---
 

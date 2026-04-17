@@ -8,24 +8,25 @@
   (glide-cpm 32 8)
 
   (playing)
+
   (stop!)
+
   (play!
    :plucks (->
-            (note (choose-n 1 (ov/chord :c6 :minor7)))
+            (note (choose-n 8 (ov/chord :c6 :minor7)))
             (add 0)
-            (fast 4)
+            (ribbon 6 1)
+            (room (overlay [0.9 0.6 0.1]))
             (s :ks-stringer)
-            #_(distort 0.7)
             #_(echo-delay 0.02)
-            #_(crush 0.9)
+            (crush (overlay [0.1 0.3 0.6]))
             #_(distort 0.5)
             #_(release 0.01)
-            #_(room 0.5)
             #_(pan-hz 1)
             #_(pan-depth 0.9)
             (duck-trigger 1)
-            #_(swing [0/4])
-            #_(gain 0.3)))
+            #_(swing [1/8])
+            (gain 0.6)))
 
   (play-only!
    :kick (->

@@ -427,6 +427,7 @@
 
 (def with-param p/with-param)
 (def set-param p/set-param)
+(def overlay p/overlay)
 
 ;; --- DSL Modifiers ---
 
