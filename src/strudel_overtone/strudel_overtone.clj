@@ -738,9 +738,7 @@
       (catch Exception _ nil))))
 
 (defn update-mono-inst [inst args]
-  (when (ov/node-active? inst)
-    (gate-off inst)
-    (apply ov/ctl inst :gate 1 args)))
+  (apply ov/ctl inst args))
 
 (defn start-mono-inst [key voice-idx synth-var args old-inst]
   (gate-off old-inst)
@@ -752,10 +750,11 @@
   (ov/apply-at (metro beat)
                (fn [& _]
                  (when (contains? (:loops @player-state) key)
-                   (let [existing (get-in @player-state [:active-synths [key voice-idx]])]
-                     (if (and existing (= (:synth existing) synth-var))
-                       (update-mono-inst (:inst existing) args)
-                       (start-mono-inst key voice-idx synth-var args (:inst existing))))))))
+                   (let [existing (get-in @player-state [:active-synths [key voice-idx]])
+                         inst (:inst existing)]
+                     (if (and inst (ov/node-active? inst) (= (:synth existing) synth-var))
+                       (update-mono-inst inst args)
+                       (start-mono-inst key voice-idx synth-var args inst)))))))
 
 (defn trigger-single-event [key ev params beat dur-beats voice-idx]
   (let [sound-param (:sound params)

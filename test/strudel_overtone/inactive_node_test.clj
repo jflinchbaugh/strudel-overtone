@@ -31,17 +31,37 @@
         ;; This should catch the exception and return nil instead of crashing
         (is (nil? (@#'sut/gate-off mock-inst))))))))
 
-(deftest stop-handles-inactive-nodes-test
-  (testing "stop! cleans up state even if nodes are inactive"
-    (let [mock-inst {:id 66}
-          player-state (atom {:playing? true 
-                             :patterns {:p1 {}} 
-                             :loops #{:p1} 
-                             :active-synths {:p1 {:inst mock-inst}}})]
+(deftest at-metro-mono-node-status-test
+  (testing "at-metro-mono starts new inst if old one is inactive"
+    (let [start-called (atom false)
+          update-called (atom false)
+          mock-inst {:id 101}
+          player-state (atom {:playing? true
+                             :loops #{:p1}
+                             :active-synths {[:p1 0] {:inst mock-inst :synth :saw}}})]
       (with-redefs [sut/player-state player-state
+                    sut/metro (constantly 0)
+                    ov/apply-at (fn [_ f] (f))
                     ov/node-active? (constantly false)
-                    ov/ctl (fn [& _] (throw (Exception. "Should not be called")))]
-        (sut/stop!)
-        (is (false? (:playing? @player-state)))
-        (is (empty? (:active-synths @player-state)))
-        (is (empty? (:loops @player-state)))))))
+                    sut/start-mono-inst (fn [& _] (reset! start-called true))
+                    sut/update-mono-inst (fn [& _] (reset! update-called true))]
+        (sut/at-metro-mono 0 :p1 0 :saw [])
+        (is (true? @start-called))
+        (is (false? @update-called)))))
+
+  (testing "at-metro-mono updates existing inst if it is active"
+    (let [start-called (atom false)
+          update-called (atom false)
+          mock-inst {:id 101}
+          player-state (atom {:playing? true
+                             :loops #{:p1}
+                             :active-synths {[:p1 0] {:inst mock-inst :synth :saw}}})]
+      (with-redefs [sut/player-state player-state
+                    sut/metro (constantly 0)
+                    ov/apply-at (fn [_ f] (f))
+                    ov/node-active? (constantly true)
+                    sut/start-mono-inst (fn [& _] (reset! start-called true))
+                    sut/update-mono-inst (fn [& _] (reset! update-called true))]
+        (sut/at-metro-mono 0 :p1 0 :saw [])
+        (is (false? @start-called))
+        (is (true? @update-called))))))
