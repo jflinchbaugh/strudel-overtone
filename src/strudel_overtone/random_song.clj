@@ -39,6 +39,7 @@
    :chopped (->
               (note (choose-n 32 [:c4 :e4 :g4 :b4]))
               (delay-cycles 1)
+              #_(mono)
               (s [:saw])
               (add (choose [-12 0 12]))
               (gain (choose [0.3 0.1]))
@@ -150,12 +151,14 @@
   (drop 4 (rtake 6 :things (irand 0 10)))
 
   (play-only! :swoosh (->
-                        (note [:a3 :a3 :a3])
-                        (s [:sine :sine :sine])
+                        (note [:a3 :a3 :a3 :a3 :a3])
+                        (s :sine)
                         (mono)
-                        (glide 0.5)
-                        (pan [1 -1])))
+                        (glide 1.0)
+                        (pan (sine))))
 
   (stop!)
+
+  (ov/stop)
 
   .)

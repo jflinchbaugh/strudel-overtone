@@ -1,0 +1,662 @@
+(ns strudel-overtone.pattern
+  (:require [overtone.core :as ov]))
+
+;; --- Data Structures ---
+
+(defrecord Event [time duration params])
+(defrecord Pattern [events cycles delay-cycles])
+
+(defn make-pattern [events]
+  (->Pattern events (constantly 1) 0))
+
+;; --- Randomness ---
+
+(defonce global-seed (atom 0))
+
+(defn seed!
+  "Sets the global seed for repeatable randomness.
+   Default is 0."
+  [n]
+  (reset! global-seed n))
+
+(defn repeatable-rand
+  "Returns a deterministic random value [0, 1) based on time t,
+   a seed-offset (usually the param key), and the global-seed."
+  [t seed-offset]
+  (let [s @global-seed
+        h (hash [s t seed-offset])]
+    (/ (Math/abs h) (double Integer/MAX_VALUE))))
+
+(defn irand
+  "Returns a repeatable random integer stream between low (inclusive)
+   and high (exclusive). If only one arg is provided, it's [0, high)."
+  ([high] (irand 0 high))
+  ([low high]
+   (fn [t seed]
+     (let [r (repeatable-rand t seed)]
+       (int (+ low (* r (- high low))))))))
+
+(defn srand
+  "Returns a repeatable random float stream between low and high.
+   Defaults to [0, 1)."
+  ([] (srand 0 1))
+  ([high] (srand 0 high))
+  ([low high]
+   (fn [t seed]
+     (let [r (repeatable-rand t seed)]
+       (+ low (* r (- high low)))))))
+
+(defn choose
+  "Returns a repeatable random stream that picks an element from coll."
+  [coll]
+  (fn [t seed]
+    (let [r (repeatable-rand t seed)
+          idx (int (* r (count coll)))]
+      (nth coll idx))))
+
+(defn wchoose
+  "Returns a repeatable random stream that picks from choices based on weights.
+   pairs: a collection of [value weight] pairs."
+  [pairs]
+  (let [choices (mapv first pairs)
+        weights (mapv second pairs)
+        total (double (reduce + weights))
+        cum-weights (vec (reductions + weights))]
+    (fn [t seed]
+      (if (zero? total)
+        (rand-nth choices)
+        (let [r (* (repeatable-rand t seed) total)]
+          (loop [i 0]
+            (if (< r (cum-weights i))
+              (choices i)
+              (if (< (inc i) (count cum-weights))
+                (recur (inc i))
+                (choices (dec (count choices)))))))))))
+
+(defn- chosen-from
+  "Returns an infinite sequence of repeatable random stream functions
+   that each pick from coll. Useful for initializing patterns.
+   Example: (note (choose-n 16 [:c2 :e2 :g2]))"
+  [coll]
+  (map (fn [i]
+         (fn [t seed]
+           (let [r (repeatable-rand (+ t (* i 0.001)) seed)]
+             (nth coll (int (* r (count coll)))))))
+       (range)))
+
+(defn choose-n
+  "Returns a sequence of n repeatable random stream functions
+   that each pick from coll. Useful for creating random sequences.
+   Example: (s (choose-n 4 [\"kick\" \"snare\" \"hat\"]))"
+  [n coll]
+  (take n (chosen-from coll)))
+
+(defn rtake
+  "Manually get some values from a random stream function.
+  Get n values for id usage from rand-f."
+  [n id rand-f]
+  (for [t (range n)] (rand-f t id)))
+
+;; --- Signals ---
+
+(defn- tau [t] (* 2 Math/PI t))
+
+(defn sine
+  "Returns a continuous sine wave signal (0 to 1)."
+  [t _]
+  (+ 0.5 (* 0.5 (Math/sin (tau t)))))
+
+(defn saw
+  "Returns a continuous sawtooth wave signal (0 to 1)."
+  [t _]
+  (mod t 1))
+
+(defn tri
+  "Returns a continuous triangle wave signal (0 to 1)."
+  [t _]
+  (let [x (mod t 1)]
+    (if (< x 0.5)
+      (* 2 x)
+      (- 2 (* 2 x)))))
+
+(defn square
+  "Returns a continuous square wave signal (0 to 1)."
+  [t _]
+  (if (< (mod t 1) 0.5) 1 0))
+
+(defn cosine
+  "Returns a continuous cosine wave signal (0 to 1)."
+  [t _]
+  (+ 0.5 (* 0.5 (Math/cos (tau t)))))
+
+(defn sig-range
+  "Wraps a signal function to scale its output to [low, high]."
+  [sig low high]
+  (fn [t seed]
+    (let [v (sig t seed)]
+      (+ low (* v (- high low))))))
+
+;; --- Mini-notation Parser ---
+
+(defn parse-mini
+  "Naively parses a collection or single value into a sequence of events.
+   Returns a list of maps {:value v :start s :duration d}.
+   Handles nested collections by subdividing the duration.
+   Handles sets by creating simultaneous events with the same duration."
+  ([tokens] (parse-mini tokens 0.0 1.0))
+  ([tokens start duration]
+   (if (sequential? tokens)
+     (let [n (count tokens)
+           dur (if (pos? n) (/ duration (double n)) 0)]
+       (mapcat (fn [[i v]]
+                 (let [s-time (+ start (* i dur))]
+                   (cond
+                     (set? v)
+                     (map (fn [val]
+                            {:value val
+                             :start s-time
+                             :duration dur})
+                          v)
+
+                     (and (sequential? v) (not (string? v)))
+                     (parse-mini v s-time dur)
+
+                     :else
+                     [{:value v
+                       :start s-time
+                       :duration dur}])))
+               (map-indexed vector tokens)))
+     [{:value tokens
+       :start start
+       :duration duration}])))
+
+;; --- Core Pattern Builders ---
+
+(defn with-param
+  "Updates pattern events with a specific parameter."
+  [pattern key value]
+  (update pattern :events
+          (fn [evs]
+            (map (fn [e] (assoc-in e [:params key] value)) evs))))
+
+(defn ->name
+  [v]
+  (cond
+    (fn? v) v
+    (instance? clojure.lang.Named v) (keyword (name v))
+    :else (keyword (str v))))
+
+(defn- is-rest? [v]
+  (#{:- :_} (->name v)))
+
+(defn- try-parse-number [v]
+  (cond
+    (fn? v) v
+    (string? v) (try (Double/parseDouble v) (catch Exception _ v))
+    :else v))
+
+(defn- wrap-number-fn [v]
+  (if (number? v) (constantly v) v))
+
+(defn- make-event-list [pat key transform-fn]
+  (let [parsed (parse-mini pat)]
+    (keep (fn [p]
+            (let [v (:value p)
+                  res (wrap-number-fn (transform-fn v))]
+              (when-not (is-rest? v)
+                (->Event (:start p)
+                         (:duration p)
+                         {key res}))))
+          parsed)))
+
+(defn- combine-patterns [base-pat new-pat key]
+  (let [base-events (:events base-pat)
+        new-events (:events new-pat)]
+    (assoc base-pat :events
+           (mapcat (fn [be]
+                     (let [mid (+ (:time be) (/ (:duration be) 2))
+                           matches (filter (fn [ne]
+                                             (let [s (:time ne)
+                                                   e (+ s (:duration ne))]
+                                               (and (<= s mid) (< mid e))))
+                                           new-events)]
+                       (if (seq matches)
+                         (map
+                          (fn [match]
+                            (assoc-in be
+                                      [:params key]
+                                      (get-in match [:params key])))
+                          matches)
+                         [be])))
+                   base-events))))
+
+(defn set-param
+  ([pattern key val] (set-param pattern key val try-parse-number))
+  ([pattern key val transform-fn]
+   (if (sequential? val)
+     (combine-patterns
+      pattern
+      (make-pattern (make-event-list val key (comp wrap-number-fn transform-fn)))
+      key)
+     (with-param pattern key (wrap-number-fn (transform-fn val))))))
+
+;; --- DSL Modifiers ---
+
+(defn s
+  "Creates a pattern from a sound string (mini-notation),
+  or sets the sound of an existing pattern."
+  ([pat]
+   (make-pattern (make-event-list pat :sound ->name)))
+  ([pattern sound-val]
+   (set-param pattern :sound sound-val ->name)))
+
+(defn simul
+  "Creates a simultaneous collection (chord) from a sequence of values.
+   Use inside a pattern vector.
+   Example: (note [:c4 (simul [:e4 :g4])])"
+  [vals]
+  (set vals))
+
+(defn note
+  "Creates a pattern from a note string (mini-notation),
+   or sets the note of an existing pattern."
+  ([pat]
+   (make-pattern (make-event-list pat :note identity)))
+  ([pattern note-val]
+   (set-param pattern :note note-val identity)))
+
+(defn gain
+  "Sets the gain (amplitude/volume) of the pattern.
+   Values: 0.0 (silent) to 1.0 (default) or higher."
+  [pattern val] (set-param pattern :amp val))
+
+(defn swing
+  "Sets the swing amount (shuffle feel).
+   Delays every second 8th note by the specified amount (fraction of an 8th note).
+   Values: 0.0 (straight) to ~0.33 (triplet feel) to 0.5 (hard swing)."
+  [pattern val] (set-param pattern :swing val))
+
+(defn duck
+  "Sets the ducking amount (how much this sound is ducked by the sidechain).
+   Values: 0.0 (none) to 1.0 (full duck)."
+  [pattern val] (set-param pattern :duck val))
+
+(defn duck-trigger
+  "Sets the ducking trigger amount (how much this sound triggers the sidechain).
+   Values: 0.0 (none) to 1.0 (full trigger)."
+  [pattern val] (set-param pattern :duck-trigger val))
+
+(defn duck-attack
+  "Sets the sidechain trigger attack time in seconds.
+   Default: 0.001 (1ms)."
+  [pattern val] (set-param pattern :duck-attack val))
+
+(defn duck-release
+  "Sets the sidechain trigger release time in seconds.
+   Default: 0.2 (200ms)."
+  [pattern val] (set-param pattern :duck-release val))
+
+(defn lpf
+  "Sets the Low Pass Filter lpf frequency.
+   Values: Frequency in Hz (e.g. 100 to 20000)."
+  [pattern val] (set-param pattern :lpf val))
+
+(defn pan
+  "Sets the stereo panning.
+   Values: -1.0 (left) to 1.0 (right). 0.0 is center."
+  [pattern val] (set-param pattern :pan val))
+
+(defn resonance
+  "Sets the filter resonance (inverse bandwidth).
+   Values: 0.0 (resonant) to 1.0 (flat).
+   Note: In Overtone this maps to 'rq',
+   so lower values mean MORE resonance."
+  [pattern val] (set-param pattern :resonance val))
+
+(defn attack
+  "Sets the envelope attack time.
+   Values: Time in seconds."
+  [pattern val] (set-param pattern :attack val))
+
+(defn decay
+  "Sets the envelope decay time.
+   Values: Time in seconds."
+  [pattern val] (set-param pattern :decay val))
+
+(defn s-level
+  "Sets the envelope sustain level.
+   Values: Amplitude fraction (0.0 to 1.0) relative to peak."
+  [pattern val] (set-param pattern :s-level val))
+
+(defn sustain
+  "Sets the note duration (sustain time) in seconds.
+   If not set, it defaults to the duration of the step."
+  [pattern val] (set-param pattern :sustain val))
+
+(defn legato
+  "Sets the note legato (duration multiplier).
+   Values: 1.0 (standard), >1.0 (overlapping), <1.0 (staccato)."
+  [pattern val] (set-param pattern :legato val))
+
+(defn monophonic
+  "Enables monophonic mode for the pattern.
+   In monophonic mode, a single synth instance is used and its parameters
+   (like frequency) are updated for each note, rather than triggering
+   a new synth instance."
+  ([pattern] (set-param pattern :monophonic 1))
+  ([pattern val] (set-param pattern :monophonic val)))
+
+(def mono monophonic)
+
+(defn release
+  "Sets the envelope release time.
+   Values: Time in seconds."
+  [pattern val] (set-param pattern :release val))
+
+(defn width
+  "Sets the pulse width for square waves.
+   Values: 0.0 to 1.0. 0.5 is a square wave."
+  [pattern val] (set-param pattern :width val))
+
+(defn carrier-ratio
+  "Sets the FM carrier frequency ratio.
+   Values: Ratio multiplier for the carrier frequency."
+  [pattern val] (set-param pattern :carrier-ratio val))
+
+(defn modulator-ratio
+  "Sets the FM modulator frequency ratio.
+   Values: Ratio multiplier for the modulator frequency."
+  [pattern val] (set-param pattern :modulator-ratio val))
+
+(defn mod-index
+  "Sets the FM modulation index (depth).
+   Values: Higher values create brighter/noisier timbres."
+  [pattern val] (set-param pattern :mod-index val))
+
+(defn detune
+  "Sets the detuning amount in cents.
+   Values: -100 to 100 cents (100 cents = 1 semitone)."
+  [pattern val] (set-param pattern :detune val))
+
+(defn add
+  "Offsets the MIDI note number.
+   Values: Semitones (e.g. 12 for +1 octave, -12 for -1 octave)."
+  [pattern val] (set-param pattern :add val))
+
+(defn chaos
+  "Sets the chaos parameter for the Crackle synth.
+   Values: 1.0 (steady) to 2.0 (chaotic/crackling)."
+  [pattern val] (set-param pattern :chaos val))
+
+(defn coef
+  "Sets the reflection coefficient for the Karplus-Strong (ks-stringer) synth.
+   Values: -1.0 to 1.0. High values result in longer decay."
+  [pattern val] (set-param pattern :coef val))
+
+(defn crush
+  "Sets the bitcrushing amount.
+   Values: 0.0 (clean) to 1.0 (s-max destruction: 4-bit, 2kHz sample rate)."
+  [pattern val] (set-param pattern :crush val))
+
+(defn distort
+  "Sets the distortion amount.
+   Values: 0.0 (clean) to 1.0 (heavy distortion)."
+  [pattern val] (set-param pattern :distort val))
+
+(defn hpf
+  "Sets the High Pass Filter lpf frequency.
+   Values: Frequency in Hz. 0 disables it."
+  [pattern val] (set-param pattern :hpf val))
+
+(defn bpf
+  "Sets the Band Pass Filter center frequency.
+   Values: Frequency in Hz. -1 disables it."
+  [pattern val] (set-param pattern :bpf val))
+
+(defn room
+  "Sets the reverb mix amount (dry/wet).
+   Values: 0.0 (completely dry) to 1.0 (completely wet).
+   Default: 0.0 (no reverb)."
+  [pattern val] (set-param pattern :room val))
+
+(defn room-size
+  "Sets the perceived size of the reverberant space.
+   Values: 0.0 (small room) to 1.0 (massive hall).
+   Affects decay time and reflection density.
+   Default: 0.5."
+  [pattern val] (set-param pattern :room-size val))
+
+(defn damp
+  "Sets the high-frequency damping of the reverb.
+   Values: 0.0 (bright, reflective) to 1.0 (dark, absorbed).
+   Controls how quickly high frequencies decay.
+   Default: 0.5."
+  [pattern val] (set-param pattern :damp val))
+
+(defn vibrato
+  "Sets the vibrato rate.
+   Values: Frequency in Hz (speed). 0 disables it.
+   Depth is fixed at 0.02 (2%)."
+  [pattern val] (set-param pattern :vibrato val))
+
+(defn echo-delay
+  "Sets the echo delay time.
+   Values: Time in seconds (e.g. 0.25). 0 disables it.
+   Note: Automatically adds repeats (feedback)."
+  [pattern val] (set-param pattern :delay val))
+
+(defn echo-repeats
+  "Sets the number of echo repeats (feedback).
+   Values: Number of repeats (e.g. 4). Default is 4."
+  [pattern val] (set-param pattern :repeats val))
+
+(defn rate
+  "Sets the playback rate for samples.
+   Values: 1.0 (normal), 0.5 (half speed), -1.0 (reverse), etc."
+  [pattern val] (set-param pattern :rate val))
+
+(def speed
+  "Alias for rate.
+   Sets the playback rate for samples."
+  rate)
+
+(defn pshift
+  "Sets the pitch shift in semitones.
+   Uses a time-domain granular pitch shifter.
+   Values: -24 to 24 (default 0)."
+  [pattern val] (set-param pattern :pshift val))
+
+(defn fshift
+  "Sets the frequency shift in Hz.
+   Shifts all frequencies by a fixed amount.
+   Values: -2000 to 2000 (default 0)."
+  [pattern val] (set-param pattern :fshift val))
+
+(defn tremolo-hz
+  "Sets the tremolo (amplitude modulation) frequency in Hz.
+   Values: 0.1 to 20 (default 0)."
+  [pattern val] (set-param pattern :tremolo-hz val))
+
+(defn tremolo-depth
+  "Sets the tremolo depth.
+   Values: 0.0 (none) to 1.0 (full modulation)."
+  [pattern val] (set-param pattern :tremolo-depth val))
+
+(defn pan-hz
+  "Sets the auto-pan (panning modulation) frequency in Hz.
+   Values: 0.1 to 20 (default 0)."
+  [pattern val] (set-param pattern :pan-hz val))
+
+(defn pan-depth
+  "Sets the auto-pan depth.
+   Values: 0.0 (center) to 1.0 (full stereo sweep)."
+  [pattern val] (set-param pattern :pan-depth val))
+
+(defn phaser-hz
+  "Sets the phaser frequency in Hz.
+   Values: 0.1 to 10 (default 0)."
+  [pattern val] (set-param pattern :phaser-hz val))
+
+(defn phaser-depth
+  "Sets the phaser depth (mix).
+   Values: 0.0 (dry) to 1.0 (wet)."
+  [pattern val] (set-param pattern :phaser-depth val))
+
+(defn begin
+  "Sets the start position of the sample (0.0 to 1.0)."
+  [pattern val] (set-param pattern :begin val))
+
+(defn end
+  "Sets the end position of the sample (0.0 to 1.0)."
+  [pattern val] (set-param pattern :end val))
+
+(defn looping
+  "Sets the loop flag. 1 for loop, 0 for one-shot."
+  [pattern val] (set-param pattern :loop? val))
+
+(defn env
+  "Sets the envelope of a pattern.
+   Can be a single value or a sequence/mini-notation."
+  ([pat]
+   (make-pattern (make-event-list pat :env ->name)))
+  ([pattern val]
+   (set-param pattern :env val ->name)))
+
+(defn active [pattern val]
+  (set-param pattern :active val try-parse-number))
+
+(defn glide
+  "Adds a frequency slide (glide/portamento) to the pattern.
+   n: glide time in cycles (relative to cycle duration)"
+  [pattern n]
+  (set-param pattern :slide n))
+
+;; --- Time/Structural Modifiers ---
+
+(defn fast [pattern amount]
+  (let [amount-fn (wrap-number-fn amount)]
+    (update pattern :cycles
+            (fn [old-val]
+              (let [old-fn (wrap-number-fn old-val)]
+                (fn [t seed]
+                  (* (old-fn t seed) (amount-fn t seed))))))))
+
+(defn slow [pattern amount]
+  (let [amount-fn (wrap-number-fn amount)]
+    (update pattern :cycles
+            (fn [old-val]
+              (let [old-fn (wrap-number-fn old-val)]
+                (fn [t seed]
+                  (/ (old-fn t seed) (amount-fn t seed))))))))
+
+(defn early
+  "Shifts the start time of all events in the pattern earlier by amount cycles."
+  [pattern amount]
+  (update pattern :events (fn [evs] (map (fn [e] (update e :time - amount)) evs))))
+
+(defn late
+  "Shifts the start time of all events in the pattern later by amount cycles."
+  [pattern amount]
+  (update pattern :events (fn [evs] (map (fn [e] (update e :time + amount)) evs))))
+
+(defn ribbon
+  "Loops a specific segment of a pattern.
+   offset: start point in cycles
+   len: length of segment in cycles"
+  [pattern offset len]
+  (let [source-events (:events pattern)
+        ;; Determine the number of cycles in the source pattern
+        max-source-t (if (seq source-events)
+                       (apply max (map :time source-events))
+                       0)
+        source-num-cycles (inc (long max-source-t))
+        ;; How many cycles do we need to reach 'offset + len'?
+        required-cycles (long (Math/ceil (+ offset len)))
+        ;; Unroll the source events if needed to cover the range
+        unroll-count (long (Math/ceil (/ required-cycles (double source-num-cycles))))
+        unrolled-events (if (> unroll-count 1)
+                          (mapcat (fn [i]
+                                    (map (fn [ev]
+                                           (update ev :time + (* i source-num-cycles)))
+                                         source-events))
+                                  (range unroll-count))
+                          source-events)
+        end (+ offset len)
+        segment-events (filter (fn [ev]
+                                 (let [t (:time ev)]
+                                   (and (>= t offset) (< t end))))
+                               unrolled-events)]
+    (assoc pattern :events
+           (mapcat (fn [i]
+                     (map (fn [ev]
+                            (let [orig-t (:time ev)
+                                  new-t (+ (* i len) (- orig-t offset))]
+                              (-> ev
+                                  (assoc :time new-t)
+                                  (update :params
+                                          (fn [ps]
+                                            (reduce-kv (fn [m k v]
+                                                         (assoc m k
+                                                                (if (fn? v)
+                                                             ;; Freeze the time for existing functions
+                                                             ;; using a stable t derived from orig-t.
+                                                             ;; We use * 4.0 to match the beat scale.
+                                                                  (fn [_t k] (v (* orig-t 4.0) k))
+                                                                  v)))
+                                                       {} ps))))))
+                          segment-events))
+                   (range 100))))) ;; Pre-generate many cycles
+
+(defn rev
+  "Reverses the events within a cycle (0 to 1 range)."
+  [pattern]
+  (update pattern :events
+          (fn [evs]
+            (map (fn [e]
+                   (let [t (:time e)
+                         d (:duration e)
+                         cycle-idx (long t)
+                         rel-t (- t cycle-idx)
+                         new-rel-t (- 1.0 rel-t d)]
+                     (assoc e :time (+ cycle-idx new-rel-t))))
+                 evs))))
+
+(defn jux
+  "Juxtaposes the pattern with a transformed version,
+   panning one left and the other right."
+  [f pattern]
+  (let [left (-> pattern (pan -1))
+        right (-> pattern f (pan 1))]
+    (update left :events concat (:events right))))
+
+(defn sometimes
+  "Randomly applies function f to the pattern with 50% probability per cycle."
+  [f pattern]
+  (update pattern :events
+          (fn [evs]
+            (map (fn [e]
+                   (let [t (:time e)
+                         cycle-idx (long t)
+                         r (repeatable-rand cycle-idx :sometimes)]
+                     (if (< r 0.5)
+                       ((f (make-pattern [e])) :events 0) ; Apply f to single event
+                       e)))
+                 evs))))
+
+(defn degrade
+  "Randomly removes events from the pattern with probability p."
+  ([pattern] (degrade pattern 0.5))
+  ([pattern p]
+   (update pattern :events
+           (fn [evs]
+             (filter (fn [e]
+                       (let [t (:time e)
+                             r (repeatable-rand t :degrade)]
+                         (> r p)))
+                     evs)))))
+
+(defn delay-cycles
+  "Delays the start of a pattern by n cycles.
+   Only affects the initial scheduling (when the pattern is first played)."
+  [pattern n]
+  (assoc pattern :delay-cycles n))
