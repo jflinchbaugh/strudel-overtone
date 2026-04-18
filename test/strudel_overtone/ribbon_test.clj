@@ -1,6 +1,7 @@
 (ns strudel-overtone.ribbon-test
   (:require [clojure.test :refer :all]
             [strudel-overtone.strudel-overtone :as sut]
+            [strudel-overtone.player :as player]
             [overtone.core :as ov]))
 
 (deftest ribbon-basic-test
@@ -16,11 +17,11 @@
       ;; check that it repeats in play-loop
       (let [player-state (atom {:playing? true :patterns {:test pat} :loops #{:test}})
             trigger-calls (atom [])]
-        (with-redefs [sut/player-state player-state
-                      sut/metro (fn ([] 0) ([b] (* b 1000)))
+        (with-redefs [player/player-state player-state
+                      player/metro (fn ([] 0) ([b] (* b 1000)))
                       ov/apply-by (fn [& _] nil)
-                      sut/trigger-event (fn [key ev beat dur]
-                                          (swap! trigger-calls conj (get-in ev [:params :sound])))]
+                      player/trigger-event (fn [key ev beat dur]
+                                             (swap! trigger-calls conj (get-in ev [:params :sound])))]
           
           ;; cycle-idx (mod 0 0.5) = 0.0
           ;; schedules t in [0, 0.5)
@@ -43,13 +44,13 @@
           player-state (atom {:playing? true :patterns {:test pat} :loops #{:test}})
           results (atom [])]
 
-      (with-redefs [sut/player-state player-state
-                    sut/metro (fn ([] 0) ([b] (* b 1000)))
+      (with-redefs [player/player-state player-state
+                    player/metro (fn ([] 0) ([b] (* b 1000)))
                     ov/apply-by (fn [& _] nil)
-                    sut/trigger-event (fn [key ev beat dur]
-                                        (let [note (get-in ev [:params :note])
-                                              resolved-note (if (fn? note) (note beat :note) note)]
-                                          (swap! results conj resolved-note)))]
+                    player/trigger-event (fn [key ev beat dur]
+                                           (let [note (get-in ev [:params :note])
+                                                 resolved-note (if (fn? note) (note beat :note) note)]
+                                             (swap! results conj resolved-note)))]
 
         ;; Play first cycle (beat 0)
         (sut/play-loop :test 0)
@@ -71,13 +72,13 @@
           player-state (atom {:playing? true :patterns {:test pat} :loops #{:test}})
           results (atom [])]
 
-      (with-redefs [sut/player-state player-state
-                    sut/metro (fn ([] 0) ([b] (* b 1000)))
+      (with-redefs [player/player-state player-state
+                    player/metro (fn ([] 0) ([b] (* b 1000)))
                     ov/apply-by (fn [& _] nil)
-                    sut/trigger-event (fn [key ev beat dur]
-                                        (let [pan (get-in ev [:params :pan])
-                                              resolved-pan (if (fn? pan) (pan beat :pan) pan)]
-                                          (swap! results conj resolved-pan)))]
+                    player/trigger-event (fn [key ev beat dur]
+                                           (let [pan (get-in ev [:params :pan])
+                                                 resolved-pan (if (fn? pan) (pan beat :pan) pan)]
+                                             (swap! results conj resolved-pan)))]
 
         (sut/play-loop :test 0)
         (let [pan1 (first @results)]

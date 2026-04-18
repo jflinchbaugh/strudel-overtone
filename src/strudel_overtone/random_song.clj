@@ -3,7 +3,7 @@
             [strudel-overtone.strudel-overtone :refer :all]))
 
 (comment
-  (seed! 44) ;; Set a seed for repeatable randomness
+  (seed! 42) ;; Set a seed for repeatable randomness
 
   (play!
    :kick (->
@@ -59,7 +59,7 @@
                         (gain (choose-n 2 [1/4 1/4 1/16]))
                         #_(lpf (sig-range sine 500 2000)))
 
-    ) ;; LPF still moves!
+    )
 
 
   (play! :test (->
@@ -85,7 +85,7 @@
                       (swing 0.5)
                        (s :ks-stringer)
                        (ribbon 1 2) ;; Freeze the random 4-chord progression
-                       (gain 0.4)
+                       (gain 0.6)
                        (lpf 2000))))
 
   ;; Example: Super-random chord progression
@@ -95,6 +95,7 @@
         all-chords (for [r roots t types] (set (take 5 (ov/chord r t))))]
     (play! :rand-chords (-> (note (choose-n 2 all-chords))
                             (s :sine)
+                            (gain 0.4)
                             (ribbon 0 4) ;; Capture 4 random chords into a loop
                             (lpf (sig-range sine 500 5000)))))
 

@@ -2,18 +2,21 @@
   (:require [clojure.test :refer :all]
             [strudel-overtone.strudel-overtone :as sut]
             [strudel-overtone.strudel-overtone-test :as sut-test]
+            [strudel-overtone.player :as player]
+            [strudel-overtone.synths :as synths]
+            [strudel-overtone.samples :as samples]
             [overtone.core :as ov]))
 
 (deftest sample-end-sets-sustain-test
   (testing "setting end on a sample sets the sustain automatically"
     (let [mock-calls (atom [])]
       (with-redefs [ov/metro-bpm (constantly 120)
-                    sut/metro (constantly 0)
+                    player/metro (constantly 0)
                     ov/apply-at (fn [ms func & args] (swap! mock-calls conj {:func func :args args}))
-                    sut/at-metro (fn [beat synth-var args] (swap! mock-calls conj {:func synth-var :args [args]}))
-                    sut/samples (atom {:test {:id 1 :duration 2.0}})
-                    sut/sampler-adsr (fn [& args] args)
-                    sut/sampler-perc (fn [& args] args)]
+                    player/at-metro (fn [beat synth-var args] (swap! mock-calls conj {:func synth-var :args [args]}))
+                    samples/samples (atom {:test {:id 1 :duration 2.0}})
+                    synths/sampler-adsr (fn [& args] args)
+                    synths/sampler-perc (fn [& args] args)]
 
                 ;; Event with sound :test and end 0.5
                 ;; begin defaults to 0, rate defaults to 1

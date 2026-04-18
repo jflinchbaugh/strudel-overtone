@@ -1,6 +1,8 @@
 (ns strudel-overtone.inactive-node-test
   (:require [clojure.test :refer :all]
             [strudel-overtone.strudel-overtone :as sut]
+            [strudel-overtone.player :as player]
+            [strudel-overtone.synths :as synths]
             [overtone.core :as ov]))
 
 (deftest gate-off-inactive-node-test
@@ -10,7 +12,7 @@
       (with-redefs [ov/node-active? (constantly false)
                     ov/ctl (fn [& _] (reset! ctl-called true))]
         ;; This should not throw and should not call ctl
-        (is (nil? (@#'sut/gate-off mock-inst)))
+        (is (nil? (player/gate-off mock-inst)))
         (is (false? @ctl-called))))
 
   (testing "gate-off calls ctl when node is active"
@@ -21,7 +23,7 @@
                              (is (= :gate k))
                              (is (= 0 v))
                              (reset! ctl-called true))]
-        (is (some? (@#'sut/gate-off mock-inst)))
+        (is (some? (player/gate-off mock-inst)))
         (is (true? @ctl-called)))))
 
   (testing "gate-off catches exceptions from ctl"
@@ -29,7 +31,7 @@
       (with-redefs [ov/node-active? (constantly true)
                     ov/ctl (fn [& _] (throw (Exception. "Inactive node modification attempted")))]
         ;; This should catch the exception and return nil instead of crashing
-        (is (nil? (@#'sut/gate-off mock-inst))))))))
+        (is (nil? (player/gate-off mock-inst))))))))
 
 (deftest at-metro-mono-node-status-test
   (testing "at-metro-mono starts new inst if old one is inactive"
@@ -39,13 +41,13 @@
           player-state (atom {:playing? true
                              :loops #{:p1}
                              :active-synths {[:p1 0] {:inst mock-inst :synth :saw}}})]
-      (with-redefs [sut/player-state player-state
-                    sut/metro (constantly 0)
+      (with-redefs [player/player-state player-state
+                    player/metro (constantly 0)
                     ov/apply-at (fn [_ f] (f))
                     ov/node-active? (constantly false)
-                    sut/start-mono-inst (fn [& _] (reset! start-called true))
-                    sut/update-mono-inst (fn [& _] (reset! update-called true))]
-        (sut/at-metro-mono 0 :p1 0 :saw [])
+                    player/start-mono-inst (fn [& _] (reset! start-called true))
+                    player/update-mono-inst (fn [& _] (reset! update-called true))]
+        (player/at-metro-mono 0 :p1 0 :saw [])
         (is (true? @start-called))
         (is (false? @update-called)))))
 
@@ -56,12 +58,12 @@
           player-state (atom {:playing? true
                              :loops #{:p1}
                              :active-synths {[:p1 0] {:inst mock-inst :synth :saw}}})]
-      (with-redefs [sut/player-state player-state
-                    sut/metro (constantly 0)
+      (with-redefs [player/player-state player-state
+                    player/metro (constantly 0)
                     ov/apply-at (fn [_ f] (f))
                     ov/node-active? (constantly true)
-                    sut/start-mono-inst (fn [& _] (reset! start-called true))
-                    sut/update-mono-inst (fn [& _] (reset! update-called true))]
-        (sut/at-metro-mono 0 :p1 0 :saw [])
+                    player/start-mono-inst (fn [& _] (reset! start-called true))
+                    player/update-mono-inst (fn [& _] (reset! update-called true))]
+        (player/at-metro-mono 0 :p1 0 :saw [])
         (is (false? @start-called))
         (is (true? @update-called))))))

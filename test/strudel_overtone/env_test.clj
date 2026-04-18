@@ -1,25 +1,27 @@
 (ns strudel-overtone.env-test
   (:require [clojure.test :refer :all]
             [strudel-overtone.strudel-overtone :as sut]
+            [strudel-overtone.player :as player]
+            [strudel-overtone.synths :as synths]
             [overtone.core :as ov]))
 
 (deftest synth-lookup-test
   (testing "get-synth-name resolves aliases and defaults"
-    (is (= :saw-adsr (#'sut/get-synth-name :saw {})))
+    (is (= :saw-adsr (#'synths/get-synth-name :saw {})))
     ;; bd aliased to kick, kick is percussive so default is perc
-    (is (= :kick-perc (#'sut/get-synth-name :bd {})))
-    (is (= :snare-perc (#'sut/get-synth-name :sd {}))))
+    (is (= :kick-perc (#'synths/get-synth-name :bd {})))
+    (is (= :snare-perc (#'synths/get-synth-name :snare {}))))
 
   (testing "get-synth-name handles env param"
-    (is (= :kick-perc (#'sut/get-synth-name :bd {:env :perc})))
-    (is (= :saw-perc (#'sut/get-synth-name :saw {:env :perc})))
-    (is (= :sine-perc (#'sut/get-synth-name :sine {:env :perc}))))
+    (is (= :kick-perc (#'synths/get-synth-name :bd {:env :perc})))
+    (is (= :saw-perc (#'synths/get-synth-name :saw {:env :perc})))
+    (is (= :sine-perc (#'synths/get-synth-name :sine {:env :perc}))))
 
   (testing "resolve-synth finds existing synths"
-    (is (var? (#'sut/resolve-synth :kick-adsr)))
-    (is (var? (#'sut/resolve-synth :saw-adsr)))
-    (is (var? (#'sut/resolve-synth :saw-perc)))
-    (is (nil? (#'sut/resolve-synth :non-existent-synth)))))
+    (is (var? (#'synths/resolve-synth :kick-adsr)))
+    (is (var? (#'synths/resolve-synth :saw-adsr)))
+    (is (var? (#'synths/resolve-synth :saw-perc)))
+    (is (nil? (#'synths/resolve-synth :non-existent-synth)))))
 
 (deftest env-param-test
   (testing "env function sets param"
@@ -29,20 +31,21 @@
   (testing "trigger-event calls perc synth"
     (let [mock-calls (atom [])]
       (with-redefs [ov/metro-bpm (constantly 120)
-                    sut/metro (constantly 0)
+                    player/metro (constantly 0)
                     ov/apply-at (fn [ms func & args] (swap! mock-calls conj {:func func :args args}))
-                    sut/at-metro (fn [beat synth-var args] (swap! mock-calls conj {:func synth-var :args [args]}))
-                    sut/saw-perc (fn [& args] args)] ;; Mock synth var
+                    player/at-metro (fn [beat synth-var args] (swap! mock-calls conj {:func synth-var :args [args]}))
+                    synths/saw-perc (fn [& args] args)] ;; Mock synth var
 
         (let [pat (-> (sut/note [:c4])
                       (sut/s [:saw-synth])
                       (sut/env :perc))
               ev (first (:events pat))]
 
-          (with-redefs [sut/resolve-synth (fn [name]
+          (with-redefs [synths/resolve-synth (fn [name]
                                             (if (= name :saw-synth-perc)
-                                              #'sut/saw-perc
+                                              #'synths/saw-perc
                                               nil))]
              (sut/trigger-event :test-key ev 0 1)
              (let [synth-call (second @mock-calls)]
-               (is (= #'sut/saw-perc (:func synth-call))))))))))
+               (is (= #'synths/saw-perc (:func synth-call))))))))))
+

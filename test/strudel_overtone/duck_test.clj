@@ -1,6 +1,8 @@
 (ns strudel-overtone.duck-test
   (:require [clojure.test :refer :all]
             [strudel-overtone.strudel-overtone :as sut]
+            [strudel-overtone.player :as player]
+            [strudel-overtone.synths :as synths]
             [overtone.core :as ov]))
 
 (deftest duck-params-test
@@ -17,10 +19,10 @@
   (testing "trigger-event passes duck params to synth"
      (let [mock-calls (atom [])]
       (with-redefs [ov/metro-bpm (constantly 120)
-                    sut/metro (constantly 0)
+                    player/metro (constantly 0)
                     ov/apply-at (fn [ms func & args] (swap! mock-calls conj {:func func :args args}))
-                    sut/at-metro (fn [beat synth-var args] (swap! mock-calls conj {:func synth-var :args [args]}))
-                    sut/saw-adsr (fn [& args] args)] ;; Mock synth
+                    player/at-metro (fn [beat synth-var args] (swap! mock-calls conj {:func synth-var :args [args]}))
+                    synths/saw-adsr (fn [& args] args)] ;; Mock synth
 
         (let [pat (-> (sut/note [:c4])
                       (sut/s [:saw])

@@ -1,403 +1,16 @@
 (ns strudel-overtone.strudel-overtone
   (:require [overtone.core :as ov]
             [taoensso.telemere :as tel]
-            [tick.core :as t]
-            [clojure.string :as str]
-            [strudel-overtone.pattern :as p])
-  (:import [strudel_overtone.pattern Event Pattern]))
+            [strudel-overtone.pattern :as p]
+            [strudel-overtone.synths :as synths]
+            [strudel-overtone.samples :as samples]
+            [strudel-overtone.player :as player])
+  (:import [strudel_overtone.pattern Event Pattern Overlay]))
 
-(defmacro s-max [min-val val]
-  `(ov/clip ~val ~min-val 20000))
+;; --- Pattern Engine Re-exports ---
 
-(defmacro defsynth [name args & body]
-  `(ov/defsynth ~name ~args
-     (ov/line:kr 0 0 60 ov/FREE)
-     ~@body))
-
-;; --- Synths ---
-
-(defonce duck-bus (ov/control-bus))
-
-(defmacro with-glide [freq & body]
-  `(let [~'actual-f (ov/select:kr ~'monophonic
-                                 [(ov/line:kr ~'slide-from ~freq ~'slide)
-                                  (ov/varlag ~freq ~'slide)])]
-     ~@body))
-
-(defmacro def-strudel-synth [name extra-args & body]
-  (let [common-args '{amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
-                      crush 0 distort 0
-                      pshift 0 fshift 0
-                      tremolo-hz 0 tremolo-depth 0
-                      pan-hz 0 pan-depth 0
-                      phaser-hz 0 phaser-depth 0
-                      hpf 0 bpf -1 room 0 delay 0 repeats 4
-                      duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2
-                      room-size 0.5 damp 0.5
-                      slide 0 slide-from -1
-                      legato 1
-                      monophonic 0
-                      gate 1}
-        adsr-defaults '{attack 0.01 decay 0.1 s-level 0.5 release 0.3}
-        perc-defaults '{attack 0.01}
-        ;; Helper to building smoothed parameters for mono mode
-        varlag-param (fn [name]
-                       `(ov/select:kr ~'monophonic [~name (ov/varlag ~name ~'slide)]))
-        ;; Helper to build the synth definition
-        make-synth (fn [suffix env-gen-form env-defaults]
-                     (let [extra-map (apply hash-map extra-args)
-                           final-args-map (merge
-                                           common-args
-                                           env-defaults
-                                           extra-map)
-                           final-args-vec (reduce-kv
-                                           (fn [acc k v]
-                                             (conj acc k v))
-                                           [] final-args-map)]
-                       `(ov/defsynth ~(symbol (str (clojure.core/name name) suffix))
-                          ~final-args-vec
-                          (let [;; Smoothed parameters for mono mode
-                                ~'lpf ~(varlag-param 'lpf)
-                                ~'resonance ~(varlag-param 'resonance)
-                                ~'amp ~(varlag-param 'amp)
-                                ~'pan ~(varlag-param 'pan)
-                                ~'hpf ~(varlag-param 'hpf)
-                                ~'bpf ~(varlag-param 'bpf)
-                                ~'crush ~(varlag-param 'crush)
-                                ~'distort ~(varlag-param 'distort)
-                                ~'fshift ~(varlag-param 'fshift)
-                                ~'pshift ~(varlag-param 'pshift)
-
-                                ~'env ~env-gen-form
-                                ;; Trigger Sidechain
-                                _# (let [trig-env# (ov/env-gen
-                                                    (ov/perc
-                                                     ~'duck-attack
-                                                     ~'duck-release)
-                                                    :level-scale
-                                                    ~'duck-trigger)]
-                                     (ov/out:kr duck-bus trig-env#))
-                                ;; Read Sidechain
-                                ~'duck-env (ov/in:kr duck-bus)
-                                ~'amp-duck (ov/clip
-                                            (~'- 1 (~'* ~'duck ~'duck-env))
-                                            0 1)
-                                ~'snd (do ~@body)
-                                ;; Effect Chain
-                                ;; Pitch Shift bypass
-                                ~'ps (let [~'use-ps (~'> (ov/absdif ~'pshift 0)
-                                                         0.01)
-                                           ~'ps-sig (ov/pitch-shift
-                                                     ~'snd 0.2
-                                                     (ov/pow 2
-                                                             (~'/ ~'pshift 12)))]
-                                       (ov/x-fade2
-                                        ~'snd
-                                        ~'ps-sig
-                                        (ov/lin-lin ~'use-ps 0 1 -1 1)))
-
-                                ;; Freq Shift bypass
-                                ~'fs (let [~'use-fs (~'>
-                                                     (ov/absdif ~'fshift 0)
-                                                     0.01)
-                                           ~'fs-sig (ov/freq-shift ~'ps ~'fshift)]
-                                       (ov/x-fade2
-                                        ~'ps
-                                        ~'fs-sig
-                                        (ov/lin-lin ~'use-fs 0 1 -1 1)))
-
-                                ~'trem (let [~'dry ~'fs
-                                             ~'wet (~'* ~'dry
-                                                        (ov/lin-lin
-                                                         (ov/sin-osc:kr
-                                                          ~'tremolo-hz)
-                                                         -1 1
-                                                         (~'- 1 ~'tremolo-depth)
-                                                         1))]
-                                         (ov/x-fade2
-                                          ~'dry
-                                          ~'wet
-                                          (ov/lin-lin
-                                           (~'> ~'tremolo-depth 0)
-                                           0 1 -1 1)))
-
-                                ~'phs (let [~'dry ~'trem
-                                            ~'wet (ov/allpass-n
-                                                   ~'dry 0.02
-                                                   (ov/lin-lin
-                                                    (ov/sin-osc:kr ~'phaser-hz)
-                                                    -1 1 0.001 0.01)
-                                                   0.1)]
-                                        (ov/x-fade2
-                                         ~'dry
-                                         ~'wet
-                                         (ov/lin-lin ~'phaser-depth 0 1 -1 1)))
-
-                                ~'filt (ov/hpf ~'phs (~'s-max 20 ~'hpf))
-                                ~'filt (let [~'bpf-sig (ov/bpf
-                                                        ~'filt
-                                                        (~'s-max 20 ~'bpf)
-                                                        1)]
-                                         (ov/x-fade2
-                                          ~'filt
-                                          ~'bpf-sig
-                                          (ov/lin-lin
-                                           (~'> ~'bpf 0)
-                                           0 1 -1 1)))
-                                ~'filt (ov/rlpf
-                                        ~'filt
-                                        (~'s-max 20 ~'lpf)
-                                        ~'resonance)
-
-                                ~'dst (ov/distort
-                                       (~'* ~'filt
-                                            (ov/dbamp (~'* ~'distort 24))))
-
-                                ;; Decimator bypass - critical for ringing
-                                ~'crs (let [~'dry ~'dst
-                                            ~'wet (ov/decimator
-                                                   ~'dry
-                                                   (ov/lin-lin
-                                                    ~'crush 0 1 44100 2000)
-                                                   (ov/lin-lin
-                                                    ~'crush 0 1 24 4))]
-                                        (ov/x-fade2
-                                         ~'dry
-                                         ~'wet
-                                         (ov/lin-lin
-                                          (~'> ~'crush 0)
-                                          0 1 -1 1)))
-
-                                ~'gated (~'* ~'crs ~'env)
-                                ~'dly (let [~'dry ~'gated
-                                            ~'wet (~'+ ~'dry
-                                                       (ov/comb-n
-                                                        ~'dry 0.5
-                                                        (~'s-max 0.0001 ~'delay)
-                                                        (~'*
-                                                         ~'delay
-                                                         ~'repeats)))]
-                                        (ov/x-fade2
-                                         ~'dry
-                                         ~'wet
-                                         (ov/lin-lin
-                                          (~'> ~'delay 0)
-                                          0 1 -1 1)))
-
-                                ~'reverbed (ov/free-verb
-                                            ~'dly
-                                            ~'room
-                                            ~'room-size
-                                            ~'damp)
-                                _# (ov/detect-silence
-                                    ~'reverbed
-                                    :amp 0.0001
-                                    :time 0.2
-                                    :action ov/FREE)
-                                ~'actual-pan (~'+
-                                              ~'pan
-                                              (let [~'mod (~'*
-                                                           (ov/sin-osc:kr ~'pan-hz)
-                                                           ~'pan-depth)]
-                                                (~'*
-                                                 ~'mod
-                                                 (~'> ~'pan-depth 0))))]
-                            (ov/out 0
-                                    (ov/pan2
-                                     (~'*
-                                      (ov/mix [~'reverbed])
-                                      ~'amp
-                                      ~'amp-duck)
-                                     ~'actual-pan))))))]
-    `(do
-       ~(make-synth "-adsr"
-                    `(let [auto-gate# (ov/line:kr 1 0 ~'sustain)
-                           effective-gate# (ov/select:kr ~'monophonic [auto-gate# ~'gate])]
-                       (ov/env-gen (ov/adsr ~'attack ~'decay ~'s-level ~'release)
-                                   :gate effective-gate#
-                                   :action ov/FREE))
-                    adsr-defaults)
-       ~(make-synth "-perc"
-                    `(let [auto-gate# (ov/line:kr 1 0 ~'sustain)
-                           effective-gate# (ov/select:kr ~'monophonic [auto-gate# ~'gate])]
-                       (ov/env-gen (ov/perc ~'attack ~'sustain)
-                                   :gate effective-gate#
-                                   :action ov/FREE))
-                    perc-defaults))))
-
-;; --- Logging ---
-
-(def ^:private time-formatter
-  (t/formatter "HH:mm:ss.SSS"))
-
-(tel/stop-handlers!)
-
-(tel/add-handler!
- :console
- (tel/handler:console
-  {:output-fn
-   (fn [signal]
-     (let [{:keys [inst msg_ data]} signal]
-       (str (t/format time-formatter (t/zoned-date-time inst)) " "
-            (or (force msg_) data)
-            "\n")))}))
-
-(def-strudel-synth kick [freq 60]
-  (ov/sin-osc (ov/line:kr (* 2 freq) freq 0.1)))
-
-(def-strudel-synth snare [freq 200]
-  (let [noise (ov/white-noise)]
-    (+ (* 0.5 (ov/sin-osc freq)) (* 0.8 noise))))
-
-(def-strudel-synth hat [freq 8000]
-  (ov/white-noise))
-
-(def-strudel-synth clap [freq 1200]
-  (ov/bpf (ov/white-noise) freq resonance))
-
-(def-strudel-synth saw [freq 440 detune 0 vibrato 0]
-  (with-glide freq
-    (let [f-raw (* actual-f (ov/pow 2 (/ detune 1200)))
-          f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
-      (ov/saw f-vib))))
-
-(def-strudel-synth sine [freq 440 detune 0 vibrato 0]
-  (with-glide freq
-    (let [f-raw (* actual-f (ov/pow 2 (/ detune 1200)))
-          f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
-      (ov/sin-osc f-vib))))
-
-(def-strudel-synth square [freq 440 detune 0 vibrato 0 width 0.5]
-  (with-glide freq
-    (let [f-raw (* actual-f (ov/pow 2 (/ detune 1200)))
-          f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
-      (ov/pulse f-vib width))))
-
-(def-strudel-synth tri [freq 440 detune 0 vibrato 0]
-  (with-glide freq
-    (let [f-raw (* actual-f (ov/pow 2 (/ detune 1200)))
-          f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
-      (ov/lf-tri f-vib))))
-
-(def-strudel-synth fm
-  [freq 440
-   detune 0
-   vibrato 0
-   carrier-ratio 1
-   modulator-ratio 2
-   mod-index 5]
-  (with-glide freq
-    (let [f-raw (* actual-f (ov/pow 2 (/ detune 1200)))
-          f-vib (ov/vibrato:kr f-raw vibrato 0.02)
-          modulator (ov/sin-osc (* f-vib modulator-ratio))
-          carrier (ov/sin-osc (+ (* f-vib carrier-ratio)
-                                 (* modulator mod-index f-vib)))]
-      carrier)))
-
-;; --- Noise Synths ---
-
-(def-strudel-synth white [freq 440] (ov/white-noise))
-(def-strudel-synth pink [freq 440] (ov/pink-noise))
-(def-strudel-synth brown [freq 440] (ov/brown-noise))
-(def-strudel-synth gray [freq 440] (ov/gray-noise))
-(def-strudel-synth clip [freq 440] (ov/clip-noise))
-
-(def-strudel-synth crackle
-  [freq 440
-   chaos 1.5]
-  (ov/crackle chaos))
-
-(def-strudel-synth dust [freq 440 detune 0]
-  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
-    (ov/dust f-raw)))
-
-(def-strudel-synth dust2 [freq 440 detune 0]
-  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
-    (ov/dust2 f-raw)))
-
-(def-strudel-synth lf-noise0 [freq 440 detune 0]
-  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
-    (ov/lf-noise0 f-raw)))
-
-(def-strudel-synth lf-noise1 [freq 440 detune 0]
-  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
-    (ov/lf-noise1 f-raw)))
-
-(def-strudel-synth lf-noise2 [freq 440 detune 0]
-  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
-    (ov/lf-noise2 f-raw)))
-
-(def-strudel-synth tb303 [freq 440 wave 1 env-amount 1000]
-  (with-glide freq
-    (let [freqs [actual-f (* 1.01 actual-f)]
-          waves [(ov/saw freqs)
-                 (ov/pulse freqs 0.5)
-                 (ov/lf-tri freqs)]
-          selector (ov/select wave waves)
-          fil-env (ov/env-gen (ov/perc attack sustain))
-          fil-lpf (s-max 20 (+ lpf (* env-amount fil-env)))]
-      (ov/rlpf selector fil-lpf (ov/lin-lin resonance 0 1 0.9 0.05)))))
-
-(def-strudel-synth supersaw [freq 440]
-  (with-glide freq
-    (let [input (ov/lf-saw actual-f)
-          shift1 (ov/lf-saw 4)
-          shift2 (ov/lf-saw 7)
-          shift3 (ov/lf-saw 5)
-          shift4 (ov/lf-saw 2)
-          comp1 (> input shift1)
-          comp2 (> input shift2)
-          comp3 (> input shift3)
-          comp4 (> input shift4)]
-      (ov/leak-dc:ar
-       (* (- (+ (- input comp1)
-                (- input comp2)
-                (- input comp3)
-                (- input comp4)) input) 0.25)))))
-
-(def-strudel-synth mooger
-  [freq 440
-   osc1 0
-   osc2 1
-   osc1-level 0.5
-   osc2-level 0.5]
-  (with-glide freq
-    (let [osc-bank-1 [(ov/saw actual-f) (ov/sin-osc actual-f) (ov/pulse actual-f)]
-          osc-bank-2 [(ov/saw actual-f) (ov/sin-osc actual-f) (ov/pulse actual-f)]
-          s1 (* osc1-level (ov/select osc1 osc-bank-1))
-          s2 (* osc2-level (ov/select osc2 osc-bank-2))]
-      (ov/moog-ff (+ s1 s2) lpf (ov/lin-lin resonance 0 1 3 0)))))
-
-(def-strudel-synth ks-stringer [freq 440 coef 0.5]
-  (with-glide freq
-    (let [noise (* 0.8 (ov/white-noise))
-          ;; Excitation burst
-          burst (* noise (ov/env-gen (ov/perc 0.001 0.01)))
-          ;; Waveguide string modeling
-          delay-time (/ 1.0 actual-f)
-          ;; Use comb-l for a delay line that supports real-time modulation of delay-time
-          string (ov/comb-l burst 0.1 delay-time (ov/lin-lin coef -1 1 0.1 10))]
-      string)))
-
-(def-strudel-synth dub-kick [freq 80]
-  (let [lpf-env (ov/perc 0.001 1 freq -20)
-        amp-env (ov/perc 0.001 1 1 -8)
-        osc-env (ov/perc 0.001 1 freq -8)
-        noiz (ov/lpf (ov/white-noise) (+ (ov/env-gen:kr lpf-env) 20))
-        snd (ov/lpf (ov/sin-osc (+ (ov/env-gen:kr osc-env) 20)) 200)]
-    (* (+ noiz snd) (ov/env-gen amp-env :action ov/NO-ACTION))))
-
-(def-strudel-synth dance-kick [freq 80]
-  (let [freq-env (ov/env-gen (ov/perc 0.001 0.1))
-        snd (ov/sin-osc (+ freq (* freq-env 200)))
-        click (ov/lpf (ov/white-noise) (+ 500 (* freq-env 2000)))]
-    (+ snd (* 0.3 click))))
-
-;; --- Pattern Engine ---
-
-;; --- Randomness ---
-
-(def seed! p/seed! )
+;; Randomness
+(def seed! p/seed!)
 (def irand p/irand)
 (def srand p/srand)
 (def repeatable-rand p/repeatable-rand)
@@ -406,8 +19,7 @@
 (def choose-n p/choose-n)
 (def rtake p/rtake)
 
-;; --- Signals ---
-
+;; Signals
 (def sine p/sine)
 (def saw p/saw)
 (def tri p/tri)
@@ -415,29 +27,22 @@
 (def cosine p/cosine)
 (def sig-range p/sig-range)
 
-;; --- Pattern records ---
-
+;; Pattern records & builders
 (defn ->Event [time duration params] (p/->Event time duration params))
 (defn ->Pattern [events cycles delay-cycles length] (p/->Pattern events cycles delay-cycles length))
+(defn ->Overlay [val] (p/->Overlay val))
 (def make-pattern p/make-pattern)
 (def parse-mini p/parse-mini)
-
-
-;; --- Core Pattern Builders ---
-
 (def with-param p/with-param)
 (def set-param p/set-param)
 (def overlay p/overlay)
 
-;; --- DSL Modifiers ---
-
+;; DSL Modifiers
 (def s p/s)
 (def simul p/simul)
 (def note p/note)
 (def gain p/gain)
 (def swing p/swing)
-
-
 (def duck p/duck)
 (def duck-trigger p/duck-trigger)
 (def duck-attack p/duck-attack)
@@ -452,8 +57,6 @@
 (def legato p/legato)
 (def monophonic p/monophonic)
 (def mono p/mono)
-
-
 (def release p/release)
 (def width p/width)
 (def carrier-ratio p/carrier-ratio)
@@ -483,17 +86,13 @@
 (def pan-depth p/pan-depth)
 (def phaser-hz p/phaser-hz)
 (def phaser-depth p/phaser-depth)
-
-
 (def begin p/begin)
 (def end p/end)
 (def looping p/looping)
 (def env p/env)
 (def active p/active)
-
 (def fast p/fast)
 (def slow p/slow)
-
 (def early p/early)
 (def late p/late)
 (def ribbon p/ribbon)
@@ -502,481 +101,97 @@
 (def sometimes p/sometimes)
 (def degrade p/degrade)
 (def delay-cycles p/delay-cycles)
-
 (def glide p/glide)
 
-;; --- Player ---
+;; --- Player Re-exports ---
 
-(defonce metro (ov/metronome 120))
+(def metro player/metro)
+(def cpm player/cpm)
+(def glide-cpm player/glide-cpm)
+(def player-state player/player-state)
+(def at-metro player/at-metro)
+(def gate-off player/gate-off)
+(def update-mono-inst player/update-mono-inst)
+(def start-mono-inst player/start-mono-inst)
+(def at-metro-mono player/at-metro-mono)
+(def trigger-event player/trigger-event)
+(def trigger-single-event player/trigger-single-event)
+(def apply-swing player/apply-swing)
+(def cycle-n player/cycle-n)
+(def play-loop player/play-loop)
+(def playing player/playing)
+(def play! player/play!)
+(def play-only! player/play-only!)
+(def stop! player/stop!)
 
-(defn cpm
-  "Sets or gets the cycles per minute.
-   Assumes 4 beats per cycle."
-  ([] (/ (ov/metro-bpm metro) 4))
-  ([n] (metro :bpm (* n 4)) n))
+;; --- Synths Re-exports ---
+(def get-synth-name synths/get-synth-name)
+(def resolve-synth synths/resolve-synth)
 
-(defn glide-cpm
-  "Smoothly transitions the CPM to a new value over a duration (in cycles).
-   Default resolution is 1 step per cycle."
-  ([target-cpm dur-cycles]
-   (glide-cpm target-cpm dur-cycles 1))
-  ([target-cpm dur-cycles steps-per-cycle]
-   (let [dur-beats (* dur-cycles 4)
-         start-cpm (cpm)
-         total-steps (int (* dur-cycles steps-per-cycle))
-         total-steps (max 1 total-steps)
-         step-size (/ (- target-cpm start-cpm) total-steps)
-         step-dur-beats (/ dur-beats total-steps)
-         now (metro)]
-     (dotimes [i total-steps]
-       (let [beat-offset (* (inc i) step-dur-beats)
-             target-val (+ start-cpm (* (inc i) step-size))]
-         (ov/apply-at (metro (+ now beat-offset))
-                      (fn []
-                        (tel/log! :info {:cpm target-val})
-                        (cpm target-val))))))))
+(def kick-adsr synths/kick-adsr)
+(def kick-perc synths/kick-perc)
+(def snare-adsr synths/snare-adsr)
+(def snare-perc synths/snare-perc)
+(def hat-adsr synths/hat-adsr)
+(def hat-perc synths/hat-perc)
+(def clap-adsr synths/clap-adsr)
+(def clap-perc synths/clap-perc)
+(def saw-adsr synths/saw-adsr)
+(def saw-perc synths/saw-perc)
+(def sine-adsr synths/sine-adsr)
+(def sine-perc synths/sine-perc)
+(def square-adsr synths/square-adsr)
+(def square-perc synths/square-perc)
+(def tri-adsr synths/tri-adsr)
+(def tri-perc synths/tri-perc)
+(def fm-adsr synths/fm-adsr)
+(def fm-perc synths/fm-perc)
+(def white-adsr synths/white-adsr)
+(def white-perc synths/white-perc)
+(def pink-adsr synths/pink-adsr)
+(def pink-perc synths/pink-perc)
+(def brown-adsr synths/brown-adsr)
+(def brown-perc synths/brown-perc)
+(def gray-adsr synths/gray-adsr)
+(def gray-perc synths/gray-perc)
+(def clip-adsr synths/clip-adsr)
+(def clip-perc synths/clip-perc)
+(def crackle-adsr synths/crackle-adsr)
+(def crackle-perc synths/crackle-perc)
+(def dust-adsr synths/dust-adsr)
+(def dust-perc synths/dust-perc)
+(def dust2-adsr synths/dust2-adsr)
+(def dust2-perc synths/dust2-perc)
+(def lf-noise0-adsr synths/lf-noise0-adsr)
+(def lf-noise0-perc synths/lf-noise0-perc)
+(def lf-noise1-adsr synths/lf-noise1-adsr)
+(def lf-noise1-perc synths/lf-noise1-perc)
+(def lf-noise2-adsr synths/lf-noise2-adsr)
+(def lf-noise2-perc synths/lf-noise2-perc)
+(def tb303-adsr synths/tb303-adsr)
+(def tb303-perc synths/tb303-perc)
+(def supersaw-adsr synths/supersaw-adsr)
+(def supersaw-perc synths/supersaw-perc)
+(def mooger-adsr synths/mooger-adsr)
+(def mooger-perc synths/mooger-perc)
+(def ks-stringer-adsr synths/ks-stringer-adsr)
+(def ks-stringer-perc synths/ks-stringer-perc)
+(def dub-kick-adsr synths/dub-kick-adsr)
+(def dub-kick-perc synths/dub-kick-perc)
+(def dance-kick-adsr synths/dance-kick-adsr)
+(def dance-kick-perc synths/dance-kick-perc)
+(def sampler-adsr synths/sampler-adsr)
+(def sampler-perc synths/sampler-perc)
 
-;; --- Sampling ---
+;; --- Sampling Re-exports ---
 
-(defonce samples (atom {}))
-(defonce sample-slices (atom {}))
-
-(defn- clean-name [n]
-  (keyword (str/replace (clojure.core/name (p/->name n)) #"^:" "")))
-
-(defn load-sample!
-  "Loads a sample into the registry.
-   Name can be a keyword or string.
-   Path is the filesystem path to the audio file."
-  [name path]
-  (if-let [buf (try (ov/load-sample path)
-                    (catch Exception e
-                      (tel/log!
-                       :error
-                       {:sample {:path path :failed (.getMessage e)}})
-                      nil))]
-    (let [k (clean-name name)]
-      (swap! samples assoc k buf)
-      (tel/log! :info {:sample-loaded {:name k :from-path path}})
-      k)
-    (do
-      (tel/log! :warn {:sample-not-loaded {:name name :from-path path}})
-      nil)))
-
-(defn load-freesound!
-  "Loads a Freesound sample into the registry by ID.
-   Name can be a keyword or string.
-   ID is the Freesound sample ID."
-  [name id]
-  (if-let [buf (try (ov/freesound id)
-                    (catch Exception e
-                      (tel/log!
-                       :error
-                       {:freesound {:id id :failed (.getMessage e)}})
-                      nil))]
-    (let [k (clean-name name)]
-      (swap! samples assoc k buf)
-      (tel/log! :info {:freesound-loaded {:name k :id id}})
-      k)
-    (do
-      (tel/log! :warn {:freesound-not-loaded {:name name :id id}})
-      nil)))
-
-(defn slice-sample!
-  "Creates a new virtual sample instrument from a slice of an existing sample.
-   name: The name for the new instrument (e.g., :kick)
-   source-name: The name of the loaded sample (e.g., :break)
-   begin: Start position (0.0 to 1.0)
-   end: End position (0.0 to 1.0)"
-  [name source-name begin end]
-  (let [s-name (clean-name name)
-        src-name (clean-name source-name)]
-    (swap! sample-slices assoc s-name {:source src-name :begin begin :end end})
-    (tel/log! :info {:sample-sliced {:name s-name :from src-name}})))
-
-(defn slice-sample-ms!
-  "Like slice-sample!, but uses milliseconds instead of 0.0 to 1.0 fractions.
-   Note: Currently only supports slicing base samples, not nested slices."
-  [name source-name begin-ms end-ms]
-  (let [s-name (clean-name name)
-        src-name (clean-name source-name)
-        buf (get @samples src-name)]
-    (if buf
-      (let [total-ms (* (:duration buf) 1000)
-            begin (double (/ begin-ms total-ms))
-            end (double (/ end-ms total-ms))]
-        (slice-sample! s-name src-name begin end))
-      (tel/log! :error {:slice-ms-failed {:name s-name :source src-name :reason "Source sample not found"}}))))
-
-(defn sample-info
-  "Returns information about a sample or slice by name."
-  [name]
-  (let [s-name (clean-name name)
-        slice (get @sample-slices s-name)
-        effective-name (if slice (:source slice) s-name)
-        buf (get @samples effective-name)]
-    (when buf
-      (let [buf-info {:duration (:duration buf)
-                      :n-channels (:n-channels buf)
-                      :rate (:rate buf)
-                      :path (:path buf)
-                      :size (:size buf)}]
-        (if slice
-          (let [begin (:begin slice)
-                end (:end slice)
-                dur (* (:duration buf) (abs (- end begin)))]
-            (merge buf-info
-                   {:type :slice
-                    :source effective-name
-                    :begin begin
-                    :end end
-                    :duration dur
-                    :full-duration (:duration buf)}))
-          (assoc buf-info :type :sample))))))
-
-(def-strudel-synth sampler [buf 0 rate 1 begin 0 end 1 loop? 0 attack 0 release 0]
-  (let [rate-s (* rate (ov/buf-rate-scale buf))
-        start-pos (* begin (ov/buf-frames buf))]
-    (ov/play-buf 2 buf rate-s 1 start-pos loop? :action ov/NO-ACTION)))
-
-(defonce player-state (atom {:playing? false :patterns {} :loops #{} :last-freq {}}))
-
-(defn- resolve-note [n]
-  (ov/midi->hz (ov/note n)))
-
-(def ^:private synth-aliases
-  {:bd :kick
-   :sd :snare
-   :hh :hat
-   :cp :clap})
-
-(def ^:private percussive-synths
-  #{:kick :snare :hat :clap :bd :sd :hh :cp :dub-kick :dance-kick :ks-stringer})
-
-(defn- supports-mono? [sound-name]
-  (not (or (percussive-synths sound-name)
-           (#{:sampler :white :pink :brown} sound-name))))
-
-(defn- get-synth-name [sound params]
-  (let [base (get synth-aliases sound sound)
-        default-env (if (percussive-synths base) :perc :adsr)
-        env (get params :env default-env)]
-    (keyword (str (clojure.core/name base) "-" (clojure.core/name env)))))
-
-(defn- resolve-synth [name]
-  (if-let [ns (find-ns 'strudel-overtone.strudel-overtone)]
-    (ns-resolve ns (symbol (clojure.core/name name)))
-    nil))
-
-(defn at-metro
-  "Executes synth-var with args at the specified beat.
-   Uses Overtone's 'at' for sample-accurate timing."
-  [beat synth-var args]
-  (ov/at (metro beat) (apply synth-var args)))
-
-(defn- resolve-params [params beat]
-  (reduce-kv (fn [m k v]
-               (assoc m k (if (fn? v) (v beat k) v)))
-             {}
-             params))
-
-(defn- try-parse-number [v]
-  (if (string? v)
-    (try (Double/parseDouble v) (catch Exception _ 0))
-    v))
-
-(defn- adjust-slice-params [params sound-name]
-  (if-let [slice (get @sample-slices sound-name)]
-    (let [s-begin (:begin slice)
-          s-end (:end slice)
-          s-dur (- s-end s-begin)
-          p-begin (get params :begin 0)
-          p-end (get params :end 1)]
-      (assoc params
-             :begin (+ s-begin (* p-begin s-dur))
-             :end (+ s-begin (* p-end s-dur))))
-    params))
-
-(defn- calculate-sustain [params sample-buf dur-beats monophonic?]
-  (let [legato (try-parse-number (get params :legato 1.0))
-        step-dur-sec (* dur-beats (/ 60 (ov/metro-bpm metro)) legato)
-        param-sustain (:sustain params)
-        env (get params :env :adsr)]
-    (cond
-      ;; For monophonic ADSR, we want the synth to stay alive indefinitely
-      ;; until gated off by the next note or the loop stopping.
-      (and monophonic? (= env :adsr))
-      9999
-
-      param-sustain
-      (if (string? param-sustain)
-        (try (Double/parseDouble param-sustain) (catch Exception _ 0.1))
-        param-sustain)
-
-      (and sample-buf (:end params))
-      (let [b (get params :begin 0)
-            e (:end params)
-            r (get params :rate 1)
-            abs-r (abs (double r))
-            dur (:duration sample-buf)
-            total-dur (* (abs (double (- e b))) dur (/ 1 (max 0.001 abs-r)))
-            total-dur (min total-dur step-dur-sec)]
-        (if (= env :perc)
-          (let [attack (let [a (get params :attack 0)]
-                         (if (string? a) (try (Double/parseDouble a) (catch Exception _ 0)) a))]
-            (max 0.001 (- total-dur attack)))
-          (let [release (let [r (get params :release 0)]
-                          (if (string? r) (try (Double/parseDouble r) (catch Exception _ 0)) r))]
-            (max 0.001 (- total-dur release)))))
-
-      :else
-      step-dur-sec)))
-
-(defn- gate-off [inst]
-  (when (and inst (ov/node-active? inst))
-    (try
-      (ov/ctl inst :gate 0)
-      (catch Exception _ nil))))
-
-(defn update-mono-inst [inst args]
-  (apply ov/ctl inst args))
-
-(defn start-mono-inst [key voice-idx synth-var args old-inst]
-  (gate-off old-inst)
-  (let [new-inst (apply synth-var args)]
-    (swap! player-state assoc-in [:active-synths [key voice-idx]]
-           {:inst new-inst :synth synth-var})))
-
-(defn at-metro-mono [beat key voice-idx synth-var args]
-  (ov/apply-at (metro beat)
-               (fn [& _]
-                 (when (contains? (:loops @player-state) key)
-                   (let [existing (get-in @player-state [:active-synths [key voice-idx]])
-                         inst (:inst existing)]
-                     (if (and inst (ov/node-active? inst) (= (:synth existing) synth-var))
-                       (update-mono-inst inst args)
-                       (start-mono-inst key voice-idx synth-var args inst)))))))
-
-(defn trigger-single-event [key ev params beat dur-beats voice-idx]
-  (let [sound-param (:sound params)
-        n (:note params)
-        sound-name (or sound-param (if n :saw nil))
-        slice (when sound-name (get @sample-slices sound-name))
-        effective-sound (if slice (:source slice) sound-name)
-        sample-buf (when effective-sound (get @samples effective-sound))
-        params (adjust-slice-params params sound-name)
-        note-offset (get params :add 0)
-        amp (try-parse-number (or (:amp params) 1.0))
-        lpf (try-parse-number (or (:lpf params) 2000))
-        slide (try-parse-number (get params :slide 0))
-        cycle-sec (* 4 (/ 60 (ov/metro-bpm metro)))
-        monophonic-param (not (zero? (get params :monophonic 0)))]
-    (when sound-name
-      (let [base (if sample-buf :sampler (get synth-aliases sound-name sound-name))
-            monophonic (and monophonic-param (supports-mono? base))
-            sustain-sec (calculate-sustain params sample-buf dur-beats monophonic)
-            synth-key (get-synth-name base params)
-            synth-var (or (resolve-synth synth-key) (resolve-synth base))
-            freq (when n (resolve-note (+ (if (keyword? n) (ov/note n) n) note-offset)))
-            last-f (get-in @player-state [:last-freq [key voice-idx]])
-            has-glide (and (pos? slide) last-f freq)
-            effective-slide-from (if has-glide last-f (or freq 440))
-            effective-slide-time (if has-glide (min sustain-sec (* slide cycle-sec)) 0.001)
-            reserved #{:sound :note :active :start :duration :env :add :swing :slide :legato :monophonic :gate}
-            handled #{:amp :lpf :sustain :freq :slide-from :gate :monophonic}
-            args (cond-> (reduce-kv (fn [acc k v] (if (or (reserved k) (handled k)) acc (conj acc k v))) [] params)
-                   true (conj :amp amp)
-                   true (conj :freq (or freq 440))
-                   lpf (conj :lpf lpf)
-                   sustain-sec (conj :sustain sustain-sec)
-                   true (conj :slide effective-slide-time)
-                   true (conj :slide-from effective-slide-from)
-                   true (conj :gate 1)
-                   true (conj :monophonic (if monophonic 1 0))
-                   sample-buf (conj :buf (:id sample-buf)))
-            ;; Filter out any nils (e.g. if lpf or sample-buf was nil)
-            args (->> (partition 2 args)
-                      (filter (fn [[k v]] (and (some? k) (some? v))))
-                      (apply concat)
-                      vec)]
-        (when freq (swap! player-state assoc-in [:last-freq [key voice-idx]] freq))
-        (when synth-var
-          (let [log-data (assoc (into {} ev) :params params)]
-            (if monophonic
-              (do
-                (ov/apply-at (metro beat) (fn [& _] (when (contains? (:loops @player-state) key) (tel/log! :info {:event log-data}))))
-                (at-metro-mono beat key voice-idx synth-var args))
-              (do
-                (ov/apply-at (metro beat) (fn [& _] (tel/log! :info {:event log-data})))
-                ;; If we were monophonic but now polyphonic, gate off the old synth
-                (when-let [existing (get-in @player-state [:active-synths [key voice-idx]])]
-                  (ov/apply-at (metro beat)
-                               (fn [& _]
-                                 (gate-off (:inst existing))
-                                 (swap! player-state update :active-synths dissoc [key voice-idx]))))
-                (at-metro beat synth-var args)))))))))
-
-(defn trigger-event
-  ([key ev beat dur-beats] (trigger-event key ev beat dur-beats 0))
-  ([key ev beat dur-beats voice-idx]
-   (let [raw-params (:params ev)
-         ;; Use source-time if available to keep random params stable across ribbon loops
-         param-beat (get ev :source-time beat)
-         params (resolve-params raw-params param-beat)
-         active (get params :active 1)
-         active? (if (number? active) (not (zero? active)) active)]
-     (when active?
-       (let [n (:note params)]
-         (cond
-           (and (sequential? n) (not (string? n)))
-           (doseq [[idx note] (map-indexed vector n)]
-             (trigger-event key (assoc-in ev [:params :note] note) beat dur-beats idx))
-
-           (set? n)
-           (doseq [[idx note] (map-indexed vector n)]
-             (trigger-event key (assoc-in ev [:params :note] note) beat dur-beats idx))
-
-           :else
-           (trigger-single-event key ev params beat dur-beats voice-idx)))))))
-
-(defn- apply-swing [t amount step-size]
-  (let [step-idx (long (/ t step-size))]
-    (if (odd? step-idx)
-      (+ t (* amount step-size))
-      t)))
-
-(defn cycle-n
-  "cycle the collection and take n from it"
-  [n col]
-  (take n (cycle col)))
-
-(defn play-loop [key beat]
-  (let [state @player-state]
-    (if (and (:playing? state)
-             (contains? (:loops state) key))
-      (let [pat (get-in state [:patterns key])]
-        (if pat
-          (let [cycles-raw (:cycles pat (constantly 1))
-                cycles-fn (if (fn? cycles-raw) cycles-raw (constantly cycles-raw))
-                cycles (cycles-fn beat :cycles)
-                cycle-dur (/ 4 cycles) ;; Beats per cycle (assuming 4/4)
-                next-beat (+ beat cycle-dur)
-                events (:events pat)
-                ;; Determine grid from smallest note duration, default to 1/8 (0.125) if empty
-                min-dur (if (seq events)
-                          (apply min (map :duration events))
-                          0.125)
-                ;; Calculate which cycle of the pattern we are on
-                ;; (Some functions like ribbon create multi-cycle event lists)
-                num-cycles (or (:length pat)
-                               (if (seq events)
-                                 (inc (long (apply max (map :time events))))
-                                 1))
-                ;; Since play-loop is quantized and incremental, we can
-                ;; rely on beat being a multiple of cycle-dur
-                cycle-total (Math/round (double (/ beat cycle-dur)))
-                
-                ;; If num-cycles is < 1, we might need to play multiple iterations of the pattern
-                ;; within this one-cycle (cycle-dur) window.
-                num-iterations (if (< num-cycles 1)
-                                 (long (/ 1 num-cycles))
-                                 1)]
-
-             ;; Schedule events for this cycle
-             (doseq [i (range num-iterations)]
-               (let [cycle-idx (mod (+ cycle-total i) num-cycles)]
-                 (doseq [ev events]
-                   (let [t (:time ev)]
-                     ;; Support fractional pattern lengths by checking the intersection 
-                     ;; of the event's interval with the current cycle block.
-                     (when (and (>= t cycle-idx) (< t (min (+ cycle-idx 1.0) num-cycles)))
-                       (let [rel-t (- t cycle-idx)
-                             ;; offset rel-t by the iteration
-                             rel-t-iter (+ rel-t (* i num-cycles))
-
-                             swing-raw (get-in ev [:params :swing] 0)
-                             swing-amount (if (fn? swing-raw) (swing-raw beat :swing) swing-raw)
-                             swung-start (if (zero? swing-amount)
-                                           rel-t-iter
-                                           (apply-swing rel-t-iter swing-amount min-dur))
-                             ;; Assoc effective start time for logging/debugging
-                             ev (assoc ev :effective-time swung-start)
-
-                             rel-dur (:duration ev)
-                             ev-beat (+ beat (* swung-start cycle-dur))
-                             ev-dur-beats (* rel-dur cycle-dur)]
-                         (trigger-event key ev ev-beat ev-dur-beats)))))))
-
-            (ov/apply-by (metro next-beat) #'play-loop [key next-beat]))
-          ;; Pattern removed, loop dies
-          (do
-            (let [active-synths (:active-synths @player-state)]
-              (doseq [[k active] active-synths]
-                (when (or (= k key) (and (vector? k) (= (first k) key)))
-                  (gate-off (:inst active))
-                  (swap! player-state update :active-synths dissoc k))))
-            (swap! player-state update :loops disj key))))
-      ;; Stopped, loop dies
-      (do
-        (let [active-synths (:active-synths @player-state)]
-          (doseq [[k active] active-synths]
-            (when (or (= k key) (and (vector? k) (= (first k) key)))
-              (gate-off (:inst active))
-              (swap! player-state update :active-synths dissoc k))))
-        (swap! player-state update :loops disj key)))))
-
-(defn playing
-  "Returns a list of the names of the currently playing patterns.
-  nil if nothing is playing"
-  []
-  (seq (:loops @player-state)))
-
-(defn play!
-  [& args]
-  (let [pairs (if (= 1 (count args))
-                [[:main (first args)]]
-                (partition 2 args))
-        something-playing? (seq (playing))]
-    (let [quant 4]
-      (doseq [[key pattern] pairs]
-        (let [start-loop? (not (contains? (:loops @player-state) key))]
-          (swap! player-state (fn [s]
-                                (-> s
-                                    (assoc :playing? true)
-                                    (assoc-in [:patterns key] pattern)
-                                    (update :loops conj key))))
-          (when start-loop?
-            (let [now (metro)
-                  delay-beats (* (get pattern :delay-cycles 0) 4)
-                  start-beat (+ now (- quant (mod now quant)) delay-beats)]
-              (ov/apply-by (metro start-beat) #'play-loop [key start-beat])))))
-      (map first pairs))))
-
-(defn play-only!
-  "Like play!, but stops any other patterns that are currently playing."
-  [& args]
-  (let [pairs (if (= 1 (count args))
-                [[:main (first args)]]
-                (partition 2 args))
-        new-keys (set (map first pairs))
-        active-synths (:active-synths @player-state)]
-    ;; Gate off synths that are being removed
-    (doseq [[k active] active-synths]
-      (let [k-base (if (vector? k) (first k) k)]
-        (when-not (new-keys k-base)
-          (gate-off (:inst active))
-          (swap! player-state update :active-synths dissoc k))))
-    (swap! player-state update :patterns select-keys new-keys)
-    (apply play! args)))
-
-(defn stop!
-  ([]
-   (swap! player-state assoc :playing? false :patterns {} :loops #{}))
-  ([key]
-   (swap! player-state (fn [s]
-                         (-> s
-                             (update :patterns dissoc key)
-                             (update :loops disj key))))))
+(def samples samples/samples)
+(def sample-slices samples/sample-slices)
+(def load-sample! samples/load-sample!)
+(def load-freesound! samples/load-freesound!)
+(def slice-sample! samples/slice-sample!)
+(def slice-sample-ms! samples/slice-sample-ms!)
+(def sample-info samples/sample-info)
 
 ;; --- Main / Entry ---
 
@@ -998,443 +213,24 @@
           (note :a2)
           (fast 16)
           (gain 1.0)
-          (lpf 1000)))
-
-  (play! :bd
-         (->
-          (s [:bd :_ :_ :_ :bd :_])
-          (fast 2)
-          (lpf 500)))
-
-  (play! :sd
-         (->
-          (s [:_ :_ :_ :sd :_ :_ :_])
-          (fast 2)
-          (gain 0.25)
-          (lpf 5000)))
-
-  ;; Update bassline
-  (play! :bass (-> (note [:c2 :_ :b2 :_]) (s :sine) (gain 1)))
-
-  (play! :bass (-> (note [:c2])
-                   (s [:sine :tri])))
-
-  (stop!)
-
-  (play! :arp
-         (->
-          (note [:c4 :_ :d4 :_ :e4 :_ :f4 :_ :g4 :_ :f4 :_ :e4 :_ :d4 :_])
-          (s :sine)
-          (fast 2)
-          (gain 1)
-          (lpf 100)))
-
-  ;; --- New Synths ---
+          (pan (srand -1 1))))
 
   (play! :hh
-         (-> (s [:hh :hh :hh :hh])
-             (fast 1)
-             (env :perc)
-             (gain 0.3)))
-
-  (play! :cp
-         (-> (s [:_ :_ :cp :_])
-             (fast 2)
-             (gain 0.5)))
-
-  (play! :lead
-         (-> (note [:c3 :e3 :g3 :b3])
-             (s :square)
-             (fast 2)
-             (lpf 1200)))
-
-  (play! :soft
-         (-> (note [:f4 :a4 :c5 :b4])
-             (s :tri)
-             (fast 0.5)
-             (gain 0.2)))
-
-  (play! :metal
          (->
-          (note [:g2 :f2 :g2 :g2 :g2])
-          (gain (concat (range 0.0 1.0 0.05) (range 1.0 0.0 -0.05)))
-          (lpf (map
-                (partial * 1000)
-                (concat
-                 (range 0.0 1.0 0.05)
-                 (range 1.0 0.0 -0.05))))
-          (s :fm)
-          (fast 1)))
+          (s [:sine])
+          (note :a4)
+          (fast 32)
+          (gain (overlay [0.2 0.5 0.3 0.8]))
+          (pan (sine 0.1 -1 1))))
+
+  (stop! :sd)
+
+  ;; Change tempo
+  (cpm 140)
+  (glide-cpm 80 4)
+
+  ;; Monophonic example
+  (play! :mono (-> (note [:c3 :e3 :g3 :b3]) (s :saw) (mono) (glide 0.1) (fast 2)))
 
   (stop!)
-
-  (cpm (/ 140 4))
-
-  (cpm)
-
-  (play!
-   :bd (-> (s [:bd :bd :bd :bd]))
-   :sd (-> (s [:- :- :sd :-]))
-   :bass (-> (note [:c2 :b2]) (s :sine) (fast 0.5)))
-
-  (play!
-   :bd (-> (s [:bd :bd :- :- :- :- :- :-]) (note [:a1 :c2]))
-   :bass (-> (s [:bd :bd :- :- :- :- :- :-]) (note [:a1 :c2])))
-
-  (play!
-   :arp (->
-         (note (->> (ov/chord :c4 :minor7) chosen-from (take 16)))
-         (s :sine)
-         (gain (take 16 (chosen-from (map (partial * 1/16) (range 16)))))
-         (active [0]))
-
-   :bass (->
-          (note (->> (ov/chord :c1 :minor7) chosen-from (take 4)))
-          (s :square)
-          (lpf 400)
-          (fast 1/8)
-          (gain [0.2]
-                #_(take 4 (chosen-from (map (partial * 1/16) (range 16))))))
-
-   :bd (->
-        (s [:bd :bd :- :-])
-        (note [:a1])
-        (fast 1))
-   :hh (->
-        (s [:hh :hh :hh :hh])
-        (fast 2)
-        (gain 0.1)
-        (active [0]))
-
-   :sd (->
-        (s [:sd :sd :- :sd])
-        (fast 4)
-        (gain 0.5)))
-
-  (stop!)
-
-;; Stop just the drums
-  (stop! :drums)
-  (stop! :snare)
-
-  (stop! :bd)
-
-  (stop! :bass)
-
-  (stop! :arp)
-
-  ;; Stop everything
-  (stop!)
-
-  (->> [1 2 3] shuffle (take 2))
-
-  (take 16 (chosen-from (ov/chord :c4 :minor7)))
-
-  (cpm (/ 80 4))
-
-  (play!
-   :bd (->
-        (s [:bd :bd :bd :bd :bd :bd :bd [:bd :bd]])
-        (gain 1)
-        (active 0 #_(chosen-from [0 0 1] 8)))
-   :bd-4 (->
-          (s [:bd :bd :bd :bd])
-          (pan 0)
-          (gain 1)
-          (active 0))
-   :sd (->
-        (s (cycle-n 16 [:- :sd]))
-        (gain 0.2)
-        (active 1))
-   :clap (->
-          (s (cons :fm (repeat 7 :-)))
-          (env :perc)
-          (gain 0.5)
-          (echo-repeats 50)
-          (room 0.5)
-          (active 0))
-   :bass-1 (->
-            (note [:c1 :bb0])
-            (s [:fm])
-            (carrier-ratio 2)
-            (modulator-ratio 3)
-            (release 0)
-            (gain 0.1)
-            (active 0))
-   :bass-2 (->
-            (s [:tri :- :tri :-])
-            (note (shuffle [:a1 :c2]))
-            (attack 2)
-            (decay 2)
-            (gain 0.1)
-            (active 0))
-   :bass-3 (->
-            (s [:- :- :saw :- :- :saw])
-            (note (shuffle [:g2 :b3]))
-            (attack 2)
-            (decay 1)
-            (gain 0.1)
-            (active 0))
-   :arp (->
-         (note [(set (ov/chord :a3 :major)) (set (ov/chord :a3 :minor))])
-         (s [#{:sine :tri}])
-         (gain 0.2)
-         (env [#{:adsr :perc}])
-         (fast 1)))
-
-  (stop!)
-
-  (cpm (/ 174 4))
-
-  (play!
-   :kick (->
-          (s [[:dub-kick] :_ [:- :kick] :_])
-          #_(s [:kick :- :kick :-])
-          (note :d1)
-          (env :perc)
-          (room 0.5)
-          (distort 0.5)
-          (gain 0.35)
-          (duck 1)
-          (lpf (chosen-from [100 200 400 800] 2))
-          #_(active 0))
-   :snare (->
-           (s [:- :- [:snare :- :-] :- :- :- [:snare :-] :-])
-           (lpf 10000)
-           (gain 0.4)
-           (duck 1)
-           (active (chosen-from [1 1 1 1] 2))
-           #_(active 0))
-   :hat (->
-         (s (repeat 8 :hat))
-         (gain 0.05)
-         (active (chosen-from [0 1 1] 8))
-         (duck 1)
-         #_(active 0))
-   :shaker (->
-            (s (repeat 16 :clap))
-            (gain 0.20)
-            (active (chosen-from [0 1 1] 4))
-            (duck 1)
-            #_(active 0))
-   :bass (->
-          (note [(set (take 3 (ov/chord :f0 :minor)))
-                 (set (take 3 (ov/chord :bb0 :minor)))
-                 (set (take 3 (ov/chord :c0 :major)))
-                 (set (take 3 (ov/chord :d0 :major)))])
-          (s [:supersaw])
-          (vibrato 1)
-          (attack 0.5)
-          (gain [0.6 0.7])
-          (pan (chosen-from (range -0.5 0.5 0.1) 4))
-          (fast 1/4)
-          (duck-trigger 1)
-          (active 0))
-   :lead (->
-          (note (chosen-from (take 5 (scale :f4 :major)) 32))
-          (s [:supersaw])
-          (env (chosen-from [:perc :adsr] 8))
-          (gain 0.1)
-          (pan (chosen-from (range -0.75 0.75 0.05) 4))
-          (fast 1/4)
-          (duck-trigger 1)
-          (active (chosen-from [0 0 1] 8))
-          #_(active 0)))
-
-  (stop!)
-
-  ;; --- New Overtone Synths Examples ---
-
-  (play!
-   :acid (->
-          (note [:c2 :c3 :bb2 :g2])
-          (s :tb303)
-          (lpf [500 1000 2000 500])
-          (resonance 0.2)
-          (fast 2)
-          (gain 0.5))
-
-   :trance (->
-            (note [:c4 :g4 :c5 :g5])
-            (s :supersaw)
-            (detune 10)
-            (sustain 0.5)
-            (room 0.5)
-            (gain 0.4)
-            (fast 0.5))
-
-   :moog (->
-          (note [:c2 :_ :c2 :_])
-          (s :mooger)
-          (lpf 800)
-          (resonance 0.1)
-          (gain 0.6))
-
-   :plucks (->
-            (note (scale :c4 :minor))
-            (s :ks-stringer)
-            (coef 0.8)
-            (fast 2)
-            (gain 0.6))
-
-   :dub (->
-         (s [:dub-kick :_ :_ :_])
-         (gain 0.8))
-
-   :dance (->
-           (s [:dance-kick :dance-kick :dance-kick :dance-kick])
-           (fast 2)
-           (gain 0.8)))
-
-  ;; --- Sampling Example ---
-  ;; (load-sample! :break "/path/to/loop.wav")
-  ;; (play! :drums (-> (s [:break]) (rate 1.0) (begin 0.2)))
-  (load-sample! :cq "/usr/share/wsjtx/sounds/CQ.wav")
-  (slice-sample! :c :cq 0.42 1)
-
-  (play!
-   :c (->
-       (s [#{:c :cq}])
-       (gain 0.5)))
-
-  (stop!)
-
-  (play-only!
-   :bass (->
-          (note [#{:c1 :e1} [:e1 :g1]])
-          (s [#{:tri :sine :square}])
-          (gain [0.5 0.5])
-          #_(distort [0.5 1])
-          (pan-hz [5])
-          (env :perc)
-          (pan-depth [0.5]))
-   :kick (-> (s [:dub-kick [:- :dub-kick]]))
-   :clap (-> (s [:clap-808
-                 [:clap-808 :clap-808]
-                 :clap-808
-                 [:clap-808 :clap :clap-808]])
-             (gain 0.3)))
-
-  (stop!)
-
-  (cpm 40)
-
-  (load-sample!
-   :clap-808
-   "samples/99sounds/clap-808.wav")
-
-  (play-only! :clap (->
-                     (s [:clap-808 :clap-808 :clap-808])
-                     (pan [1 0 -1])
-                     (gain 0.2)))
-
-  (load-sample! :drone "samples/inferno/Drone - Stellar Overdrive (C).wav")
-
-  (slice-sample! :drone-slice :drone 0.35 0.55)
-
-  (glide-cpm 20 4)
-
-  (play-only!
-   :kick (-> (s [:dub-kick :- :dub-kick :-]))
-   :clap (->
-          (s [:- :clap-808 :- [:clap-808 :clap-808]])
-          (pan-depth 0.75)
-          (pan-hz (/ 20 (cpm))))
-   :drone (->
-           (s [#{:drone-slice} :drone-slice])
-           (gain 0.5)
-           (attack 0.5)
-           (release 0.01)
-           (pan-depth 0.75)
-           (pan-hz (/ 30 (cpm)))
-           (rate 1.0)))
-
-  (playing)
-
-  (stop! :drone)
-  (metro)
-
-  (stop!)
-
-  (play!
-   :early (-> (s [:clap-808 :- :- :-]))
-   :later (-> (s [:sine :- :- :-])))
-
-  (play!
-   :early-1 (-> (s [:clap-808 :- :- :-]))
-   :later-2 (-> (s [:sine :- :- :-])))
-
-  ;; --- Freesound Example ---
-  (load-freesound! :birds 650965)
-
-  (play! :birds (-> (s [:birds]) (slow 4) (gain 0.5)))
-
-  (load-freesound! :storm 681517)
-
-  (slice-sample-ms! :sliced-storm :storm 0 40000)
-
-  (slice-sample-ms! :storm-beat :storm 900 1500)
-
-  (stop!)
-
-  (slice-sample! :storm-beat :storm 900 1500)
-
-  (glide-cpm 40 4)
-
-  (play-only!
-   :intro (->
-           (s [:sliced-storm])
-           (slow 4)
-           (gain 1)
-           (resonance 0.1)
-           (duck 1)
-           (hpf 0)
-           (lpf 30000)))
-
-  (play-only!
-   :intro (->
-           (s [:sliced-storm])
-           (slow 4)
-           (gain 0.5)
-           (fshift 0)
-           (distort 0.5)
-           (hpf 0)
-           (duck 1)
-           (lpf 30000))
-   #_#_:storm (->
-               (s [:storm-beat :- :storm-beat [:- :storm-beat]])
-               (swing 1/5)
-               (env :adsr)
-               (attack 0.2)
-               (fshift 10)
-               (gain 0.2)
-               (distort 0.7)
-               (crush 0.5)
-               (rate 1.0)
-               (duck 1)
-               (lpf 1000))
-   :snare (->
-           (s [:snare :snare :snare :snare])
-           (swing 1/5)
-           (s-level 0.2)
-           (decay 0.01)
-           (gain 0.2)
-           (duck-trigger 1))
-   #_#_:pad (->
-             (note [:b2 :f2 :g2 :g2 :b2 :f2 :g2 :c2])
-             (swing 1/5)
-             (add 24)
-             (s [:saw])
-             (fast 1)
-             (distort 0.9)
-             (crush 0.3)
-             (gain 0.1)))
-
-  (stop!)
-
-  (sample-info :storm)
-
-  (sample-info :storm-beat))
-
-
-
+)

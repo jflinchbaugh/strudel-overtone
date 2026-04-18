@@ -1,6 +1,9 @@
 (ns strudel-overtone.effects-test
   (:require [clojure.test :refer :all]
             [strudel-overtone.strudel-overtone :as sut]
+            [strudel-overtone.player :as player]
+            [strudel-overtone.synths :as synths]
+            [strudel-overtone.samples :as samples]
             [overtone.core :as ov]))
 
 (deftest effect-params-test
@@ -28,11 +31,11 @@
   (testing "trigger-event passes new effects to sampler"
     (let [mock-calls (atom [])]
       (with-redefs [ov/metro-bpm (constantly 120)
-                    sut/metro (constantly 0)
+                    player/metro (constantly 0)
                     ov/apply-at (fn [ms func & args] (swap! mock-calls conj {:func func :args args}))
-                    sut/at-metro (fn [beat synth-var args] (swap! mock-calls conj {:func synth-var :args [args]}))
-                    sut/samples (atom {"test" {:id 1 :duration 1}})
-                    sut/sampler-adsr (fn [& args] args)]
+                    player/at-metro (fn [beat synth-var args] (swap! mock-calls conj {:func synth-var :args [args]}))
+                    samples/samples (atom {"test" {:id 1 :duration 1}})
+                    synths/sampler-adsr (fn [& args] args)]
 
         (let [pat (-> (sut/s [:test])
                       (sut/pshift 7)

@@ -1,6 +1,7 @@
 (ns strudel-overtone.stop-test
   (:require [clojure.test :refer :all]
             [strudel-overtone.strudel-overtone :as sut]
+            [strudel-overtone.player :as player]
             [overtone.core :as ov]))
 
 (deftest test-stop-deferred-gating
@@ -10,9 +11,9 @@
                              :loops #{:p1}
                              :patterns {:p1 {}}
                              :active-synths {[:p1 0] {:inst {:id 101} :synth :saw}}})]
-      (with-redefs [sut/player-state player-state
-                    sut/gate-off (fn [inst] (swap! gate-off-calls conj inst))
-                    sut/metro (constantly 0)
+      (with-redefs [player/player-state player-state
+                    player/gate-off (fn [inst] (swap! gate-off-calls conj inst))
+                    player/metro (constantly 0)
                     ov/apply-by (fn [& _] nil)]
 
         ;; 1. Call stop!
@@ -39,9 +40,9 @@
                              :loops #{:p1}
                              :patterns {:p1 {}}
                              :active-synths {[:p1 0] {:inst {:id 101} :synth :saw}}})]
-      (with-redefs [sut/player-state player-state
-                    sut/gate-off (fn [inst] (swap! gate-off-calls conj inst))
-                    sut/metro (constantly 0)
+      (with-redefs [player/player-state player-state
+                    player/gate-off (fn [inst] (swap! gate-off-calls conj inst))
+                    player/metro (constantly 0)
                     ov/apply-by (fn [& _] nil)]
 
         (sut/stop!)
@@ -53,3 +54,4 @@
 
         (is (= 1 (count @gate-off-calls)))
         (is (empty? (:active-synths @player-state)))))))
+

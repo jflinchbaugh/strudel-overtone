@@ -1,10 +1,11 @@
 (ns strudel-overtone.swing-test
   (:require [clojure.test :refer :all]
             [strudel-overtone.strudel-overtone :as sut]
+            [strudel-overtone.player :as player]
             [overtone.core :as ov]))
 
 ;; Access private function
-(def apply-swing @#'sut/apply-swing)
+(def apply-swing @#'player/apply-swing)
 
 (deftest apply-swing-test
   (testing "apply-swing delays odd steps"
@@ -71,9 +72,9 @@
                               :patterns {:test pat} 
                               :loops #{:test}})]
 
-      (with-redefs [sut/metro mock-metro
-                    sut/player-state player-state
-                    sut/trigger-event mock-trigger-event
+      (with-redefs [player/metro mock-metro
+                    player/player-state player-state
+                    player/trigger-event mock-trigger-event
                     ov/apply-by (fn [& _] nil)
                     ov/metro-bpm (constantly 120)]
         
@@ -101,3 +102,4 @@
           events (:events swung)]
       (is (= 0.2 ((get-in (first events) [:params :swing]) 0 :swing)))
       (is (= 0.2 ((get-in (second events) [:params :swing]) 0 :swing))))))
+

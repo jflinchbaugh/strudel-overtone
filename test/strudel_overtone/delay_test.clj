@@ -1,18 +1,19 @@
 (ns strudel-overtone.delay-test
   (:require [clojure.test :refer :all]
             [strudel-overtone.strudel-overtone :as sut]
+            [strudel-overtone.player :as player]
             [overtone.core :as ov]))
 
 (deftest delay-cycles-test
   (testing "play! honors delay-cycles on initial start"
     (let [player-state (atom {:playing? false :patterns {} :loops #{}})
           mock-calls (atom [])]
-      (with-redefs [sut/player-state player-state
-                    sut/metro (fn
-                                ([] 10.5)
-                                ([b] (* b 1000)))
+      (with-redefs [player/player-state player-state
+                    player/metro (fn
+                                   ([] 10.5)
+                                   ([b] (* b 1000)))
                     ov/metro-bpm (constantly 120)
-                    ov/metronome (fn [& _] sut/metro)
+                    ov/metronome (fn [& _] player/metro)
                     ov/apply-by (fn [ms func args]
                                   (swap! mock-calls
                                     conj {:ms ms :func func :args args}))]

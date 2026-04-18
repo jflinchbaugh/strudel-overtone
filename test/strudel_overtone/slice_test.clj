@@ -2,18 +2,21 @@
   (:require [clojure.test :refer :all]
             [strudel-overtone.strudel-overtone :as sut]
             [strudel-overtone.strudel-overtone-test :as sut-test]
+            [strudel-overtone.player :as player]
+            [strudel-overtone.samples :as samples]
+            [strudel-overtone.synths :as synths]
             [overtone.core :as ov]))
 
 (deftest slice-sample-test
   (testing "slice-sample! creates virtual instruments"
     (let [mock-calls (atom [])]
       (with-redefs [ov/metro-bpm (constantly 120)
-                    sut/metro (constantly 0)
+                    player/metro (constantly 0)
                     ov/apply-at (fn [ms func & args] (swap! mock-calls conj {:func func :args args}))
-                    sut/at-metro (fn [beat synth-var args] (swap! mock-calls conj {:func synth-var :args [args]}))
-                    sut/samples (atom {:break {:id 1 :duration 4.0}})
-                    sut/sample-slices (atom {})
-                    sut/sampler-adsr (fn [& args] args)]
+                    player/at-metro (fn [beat synth-var args] (swap! mock-calls conj {:func synth-var :args [args]}))
+                    samples/samples (atom {:break {:id 1 :duration 4.0}})
+                    samples/sample-slices (atom {})
+                    synths/sampler-adsr (fn [& args] args)]
 
         (sut/slice-sample! :kick :break 0.0 0.1)
         (sut/slice-sample! :snare :break 0.5 0.6)
@@ -62,8 +65,8 @@
                :rate 44100.0
                :path "path"
                :size 176400}]
-      (with-redefs [sut/samples (atom {:break buf})
-                    sut/sample-slices (atom {:kick
+      (with-redefs [samples/samples (atom {:break buf})
+                    samples/sample-slices (atom {:kick
                                              {:source :break
                                               :begin 0.0
                                               :end 0.1}})]
@@ -81,8 +84,8 @@
                :rate 44100.0
                :path "path"
                :size 176400}]
-      (with-redefs [sut/samples (atom {:break buf})
-                    sut/sample-slices (atom {:kick
+      (with-redefs [samples/samples (atom {:break buf})
+                    samples/sample-slices (atom {:kick
                                              {:source :break
                                               :begin 1/2
                                               :end 3/4}})]
@@ -100,8 +103,8 @@
                :rate 44100.0
                :path "path"
                :size 176400}]
-      (with-redefs [sut/samples (atom {:break buf})
-                    sut/sample-slices (atom {:kick
+      (with-redefs [samples/samples (atom {:break buf})
+                    samples/sample-slices (atom {:kick
                                              {:source :break
                                               :begin 0.1
                                               :end 0.0}})]
@@ -111,10 +114,10 @@
 (deftest slice-ms-test
   (testing "slice-sample-ms! converts ms to fractions correctly"
     (let [buf {:duration 2.0 :n-channels 2 :rate 44100.0 :path "path" :size 88200}]
-      (with-redefs [sut/samples (atom {:break buf})
-                    sut/sample-slices (atom {})]
+      (with-redefs [samples/samples (atom {:break buf})
+                    samples/sample-slices (atom {})]
         ;; 2.0s = 2000ms. Slicing 500ms to 1500ms should be 0.25 to 0.75
         (sut/slice-sample-ms! :ms-slice :break 500 1500)
-        (let [slice (get @sut/sample-slices :ms-slice)]
+        (let [slice (get @samples/sample-slices :ms-slice)]
           (is (sut-test/approx= 0.25 (:begin slice)))
           (is (sut-test/approx= 0.75 (:end slice))))))))

@@ -1,6 +1,9 @@
 (ns strudel-overtone.strudel-overtone-test
   (:require [clojure.test :refer :all]
             [strudel-overtone.strudel-overtone :as sut]
+            [strudel-overtone.player :as player]
+            [strudel-overtone.synths :as synths]
+            [strudel-overtone.samples :as samples]
             [overtone.core :as ov]))
 
 (defn approx= [a b]
@@ -10,12 +13,12 @@
   (testing "play! quantization logic"
     (let [player-state (atom {:playing? false :patterns {} :loops #{}})
           mock-calls (atom [])]
-      (with-redefs [sut/player-state player-state
-                    sut/metro (fn
-                                ([] 10.5)
-                                ([b] (* b 1000)))
+      (with-redefs [player/player-state player-state
+                    player/metro (fn
+                                   ([] 10.5)
+                                   ([b] (* b 1000)))
                     ov/metro-bpm (constantly 120)
-                    ov/metronome (fn [& _] sut/metro)
+                    ov/metronome (fn [& _] player/metro)
                     ov/apply-at (fn [ms func & args]
                                   (swap! mock-calls
                                     conj {:ms ms :func func :args args}))
@@ -43,8 +46,8 @@
 (deftest play!-return-value-test
   (testing "play! returns the names of the patterns"
     (let [player-state (atom {:playing? false :patterns {} :loops #{}})]
-      (with-redefs [sut/player-state player-state
-                    sut/metro (constantly 0)
+      (with-redefs [player/player-state player-state
+                    player/metro (constantly 0)
                     ov/metro-bpm (constantly 120)
                     ov/apply-by (fn [& _] nil)]
         (is (= '(:main) (sut/play! {:events []})))
@@ -54,8 +57,8 @@
   (testing "play! handles multiple patterns"
     (let [player-state (atom {:playing? false :patterns {} :loops #{}})
           mock-calls (atom [])]
-      (with-redefs [sut/player-state player-state
-                    sut/metro (fn ([] 10.5) ([b] (* b 1000)))
+      (with-redefs [player/player-state player-state
+                    player/metro (fn ([] 10.5) ([b] (* b 1000)))
                     ov/metro-bpm (constantly 120)
                     ov/apply-at (fn [ms func & args]
                                   (swap! mock-calls
@@ -79,8 +82,8 @@
   (testing "play! with single argument defaults to :main"
     (let [player-state (atom {:playing? false :patterns {} :loops #{}})
           mock-calls (atom [])]
-      (with-redefs [sut/player-state player-state
-                    sut/metro (fn ([] 10.5) ([b] (* b 1000)))
+      (with-redefs [player/player-state player-state
+                    player/metro (fn ([] 10.5) ([b] (* b 1000)))
                     ov/metro-bpm (constantly 120)
                     ov/apply-at (fn [ms func & args]
                                   (swap! mock-calls
@@ -100,8 +103,8 @@
   (testing "play! does not schedule loop if already running"
     (let [player-state (atom {:playing? true :patterns {} :loops #{:existing}})
           mock-calls (atom [])]
-      (with-redefs [sut/player-state player-state
-                    sut/metro (constantly 0)
+      (with-redefs [player/player-state player-state
+                    player/metro (constantly 0)
                     ov/metro-bpm (constantly 120)
                     ov/apply-at (fn [& _] (swap! mock-calls conj :called))
                     ov/apply-by (fn [& _] (swap! mock-calls conj :called))]
@@ -111,20 +114,20 @@
   (testing "sine-synth triggers correctly"
     (let [player-state (atom {:playing? true :patterns {} :loops #{}})
           mock-calls (atom [])]
-      (with-redefs [sut/player-state player-state
-                    sut/metro (fn ([] 10.5) ([b] (* b 1000)))
+      (with-redefs [player/player-state player-state
+                    player/metro (fn ([] 10.5) ([b] (* b 1000)))
                     ov/apply-at (fn [ms func & args]
                                   (swap! mock-calls
                                     conj {:func func :args args}))
                     ov/apply-by (fn [& _] nil)
-                    sut/trigger-event (fn [key ev b d]
-                                        (swap! mock-calls
-                                          conj {:event ev
-                                                :sound (get-in ev [:params
-                                                                   :sound])}))]
+                    player/trigger-event (fn [key ev b d]
+                                           (swap! mock-calls
+                                             conj {:event ev
+                                                   :sound (get-in ev [:params
+                                                                      :sound])}))]
         (sut/play! :sine (-> (sut/note [:c4]) (sut/s [:sine-synth])))
         ;; Simulate the loop running one iteration
-        (sut/play-loop :sine 12.0)
+        (player/play-loop :sine 12.0)
         (let [trigger-call (first (filter :event @mock-calls))]
           (is (= :sine-synth (:sound trigger-call))))))))
 
@@ -174,15 +177,15 @@
     (let [mock-calls (atom [])]
       (with-redefs [ov/apply-at (fn [& _] (swap! mock-calls
                                             conj :log-called))
-                    sut/at-metro (fn [beat synth-var args]
-                                   (swap! mock-calls
-                                     conj :at-metro-called))
-                    sut/resolve-synth (constantly
-                                        (fn [& _]
-                                          (swap! mock-calls
-                                            conj :synth-called)))
+                    player/at-metro (fn [beat synth-var args]
+                                      (swap! mock-calls
+                                        conj :at-metro-called))
+                    synths/resolve-synth (constantly
+                                           (fn [& _]
+                                             (swap! mock-calls
+                                               conj :synth-called)))
                     ov/metro-bpm (constantly 120)
-                    sut/metro (constantly 0)]
+                    player/metro (constantly 0)]
         (testing "active event is triggered"
           (reset! mock-calls [])
           (sut/trigger-event :test-key (sut/->Event 0 1 {:sound :bd :active (constantly 1)}) 0 1)

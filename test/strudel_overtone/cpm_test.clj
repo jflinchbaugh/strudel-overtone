@@ -1,14 +1,15 @@
 (ns strudel-overtone.cpm-test
   (:require [clojure.test :refer :all]
             [strudel-overtone.strudel-overtone :as sut]
+            [strudel-overtone.player :as player]
             [overtone.core :as ov]))
 
 (deftest cpm-test
   (testing "cpm updates metro bpm with 4x multiplier"
     (let [bpm-atom (atom 120)]
-      (with-redefs [sut/metro (fn [& args]
-                                (when (= :bpm (first args))
-                                  (reset! bpm-atom (second args))))
+      (with-redefs [player/metro (fn [& args]
+                                   (when (= :bpm (first args))
+                                     (reset! bpm-atom (second args))))
                     ov/metro-bpm (fn [_] @bpm-atom)]
         ;; Test setting CPM
         (sut/cpm 30)
@@ -28,7 +29,7 @@
                          (empty? args) current-beat
                          (number? (first args)) (* (first args) 1000) ;; map beat to fake ms
                          (= :bpm (first args)) (reset! bpm-atom (second args))))]
-      (with-redefs [sut/metro mock-metro
+      (with-redefs [player/metro mock-metro
                     ov/metro-bpm (fn [_] @bpm-atom)
                     ov/apply-at (fn [time func]
                                   (swap! tasks conj {:time time :func func}))]

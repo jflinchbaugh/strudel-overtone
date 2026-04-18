@@ -1,16 +1,17 @@
 (ns strudel-overtone.legato-test
   (:require [clojure.test :refer :all]
             [strudel-overtone.strudel-overtone :as sut]
+            [strudel-overtone.player :as player]
             [overtone.core :as ov]))
 
 (deftest legato-param-test
   (testing "legato scales the step duration"
     (let [mock-calls (atom [])]
       (with-redefs [ov/metro-bpm (constantly 120)
-                    sut/metro (constantly 0)
+                    player/metro (constantly 0)
                     ov/apply-at (fn [& _] nil)
-                    sut/at-metro (fn [beat synth-var args] 
-                                   (swap! mock-calls conj (apply hash-map args)))]
+                    player/at-metro (fn [beat synth-var args] 
+                                      (swap! mock-calls conj (apply hash-map args)))]
         
         (testing "legato 1.0 (default)"
           (reset! mock-calls [])

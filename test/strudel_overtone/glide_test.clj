@@ -1,17 +1,19 @@
 (ns strudel-overtone.glide-test
   (:require [clojure.test :refer :all]
             [strudel-overtone.strudel-overtone :as sut]
+            [strudel-overtone.player :as player]
+            [strudel-overtone.synths :as synths]
             [overtone.core :as ov]))
 
 (deftest glide-logic-test
   (testing "trigger-event tracks last-freq and provides slide-from"
     (let [player-state (atom {:playing? true :patterns {} :loops #{} :last-freq {}})
           trigger-calls (atom [])]
-      (with-redefs [sut/player-state player-state
+      (with-redefs [player/player-state player-state
                     ov/metro-bpm (constantly 120)
-                    sut/metro (constantly 0)
+                    player/metro (constantly 0)
                     overtone.core/apply-at (fn [ms func & _] (func))
-                    sut/trigger-single-event (fn [key ev params beat dur-beats voice-idx]
+                    player/trigger-single-event (fn [key ev params beat dur-beats voice-idx]
                                                (swap! trigger-calls conj params))]
 
         (testing "first note has slide-from matching its own frequency (no glide)"
@@ -25,14 +27,14 @@
               ;; mock at a lower level. Let's mock at-metro instead to see the final args.
               ))))
 
-      (with-redefs [strudel-overtone.strudel-overtone/player-state player-state
+      (with-redefs [player/player-state player-state
                     overtone.core/metro-bpm (constantly 120)
-                    strudel-overtone.strudel-overtone/metro (constantly 0)
+                    player/metro (constantly 0)
                     overtone.core/apply-at (fn [ms func & _] (func))
-                    strudel-overtone.strudel-overtone/resolve-synth (constantly (fn [& _] nil))
-                    strudel-overtone.strudel-overtone/at-metro (fn [beat synth-var args]
+                    synths/resolve-synth (constantly (fn [& _] nil))
+                    player/at-metro (fn [beat synth-var args]
                                                                 (swap! trigger-calls conj (apply hash-map args)))
-                    strudel-overtone.strudel-overtone/at-metro-mono (fn [beat key voice-idx synth-var args]
+                    player/at-metro-mono (fn [beat key voice-idx synth-var args]
                                                                      (swap! trigger-calls conj (apply hash-map args)))]
 
         (testing "first note has slide-from matching its own frequency (no glide)"
@@ -56,3 +58,4 @@
               (is (= 0.2 (:slide args)))
               (is (= prev-freq (:slide-from args)))
               (is (= (ov/midi->hz (ov/note :g3)) (get-in @player-state [:last-freq [:p1 0]]))))))))))
+

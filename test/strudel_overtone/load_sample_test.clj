@@ -1,6 +1,7 @@
 (ns strudel-overtone.load-sample-test
   (:require [clojure.test :refer :all]
             [strudel-overtone.strudel-overtone :as sut]
+            [strudel-overtone.samples :as samples]
             [overtone.core :as ov]))
 
 (deftest load-sample-return-value-test
@@ -14,8 +15,8 @@
 
 (deftest sample-info-test
   (let [buf {:duration 10.0 :n-channels 2 :rate 44100.0 :path "path" :size 441000}]
-    (with-redefs [sut/samples (atom {:test buf})
-                  sut/sample-slices (atom {})]
+    (with-redefs [samples/samples (atom {:test buf})
+                  samples/sample-slices (atom {})]
       (testing "info for regular sample"
         (let [info (sut/sample-info :test)]
           (is (= :sample (:type info)))
@@ -31,3 +32,4 @@
 
       (testing "non-existent sample"
         (is (nil? (sut/sample-info :nope)))))))
+

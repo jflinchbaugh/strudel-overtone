@@ -1,6 +1,7 @@
 (ns strudel-overtone.freesound-test
   (:require [clojure.test :refer :all]
             [strudel-overtone.strudel-overtone :as sut]
+            [strudel-overtone.samples :as samples]
             [overtone.core :as ov]))
 
 (deftest load-freesound-return-value-test

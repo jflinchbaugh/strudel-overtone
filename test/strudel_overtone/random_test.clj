@@ -1,6 +1,9 @@
 (ns strudel-overtone.random-test
   (:require [clojure.test :refer :all]
             [strudel-overtone.strudel-overtone :as sut]
+            [strudel-overtone.player :as player]
+            [strudel-overtone.synths :as synths]
+            [strudel-overtone.pattern :as p]
             [overtone.core :as ov]))
 
 (defn approx= [a b]
@@ -8,20 +11,20 @@
 
 (deftest repeatable-rand-test
   (testing "repeatable-rand is deterministic"
-    (sut/seed! 123)
-    (let [r1 (#'sut/repeatable-rand 1.0 :amp)
-          r2 (#'sut/repeatable-rand 1.0 :amp)
-          r3 (#'sut/repeatable-rand 1.1 :amp)
-          r4 (#'sut/repeatable-rand 1.0 :pan)]
+    (p/seed! 123)
+    (let [r1 (@#'p/repeatable-rand 1.0 :amp)
+          r2 (@#'p/repeatable-rand 1.0 :amp)
+          r3 (@#'p/repeatable-rand 1.1 :amp)
+          r4 (@#'p/repeatable-rand 1.0 :pan)]
       (is (= r1 r2))
       (is (not= r1 r3))
       (is (not= r1 r4))))
 
   (testing "seed! changes the result"
-    (sut/seed! 123)
-    (let [r1 (#'sut/repeatable-rand 1.0 :amp)]
-      (sut/seed! 456)
-      (let [r2 (#'sut/repeatable-rand 1.0 :amp)]
+    (p/seed! 123)
+    (let [r1 (@#'p/repeatable-rand 1.0 :amp)]
+      (p/seed! 456)
+      (let [r2 (@#'p/repeatable-rand 1.0 :amp)]
         (is (not= r1 r2))))))
 
 (deftest srand-stream-test
@@ -105,11 +108,11 @@
   (testing "trigger-event resolves stream functions for numeric params"
     (let [mock-calls (atom [])]
       (with-redefs [ov/apply-at (fn [& _] (swap! mock-calls conj :log-called))
-                    sut/at-metro (fn [beat synth-var args]
-                                   (swap! mock-calls conj {:beat beat :args (apply hash-map args)}))
-                    sut/resolve-synth (constantly (fn [& _] nil))
+                    player/at-metro (fn [beat synth-var args]
+                                      (swap! mock-calls conj {:beat beat :args (apply hash-map args)}))
+                    synths/resolve-synth (constantly (fn [& _] nil))
                     ov/metro-bpm (constantly 120)
-                    sut/metro (constantly 0)]
+                    player/metro (constantly 0)]
         (sut/seed! 0)
         (let [ev (sut/->Event 0 1 {:sound "saw" :amp (sut/srand 0.5 0.6)})]
           (sut/trigger-event :test-key ev 10.0 1)
@@ -121,11 +124,11 @@
   (testing "trigger-event resolves stream functions for sound param"
     (let [mock-calls (atom [])]
       (with-redefs [ov/apply-at (fn [& _] (swap! mock-calls conj :log-called))
-                    sut/at-metro (fn [beat synth-var args]
-                                   (swap! mock-calls conj {:beat beat :synth synth-var}))
-                    sut/resolve-synth (fn [s] (when (= s "kick") (fn [& _] nil)))
+                    player/at-metro (fn [beat synth-var args]
+                                      (swap! mock-calls conj {:beat beat :synth synth-var}))
+                    synths/resolve-synth (fn [s] (when (= s "kick") (fn [& _] nil)))
                     ov/metro-bpm (constantly 120)
-                    sut/metro (constantly 0)]
+                    player/metro (constantly 0)]
         (sut/seed! 0)
         ;; choose that returns "kick"
         (let [ev (sut/->Event 0 1 {:sound (sut/choose ["kick" "kick"])})]
