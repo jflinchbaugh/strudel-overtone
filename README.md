@@ -12,7 +12,7 @@ making it look a little like Strudel.
 * In Emacs:
   * Start emacs
   * _connect_ to the running repl
-  * evaluate all of `strudel-overtone/strudel-overtone.clj`
+  * evaluate all of `strudel-overtone.core.clj`
   * you should be connected and ready to go!
 
 ## Running tests

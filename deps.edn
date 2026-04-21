@@ -4,8 +4,8 @@
         tick/tick {:mvn/version "1.0"}
         overtone/overtone {:mvn/version "0.16.3331"}}
  :aliases
- {:run-m {:main-opts ["-m" "strudel-overtone.strudel-overtone"]}
-  :run-x {:ns-default strudel-overtone.strudel-overtone
+ {:run-m {:main-opts ["-m" "strudel-overtone.core"]}
+  :run-x {:ns-default strudel-overtone.core
           :exec-fn greet
           :exec-args {:name "Clojure"}}
   :build {:deps {io.github.clojure/tools.build {:mvn/version "0.10.12"}}

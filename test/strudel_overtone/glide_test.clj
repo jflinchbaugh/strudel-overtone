@@ -1,6 +1,6 @@
 (ns strudel-overtone.glide-test
   (:require [clojure.test :refer :all]
-            [strudel-overtone.strudel-overtone :as sut]
+            [strudel-overtone.core :as sut]
             [strudel-overtone.player :as player]
             [strudel-overtone.synths :as synths]
             [overtone.core :as ov]))
@@ -39,7 +39,7 @@
 
         (testing "first note has slide-from matching its own frequency (no glide)"
           (reset! trigger-calls [])
-          (let [pat (-> (sut/note [:c3]) (sut/s :saw) (sut/glide 0.1))
+          (let [pat (-> (sut/note [:c3]) (sut/s :saw) (sut/mono) (sut/glide 0.1))
                 ev (first (:events pat))
                 freq (ov/midi->hz (ov/note :c3))]
             (sut/trigger-event :p1 ev 0 1)
@@ -50,7 +50,7 @@
 
         (testing "second note has slide-from matching first note"
           (reset! trigger-calls [])
-          (let [pat (-> (sut/note [:g3]) (sut/s :saw) (sut/glide 0.1))
+          (let [pat (-> (sut/note [:g3]) (sut/s :saw) (sut/mono) (sut/glide 0.1))
                 ev (first (:events pat))
                 prev-freq (ov/midi->hz (ov/note :c3))]
             (sut/trigger-event :p1 ev 4 1)

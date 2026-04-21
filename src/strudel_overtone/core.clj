@@ -1,4 +1,4 @@
-(ns strudel-overtone.strudel-overtone
+(ns strudel-overtone.core
   (:require [overtone.core :as ov]
             [taoensso.telemere :as tel]
             [strudel-overtone.pattern :as p]
@@ -197,3 +197,39 @@
 (defn -main [& args]
   (ov/connect-server)
   (tel/log! :info {:studel-overtone :ready}))
+
+(comment
+
+  ;; Play a bassline
+  (play! :bass (-> (note [:c2 :g2]) (s :saw) (gain 0.5)))
+
+  (stop!)
+
+  ;; Layer drums on top (aligned)
+  (play! :sd
+         (->
+          (s [:sine])
+          (note :a2)
+          (fast 16)
+          (gain 1.0)
+          (pan (srand -1 1))))
+
+  (play! :hh
+         (->
+          (s [:sine])
+          (note :a4)
+          (fast 32)
+          (gain (overlay [0.2 0.5 0.3 0.8]))
+          (pan (sine 0.1 -1 1))))
+
+  (stop! :sd)
+
+  ;; Change tempo
+  (cpm 140)
+  (glide-cpm 80 4)
+
+  ;; Monophonic example
+  (play! :mono (-> (note [:c3 :e3 :g3 :b3]) (s :saw) (mono) (glide 0.1) (fast 2)))
+
+  (stop!)
+)

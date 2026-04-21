@@ -1,7 +1,7 @@
 (ns strudel-overtone.slice-test
   (:require [clojure.test :refer :all]
-            [strudel-overtone.strudel-overtone :as sut]
-            [strudel-overtone.strudel-overtone-test :as sut-test]
+            [strudel-overtone.core :as sut]
+            [strudel-overtone.core-test :as sut-test]
             [strudel-overtone.player :as player]
             [strudel-overtone.samples :as samples]
             [strudel-overtone.synths :as synths]

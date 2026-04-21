@@ -1,6 +1,6 @@
 (ns strudel-overtone.random-song
   (:require [overtone.core :as ov]
-            [strudel-overtone.strudel-overtone :refer :all]))
+            [strudel-overtone.core :refer :all]))
 
 (comment
   (seed! 42) ;; Set a seed for repeatable randomness

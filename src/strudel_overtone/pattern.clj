@@ -111,40 +111,95 @@
 
 (defn- tau [t] (* 2 Math/PI t))
 
-(defn sine
-  "Returns a continuous sine wave signal (0 to 1)."
-  [t _]
-  (+ 0.5 (* 0.5 (Math/sin (tau t)))))
-
-(defn saw
-  "Returns a continuous sawtooth wave signal (0 to 1)."
-  [t _]
-  (mod t 1))
-
-(defn tri
-  "Returns a continuous triangle wave signal (0 to 1)."
-  [t _]
-  (let [x (mod t 1)]
-    (if (< x 0.5)
-      (* 2 x)
-      (- 2 (* 2 x)))))
-
-(defn square
-  "Returns a continuous square wave signal (0 to 1)."
-  [t _]
-  (if (< (mod t 1) 0.5) 1 0))
-
-(defn cosine
-  "Returns a continuous cosine wave signal (0 to 1)."
-  [t _]
-  (+ 0.5 (* 0.5 (Math/cos (tau t)))))
-
 (defn sig-range
   "Wraps a signal function to scale its output to [low, high]."
   [sig low high]
   (fn [t seed]
     (let [v (sig t seed)]
       (+ low (* v (- high low))))))
+
+(defn sine
+  "Returns a continuous sine wave signal (0 to 1).
+   Multi-arity:
+   [] -> function [t _] returning sine at freq 1
+   [t _] -> value at time t
+   [freq] -> function [t _] returning sine at freq
+   [freq low high] -> function [t _] returning sine at freq scaled to [low, high]"
+  ([] (sine 1))
+  ([t _]
+   (+ 0.5 (* 0.5 (Math/sin (tau t)))))
+  ([freq]
+   (fn [t _]
+     (sine (* t freq) nil)))
+  ([freq low high]
+   (sig-range (sine freq) low high)))
+
+(defn saw
+  "Returns a continuous sawtooth wave signal (0 to 1).
+   Multi-arity:
+   [] -> function [t _] returning saw at freq 1
+   [t _] -> value at time t
+   [freq] -> function [t _] returning saw at freq
+   [freq low high] -> function [t _] returning saw at freq scaled to [low, high]"
+  ([] (saw 1))
+  ([t _]
+   (mod t 1))
+  ([freq]
+   (fn [t _]
+     (saw (* t freq) nil)))
+  ([freq low high]
+   (sig-range (saw freq) low high)))
+
+(defn tri
+  "Returns a continuous triangle wave signal (0 to 1).
+   Multi-arity:
+   [] -> function [t _] returning tri at freq 1
+   [t _] -> value at time t
+   [freq] -> function [t _] returning tri at freq
+   [freq low high] -> function [t _] returning tri at freq scaled to [low, high]"
+  ([] (tri 1))
+  ([t _]
+   (let [x (mod t 1)]
+     (if (< x 0.5)
+       (* 2 x)
+       (- 2 (* 2 x)))))
+  ([freq]
+   (fn [t _]
+     (tri (* t freq) nil)))
+  ([freq low high]
+   (sig-range (tri freq) low high)))
+
+(defn square
+  "Returns a continuous square wave signal (0 to 1).
+   Multi-arity:
+   [] -> function [t _] returning square at freq 1
+   [t _] -> value at time t
+   [freq] -> function [t _] returning square at freq
+   [freq low high] -> function [t _] returning square at freq scaled to [low, high]"
+  ([] (square 1))
+  ([t _]
+   (if (< (mod t 1) 0.5) 1 0))
+  ([freq]
+   (fn [t _]
+     (square (* t freq) nil)))
+  ([freq low high]
+   (sig-range (square freq) low high)))
+
+(defn cosine
+  "Returns a continuous cosine wave signal (0 to 1).
+   Multi-arity:
+   [] -> function [t _] returning cosine at freq 1
+   [t _] -> value at time t
+   [freq] -> function [t _] returning cosine at freq
+   [freq low high] -> function [t _] returning cosine at freq scaled to [low, high]"
+  ([] (cosine 1))
+  ([t _]
+   (+ 0.5 (* 0.5 (Math/cos (tau t)))))
+  ([freq]
+   (fn [t _]
+     (cosine (* t freq) nil)))
+  ([freq low high]
+   (sig-range (cosine freq) low high)))
 
 ;; --- Mini-notation Parser ---
 
@@ -666,14 +721,6 @@
                          new-rel-t (- 1.0 rel-t d)]
                      (assoc e :time (+ cycle-idx new-rel-t))))
                  evs))))
-
-(defn jux
-  "Juxtaposes the pattern with a transformed version,
-   panning one left and the other right."
-  [f pattern]
-  (let [left (-> pattern (pan -1))
-        right (-> pattern f (pan 1))]
-    (update left :events concat (:events right))))
 
 (defn sometimes
   "Randomly applies function f to the pattern with 50% probability per cycle."

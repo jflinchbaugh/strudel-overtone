@@ -1,6 +1,6 @@
 (ns strudel-overtone.params-test
   (:require [clojure.test :refer :all]
-            [strudel-overtone.strudel-overtone :as sut]
+            [strudel-overtone.core :as sut]
             [strudel-overtone.player :as player]
             [strudel-overtone.synths :as synths]
             [overtone.core :as ov]))

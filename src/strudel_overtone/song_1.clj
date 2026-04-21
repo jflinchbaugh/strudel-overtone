@@ -1,6 +1,6 @@
 (ns strudel-overtone.song-1
   (:require [overtone.core :as ov]
-            [strudel-overtone.strudel-overtone :refer :all]))
+            [strudel-overtone.core :refer :all]))
 
 (comment
   (cpm)
@@ -46,8 +46,8 @@
          (swing 0/3)
          (duck 0.9))
    :pad (->
-         (note [:c3 [:b2 :c3 :d2]])
-         (mono)
+          (note [:c3 [:b2 :c3 :d2]])
+          (mono)
          (fast 1)
          (s [#{:mooger}])
          (resonance 3)

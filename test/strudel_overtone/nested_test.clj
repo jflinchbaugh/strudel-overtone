@@ -1,6 +1,6 @@
 (ns strudel-overtone.nested-test
   (:require [clojure.test :refer :all]
-            [strudel-overtone.strudel-overtone :as sut]))
+            [strudel-overtone.core :as sut]))
 
 (defn approx= [a b]
   (< (abs (- a b)) 0.01))

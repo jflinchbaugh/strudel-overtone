@@ -167,15 +167,17 @@
             synth-key (synths/get-synth-name base params)
             synth-var (or (synths/resolve-synth synth-key) (synths/resolve-synth base))
             freq (when n (resolve-note (+ (if (keyword? n) (ov/note n) n) note-offset)))
+            default-freq (if (synths/percussive-synths base) 65.406 440.0)
+            effective-freq (or freq default-freq)
             last-f (get-in @player-state [:last-freq [key voice-idx]])
-            has-glide (and (pos? slide) last-f freq)
-            effective-slide-from (if has-glide last-f (or freq 440))
+            has-glide (and monophonic (pos? slide) last-f freq)
+            effective-slide-from (if has-glide last-f effective-freq)
             effective-slide-time (if has-glide (min sustain-sec (* slide cycle-sec)) 0.001)
             reserved #{:sound :note :active :start :duration :env :add :swing :slide :legato :monophonic :gate}
             handled #{:amp :lpf :sustain :freq :slide-from :gate :monophonic}
             args (cond-> (reduce-kv (fn [acc k v] (if (or (reserved k) (handled k)) acc (conj acc k v))) [] params)
                    true (conj :amp amp)
-                   true (conj :freq (or freq 440))
+                   true (conj :freq effective-freq)
                    lpf (conj :lpf lpf)
                    sustain-sec (conj :sustain sustain-sec)
                    true (conj :slide effective-slide-time)
@@ -214,7 +216,7 @@
          params (resolve-params raw-params param-beat)
          active (get params :active 1)
          active? (if (number? active) (not (zero? active)) active)]
-     (when active?
+     (if active?
        (let [n (:note params)]
          (cond
            (and (sequential? n) (not (string? n)))
@@ -227,7 +229,13 @@
              (trigger-event key (assoc-in ev [:params :note] note) beat dur-beats idx))
 
            :else
-           (trigger-single-event key ev params beat dur-beats voice-idx)))))))
+           (trigger-single-event key ev params beat dur-beats voice-idx)))
+       ;; Deactivated event: If it was monophonic, we should gate off any existing instance
+       (when-let [existing (get-in @player-state [:active-synths [key voice-idx]])]
+         (ov/apply-at (metro beat)
+                      (fn [& _]
+                        (gate-off (:inst existing))
+                        (swap! player-state update :active-synths dissoc [key voice-idx]))))))))
 
 (defn apply-swing [t amount step-size]
   (let [step-idx (long (/ t step-size))]

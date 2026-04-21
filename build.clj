@@ -4,7 +4,7 @@
 
 (def lib 'net.clojars.strudel-overtone/strudel-overtone)
 (def version "0.1.0-SNAPSHOT")
-(def main 'strudel-overtone.strudel-overtone)
+(def main 'strudel-overtone.core)
 (def class-dir "target/classes")
 
 (defn test "Run all the tests." [opts]

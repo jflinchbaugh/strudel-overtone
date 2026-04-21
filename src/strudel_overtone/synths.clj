@@ -219,12 +219,17 @@
                                    :action ov/FREE))
                     perc-defaults))))
 
-(def-strudel-synth kick [freq 60]
-  (ov/sin-osc (ov/line:kr (* 2 freq) freq 0.1)))
+(def-strudel-synth kick [freq 50]
+  (let [f-env (ov/line:kr (* 8 freq) freq 0.02)
+        click (* 0.5 (ov/env-gen (ov/perc 0.001 0.01)) (ov/white-noise))
+        body (ov/sin-osc f-env)]
+    (ov/tanh (* 2.5 (+ body click)))))
 
 (def-strudel-synth snare [freq 200]
-  (let [noise (ov/white-noise)]
-    (+ (* 0.5 (ov/sin-osc freq)) (* 0.8 noise))))
+  (let [noise (ov/white-noise)
+        body (ov/sin-osc (ov/line:kr (* 2 freq) freq 0.05))]
+    (+ (* 0.4 body (ov/env-gen (ov/perc 0.001 0.1)))
+       (* 0.8 noise))))
 
 (def-strudel-synth hat [freq 8000]
   (ov/white-noise))
@@ -354,19 +359,17 @@
           string (ov/comb-l burst 0.1 delay-time (ov/lin-lin coef -1 1 0.1 10))]
       string)))
 
-(def-strudel-synth dub-kick [freq 80]
-  (let [lpf-env (ov/perc 0.001 1 freq -20)
-        amp-env (ov/perc 0.001 1 1 -8)
-        osc-env (ov/perc 0.001 1 freq -8)
-        noiz (ov/lpf (ov/white-noise) (+ (ov/env-gen:kr lpf-env) 20))
-        snd (ov/lpf (ov/sin-osc (+ (ov/env-gen:kr osc-env) 20)) 200)]
-    (* (+ noiz snd) (ov/env-gen amp-env :action ov/NO-ACTION))))
+(def-strudel-synth dub-kick [freq 45]
+  (let [f-env (ov/line:kr (* 4 freq) freq 0.05)
+        body (ov/sin-osc f-env)
+        noiz (* 0.2 (ov/env-gen (ov/perc 0.01 0.2)) (ov/white-noise))]
+    (ov/tanh (* 2.0 (+ body noiz)))))
 
-(def-strudel-synth dance-kick [freq 80]
-  (let [freq-env (ov/env-gen (ov/perc 0.001 0.1))
-        snd (ov/sin-osc (+ freq (* freq-env 200)))
-        click (ov/lpf (ov/white-noise) (+ 500 (* freq-env 2000)))]
-    (+ snd (* 0.3 click))))
+(def-strudel-synth dance-kick [freq 60]
+  (let [f-env (ov/line:kr (* 12 freq) freq 0.03)
+        click (* 0.8 (ov/env-gen (ov/perc 0.001 0.02)) (ov/pink-noise))
+        body (ov/sin-osc f-env)]
+    (ov/tanh (* 5.0 (+ body click)))))
 
 (def-strudel-synth sampler [buf 0 rate 1 begin 0 end 1 loop? 0 attack 0 release 0]
   (let [rate-s (* rate (ov/buf-rate-scale buf))

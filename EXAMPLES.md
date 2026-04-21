@@ -26,7 +26,6 @@ Modify the timing and structure of your loops.
 *   `slow n`: Slows down the pattern by factor n.
 *   `rev`: Reverses the events within a cycle.
 *   `ribbon offset len`: Loops a specific segment of a pattern.
-*   `jux func`: Applies a function to the right channel only.
 *   `sometimes func`: Randomly applies a function to events.
 
 ## 3. Modular Synths
