@@ -218,3 +218,9 @@
           slow-pat (sut/slow pat 2)
           cycles-fn (:cycles slow-pat)]
       (is (== 0.5 (cycles-fn 0 :cycles)))))))
+
+(deftest def-additive-test
+  (testing "def-additive! macro defines expected synths"
+    (sut/def-additive! :test-organ [1.0 0.5])
+    (is (some? (ns-resolve 'strudel-overtone.synths 'test-organ-adsr)))
+    (is (some? (ns-resolve 'strudel-overtone.synths 'test-organ-perc)))))

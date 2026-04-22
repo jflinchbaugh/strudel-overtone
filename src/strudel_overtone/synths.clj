@@ -1,6 +1,9 @@
 (ns strudel-overtone.synths
   (:require [overtone.core :as ov]
-            [strudel-overtone.pattern :as p]))
+            [strudel-overtone.pattern :as p]
+            [overtone.sc.ugen-collide :as coll])
+  (:refer-clojure :exclude [+ - * / < > <= >= min max abs])
+  (:refer overtone.sc.ugen-collide :only [+ - * / < > <= >= min max abs]))
 
 (defmacro s-max [min-val val]
   `(ov/clip ~val ~min-val 20000))
@@ -48,161 +51,168 @@
                                            (fn [acc k v]
                                              (conj acc k v))
                                            [] final-args-map)]
-                       `(ov/defsynth ~(symbol (str (clojure.core/name name) suffix))
-                          ~final-args-vec
-                          (let [;; Smoothed parameters for mono mode
-                                ~'lpf ~(varlag-param 'lpf)
-                                ~'resonance ~(varlag-param 'resonance)
-                                ~'amp ~(varlag-param 'amp)
-                                ~'pan ~(varlag-param 'pan)
-                                ~'hpf ~(varlag-param 'hpf)
-                                ~'bpf ~(varlag-param 'bpf)
-                                ~'crush ~(varlag-param 'crush)
-                                ~'distort ~(varlag-param 'distort)
-                                ~'fshift ~(varlag-param 'fshift)
-                                ~'pshift ~(varlag-param 'pshift)
+                       `(do
+                          (ov/defsynth ~(symbol (str (clojure.core/name name) suffix))
+                            ~final-args-vec
+                            (let [;; Smoothed parameters for mono mode
+                                  ~'lpf ~(varlag-param 'lpf)
+                                  ~'resonance ~(varlag-param 'resonance)
+                                  ~'amp ~(varlag-param 'amp)
+                                  ~'pan ~(varlag-param 'pan)
+                                  ~'hpf ~(varlag-param 'hpf)
+                                  ~'bpf ~(varlag-param 'bpf)
+                                  ~'crush ~(varlag-param 'crush)
+                                  ~'distort ~(varlag-param 'distort)
+                                  ~'fshift ~(varlag-param 'fshift)
+                                  ~'pshift ~(varlag-param 'pshift)
 
-                                ~'env ~env-gen-form
-                                ;; Trigger Sidechain
-                                _# (let [trig-env# (ov/env-gen
-                                                    (ov/perc
-                                                     ~'duck-attack
-                                                     ~'duck-release)
-                                                    :level-scale
-                                                    ~'duck-trigger)]
-                                     (ov/out:kr duck-bus trig-env#))
-                                ;; Read Sidechain
-                                ~'duck-env (ov/in:kr duck-bus)
-                                ~'amp-duck (ov/clip
-                                            (~'- 1 (~'* ~'duck ~'duck-env))
-                                            0 1)
-                                ~'snd (do ~@body)
-                                ;; Effect Chain
-                                ;; Pitch Shift bypass
-                                ~'ps (let [~'use-ps (~'> (ov/absdif ~'pshift 0)
+                                  ~'env ~env-gen-form
+                                  ;; Trigger Sidechain
+                                  _# (let [trig-env# (ov/env-gen
+                                                      (ov/perc
+                                                       ~'duck-attack
+                                                       ~'duck-release)
+                                                      :level-scale
+                                                      ~'duck-trigger)]
+                                       (ov/out:kr duck-bus trig-env#))
+                                  ;; Read Sidechain
+                                  ~'duck-env (ov/in:kr duck-bus)
+                                  ~'amp-duck (ov/clip
+                                              (- 1 (* ~'duck ~'duck-env))
+                                              0 1)
+                                  ~'snd (do ~@body)
+                                  ;; Effect Chain
+                                    ;; Pitch Shift bypass
+                                    ~'ps (let [~'use-ps (> (ov/absdif ~'pshift 0)
+                                                           0.01)
+                                               ~'ps-sig (ov/pitch-shift
+                                                         ~'snd 0.2
+                                                         (ov/pow 2
+                                                                 (/ ~'pshift 12)))]
+                                           (ov/x-fade2
+                                            ~'snd
+                                            ~'ps-sig
+                                            (ov/lin-lin ~'use-ps 0 1 -1 1)))
+
+                                    ;; Freq Shift bypass
+                                    ~'fs (let [~'use-fs (>
+                                                         (ov/absdif ~'fshift 0)
                                                          0.01)
-                                           ~'ps-sig (ov/pitch-shift
-                                                     ~'snd 0.2
-                                                     (ov/pow 2
-                                                             (~'/ ~'pshift 12)))]
-                                       (ov/x-fade2
-                                        ~'snd
-                                        ~'ps-sig
-                                        (ov/lin-lin ~'use-ps 0 1 -1 1)))
+                                               ~'fs-sig (ov/freq-shift ~'ps ~'fshift)]
+                                           (ov/x-fade2
+                                            ~'ps
+                                            ~'fs-sig
+                                            (ov/lin-lin ~'use-fs 0 1 -1 1)))
 
-                                ;; Freq Shift bypass
-                                ~'fs (let [~'use-fs (~'>
-                                                     (ov/absdif ~'fshift 0)
-                                                     0.01)
-                                           ~'fs-sig (ov/freq-shift ~'ps ~'fshift)]
-                                       (ov/x-fade2
-                                        ~'ps
-                                        ~'fs-sig
-                                        (ov/lin-lin ~'use-fs 0 1 -1 1)))
+                                    ~'trem (let [~'dry ~'fs
+                                                 ~'wet (* ~'dry
+                                                          (ov/lin-lin
+                                                           (ov/sin-osc:kr
+                                                            ~'tremolo-hz)
+                                                           -1 1
+                                                           (- 1 ~'tremolo-depth)
+                                                           1))]
+                                             (ov/x-fade2
+                                              ~'dry
+                                              ~'wet
+                                              (ov/lin-lin
+                                               (> ~'tremolo-depth 0)
+                                               0 1 -1 1)))
 
-                                ~'trem (let [~'dry ~'fs
-                                             ~'wet (~'* ~'dry
-                                                        (ov/lin-lin
-                                                         (ov/sin-osc:kr
-                                                          ~'tremolo-hz)
-                                                         -1 1
-                                                         (~'- 1 ~'tremolo-depth)
-                                                         1))]
-                                         (ov/x-fade2
-                                          ~'dry
-                                          ~'wet
-                                          (ov/lin-lin
-                                           (~'> ~'tremolo-depth 0)
-                                           0 1 -1 1)))
+                                    ~'phs (let [~'dry ~'trem
+                                                ~'wet (ov/allpass-n
+                                                       ~'dry 0.02
+                                                       (ov/lin-lin
+                                                        (ov/sin-osc:kr ~'phaser-hz)
+                                                        -1 1 0.001 0.01)
+                                                       0.1)]
+                                            (ov/x-fade2
+                                             ~'dry
+                                             ~'wet
+                                             (ov/lin-lin ~'phaser-depth 0 1 -1 1)))
 
-                                ~'phs (let [~'dry ~'trem
-                                            ~'wet (ov/allpass-n
-                                                   ~'dry 0.02
-                                                   (ov/lin-lin
-                                                    (ov/sin-osc:kr ~'phaser-hz)
-                                                    -1 1 0.001 0.01)
-                                                   0.1)]
-                                        (ov/x-fade2
-                                         ~'dry
-                                         ~'wet
-                                         (ov/lin-lin ~'phaser-depth 0 1 -1 1)))
+                                    ~'filt (ov/hpf ~'phs (s-max 20 ~'hpf))
+                                    ~'filt (let [~'bpf-sig (ov/bpf
+                                                            ~'filt
+                                                            (s-max 20 ~'bpf)
+                                                            1)]
+                                             (ov/x-fade2
+                                              ~'filt
+                                              ~'bpf-sig
+                                              (ov/lin-lin
+                                               (> ~'bpf 0)
+                                               0 1 -1 1)))
+                                    ~'filt (ov/rlpf
+                                            ~'filt
+                                            (s-max 20 ~'lpf)
+                                            ~'resonance)
 
-                                ~'filt (ov/hpf ~'phs (s-max 20 ~'hpf))
-                                ~'filt (let [~'bpf-sig (ov/bpf
-                                                        ~'filt
-                                                        (s-max 20 ~'bpf)
-                                                        1)]
-                                         (ov/x-fade2
-                                          ~'filt
-                                          ~'bpf-sig
-                                          (ov/lin-lin
-                                           (~'> ~'bpf 0)
-                                           0 1 -1 1)))
-                                ~'filt (ov/rlpf
-                                        ~'filt
-                                        (s-max 20 ~'lpf)
-                                        ~'resonance)
+                                    ~'dst (ov/distort
+                                           (* ~'filt
+                                              (ov/dbamp (* ~'distort 24))))
 
-                                ~'dst (ov/distort
-                                       (~'* ~'filt
-                                            (ov/dbamp (~'* ~'distort 24))))
+                                    ;; Decimator bypass - critical for ringing
+                                    ~'crs (let [~'dry ~'dst
+                                                ~'wet (ov/decimator
+                                                       ~'dry
+                                                       (ov/lin-lin
+                                                        ~'crush 0 1 44100 2000)
+                                                       (ov/lin-lin
+                                                        ~'crush 0 1 24 4))]
+                                          (ov/x-fade2
+                                           ~'dry
+                                           ~'wet
+                                           (ov/lin-lin
+                                            (> ~'crush 0)
+                                            0 1 -1 1)))
 
-                                ;; Decimator bypass - critical for ringing
-                                ~'crs (let [~'dry ~'dst
-                                            ~'wet (ov/decimator
-                                                   ~'dry
-                                                   (ov/lin-lin
-                                                    ~'crush 0 1 44100 2000)
-                                                   (ov/lin-lin
-                                                    ~'crush 0 1 24 4))]
-                                        (ov/x-fade2
-                                         ~'dry
-                                         ~'wet
-                                         (ov/lin-lin
-                                          (~'> ~'crush 0)
-                                          0 1 -1 1)))
+                                    ~'gated (* ~'crs ~'env)
+                                    ~'dly (let [~'dry ~'gated
+                                                ~'wet (+ ~'dry
+                                                         (ov/comb-n
+                                                          ~'dry 0.5
+                                                          (s-max 0.0001 ~'delay)
+                                                          (*
+                                                           ~'delay
+                                                           ~'repeats)))]
+                                            (ov/x-fade2
+                                             ~'dry
+                                             ~'wet
+                                             (ov/lin-lin
+                                              (> ~'delay 0)
+                                              0 1 -1 1)))
 
-                                ~'gated (~'* ~'crs ~'env)
-                                ~'dly (let [~'dry ~'gated
-                                            ~'wet (~'+ ~'dry
-                                                       (ov/comb-n
-                                                        ~'dry 0.5
-                                                        (s-max 0.0001 ~'delay)
-                                                        (~'*
-                                                         ~'delay
-                                                         ~'repeats)))]
-                                        (ov/x-fade2
-                                         ~'dry
-                                         ~'wet
-                                         (ov/lin-lin
-                                          (~'> ~'delay 0)
-                                          0 1 -1 1)))
+                                    ~'reverbed (ov/free-verb
+                                                ~'dly
+                                                ~'room
+                                                ~'room-size
+                                                ~'damp)
+                                    _# (ov/detect-silence
+                                        ~'reverbed
+                                        :amp 0.0001
+                                        :time 0.2
+                                        :action ov/FREE)
+                                    ~'actual-pan (+
+                                                  ~'pan
+                                                  (let [~'mod (*
+                                                               (ov/sin-osc:kr ~'pan-hz)
+                                                               ~'pan-depth)]
+                                                    (*
+                                                     ~'mod
+                                                     (> ~'pan-depth 0))))]
+                                (ov/out 0
+                                        (ov/pan2
+                                         (*
+                                          (ov/mix [~'reverbed])
+                                          ~'amp
+                                          ~'amp-duck)
+                                         ~'actual-pan))))
+                          (let [synth-var# (var ~(symbol (str (clojure.core/name name) suffix)))]
+                            (when-not (= *ns* (find-ns 'strudel-overtone.synths))
+                              (intern 'strudel-overtone.synths
+                                      (quote ~(symbol (str (clojure.core/name name) suffix)))
+                                      synth-var#))))))]
 
-                                ~'reverbed (ov/free-verb
-                                            ~'dly
-                                            ~'room
-                                            ~'room-size
-                                            ~'damp)
-                                _# (ov/detect-silence
-                                    ~'reverbed
-                                    :amp 0.0001
-                                    :time 0.2
-                                    :action ov/FREE)
-                                ~'actual-pan (~'+
-                                              ~'pan
-                                              (let [~'mod (~'*
-                                                           (ov/sin-osc:kr ~'pan-hz)
-                                                           ~'pan-depth)]
-                                                (~'*
-                                                 ~'mod
-                                                 (~'> ~'pan-depth 0))))]
-                            (ov/out 0
-                                    (ov/pan2
-                                     (~'*
-                                      (ov/mix [~'reverbed])
-                                      ~'amp
-                                      ~'amp-duck)
-                                     ~'actual-pan))))))]
     `(do
        ~(make-synth "-adsr"
                     `(let [auto-gate# (ov/line:kr 1 0 ~'sustain)
@@ -218,6 +228,20 @@
                                    :gate effective-gate#
                                    :action ov/FREE))
                     perc-defaults))))
+
+(defmacro def-additive!
+  "Defines a new additive synth from a sequence of harmonic volume ratios.
+   The resulting synth will be named `name` (e.g. :my-synth) and
+   will have the usual strudel-overtone parameters available."
+  [name ratios]
+  (let [ratios-val (if (vector? ratios) ratios (eval ratios))]
+    `(def-strudel-synth ~name [~'freq 440]
+       (with-glide ~'freq
+         (ov/mix
+          (map-indexed
+           (fn [i# r#]
+             (* r# (ov/sin-osc (* ~'actual-f (inc i#)))))
+           ~ratios-val))))))
 
 (def-strudel-synth kick [freq 50]
   (let [f-env (ov/line:kr (* 8 freq) freq 0.02)
@@ -396,6 +420,6 @@
     (keyword (str (clojure.core/name base) "-" (clojure.core/name env)))))
 
 (defn resolve-synth [name]
-  (if-let [ns (find-ns 'strudel-overtone.synths)]
-    (ns-resolve ns (symbol (clojure.core/name name)))
-    nil))
+  (let [s (symbol (clojure.core/name name))]
+    (when-let [ns (find-ns 'strudel-overtone.synths)]
+      (ns-resolve ns s))))

@@ -60,13 +60,40 @@ Load and slice your own samples.
 *   **`overlay`**: Apply a parameter pattern without splitting the base rhythm.
 *   **`mono` & `glide`**: Enable monophonic mode with legato portamento.
 *   **`duck` & `duck-trigger`**: Easy sidechain compression.
+*   **`env`**: Choose between `:adsr` (default for melodic) and `:perc` (default for drums) envelopes.
+*   **`def-additive!`**: Define custom additive synths using harmonic ratios.
+
+### Envelope Examples
+
+Every synth supports both ADSR and Percussive envelopes. You can shape your sound using parameters like `attack`, `decay`, `s-level`, `release`, `sustain`, and `legato`.
 
 ```clojure
-;; Overlay gain without breaking long pads
-(-> (note (repeat 4 :c3)) (s :saw) (gain (overlay [1 0.5 0.8])))
+;; 1. Slow ADSR Lead (Pads)
+(play! :pad (-> (note [#{:c3 :e3 :g3}])
+                (s :saw)
+                (attack 1.0)   ; 1 second fade in
+                (release 2.0)  ; 2 second fade out
+                (legato 1.0))) ; Hold for the full rhythmic duration
 
-;; Mono glide
-(-> (note [:c3 :e3]) (mono) (glide 0.1) (s :saw))
+;; 2. Percussive Pluck (forced percussive mode)
+(play! :pluck (-> (note [:c4 :eb4 :g4])
+                  (s :tb303)
+                  (env :perc)     ; Force percussive envelope
+                  (attack 0.001)  ; Sharp attack
+                  (sustain 0.1)   ; Fast decay
+                  (lpf 1000)))
+
+;; 3. Snappy Drums
+(play! :drums (-> (s [:kick :hh :sd :hh])
+                  (sustain 0.05))) ; Make all drum hits very short and tight
+```
+
+```clojure
+;; Define a custom additive organ
+(def-additive! :organ [1.0 0.5 0.33 0.25])
+
+;; Play it
+(play! :melody (-> (note [:c3 :e3 :g3]) (s :organ) (attack 0.5)))
 ```
 
 ## 6. Playback Control

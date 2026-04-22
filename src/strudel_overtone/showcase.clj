@@ -2,33 +2,61 @@
   (:require [overtone.core :as ov]
             [strudel-overtone.core :refer :all]))
 
-(stop!)
-
 (comment
+  (stop!)
+
+  (playing)
+
+  ;; 0. Additive synth
+  (def-additive! :organ [1.0 0.5 0.33 0.25 0.1 0.1])
+
+  (play! :add (-> (note [:c3 :e3 :g3 :b3])
+                (s :organ)
+                (fast 2)
+                (env :perc)
+                (gain (overlay [0.2 0.4 0.2]))
+                (lpf 1200)))
+
+  ;; 0b. Envelopes (ADSR vs Percussive)
+  ;; ADSR Lead (default lead behavior)
+  (play! :adsr-lead (-> (note [:c4 :eb4 :g4 :c5])
+                        (s :saw)
+                        (attack 0.5)
+                        (release 1.0)
+                        (gain 0.1)))
+
+  ;; Percussive Pluck (forcing percussive mode on a melodic synth)
+  (play! :pluck (-> (note [:c4 :eb4 :g4 :c5])
+                    (s :tri)
+                    (env :perc)
+                    (attack 0.001)
+                    (sustain 0.08)
+                    (gain 0.6)))
+
   ;; 1. Simple Beat with Vectors
   (play! :drums (-> (s [:kick [:snare :snare] :kick :snare])
                   (note [:c2])
-                    (gain 0.8)
-                    (duck-trigger 1)))
+                  (gain 0.8)
+                  (duck-trigger 1)))
 
   ;; 2. Acid Bassline (Mono with Glide)
   (play! :bass (-> (note [:c2 [:c2 :eb2] :g2 :_])
-                   (s :tb303)
-                   (mono)
-                   (glide 0.05)
-                   (lpf (sine 4 500 2000))
-                   (resonance 0.8)
-                   (gain 0.6)
-                   (duck 0.8)))
+                 (s :tb303)
+                 (mono)
+                 (glide 0.05)
+                 (lpf (sine 4 500 2000))
+                 (resonance 0.8)
+                 (gain 0.6)
+                 (duck 0.8)))
 
   ;; 3. Shimmering Plucks (Functional Randomness)
   (play! :plucks (-> (note (choose-n 8 (ov/chord :c5 :major7)))
-                     (s :ks-stringer)
-                     (fast 2)
-                     (pan (srand -1 1))
-                     (room 0.6)
-                     (echo-delay 0.25)
-                     (gain 0.6)))
+                   (s :ks-stringer)
+                   (fast 2)
+                   (pan (srand -1 1))
+                   (room 0.6)
+                   (echo-delay 0.25)
+                   (gain 0.6)))
 
   ;; 4. Atmospheric Pad (Overlay)
   (play! :pad (-> (note [#{:c3 :e3 :g3 :b3}])

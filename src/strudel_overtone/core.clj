@@ -124,6 +124,9 @@
 (def stop! player/stop!)
 
 ;; --- Synths Re-exports ---
+(defmacro def-additive! [name ratios]
+  `(synths/def-additive! ~name ~ratios))
+
 (def get-synth-name synths/get-synth-name)
 (def resolve-synth synths/resolve-synth)
 
