@@ -7,193 +7,80 @@
             [strudel-overtone.player :as player])
   (:import [strudel_overtone.pattern Event Pattern Overlay]))
 
+(defmacro import-vars
+  "Imports multiple vars from a namespace or alias, preserving metadata (docstrings, arglists)."
+  [ns-alias-or-sym & syms]
+  (let [ns-obj (or (find-ns ns-alias-or-sym)
+                   (get (ns-aliases *ns*) ns-alias-or-sym))]
+    `(do
+       ~@(for [s syms]
+           (let [v (ns-resolve ns-obj s)
+                 m (meta v)
+                 clean-m (select-keys m [:doc :arglists])
+                 orig-sym (symbol (str (ns-name ns-obj)) (str s))]
+             `(do
+                (def ~s ~orig-sym)
+                (alter-meta! (var ~s) merge '~clean-m)))))))
+
 ;; --- Pattern Engine Re-exports ---
 
 ;; Randomness
-(def seed! p/seed!)
-(def irand p/irand)
-(def srand p/srand)
-(def repeatable-rand p/repeatable-rand)
-(def choose p/choose)
-(def wchoose p/wchoose)
-(def choose-n p/choose-n)
-(def rtake p/rtake)
+(import-vars p
+             seed! irand srand repeatable-rand choose wchoose choose-n rtake)
 
 ;; Signals
-(def sine p/sine)
-(def saw p/saw)
-(def tri p/tri)
-(def square p/square)
-(def cosine p/cosine)
-(def sig-range p/sig-range)
+(import-vars p
+             sine saw tri square cosine sig-range)
 
 ;; Pattern records & builders
-(defn ->Event [time duration params] (p/->Event time duration params))
-(defn ->Pattern [events cycles delay-cycles length] (p/->Pattern events cycles delay-cycles length))
-(defn ->Overlay [val] (p/->Overlay val))
-(def make-pattern p/make-pattern)
-(def parse-mini p/parse-mini)
-(def with-param p/with-param)
-(def set-param p/set-param)
-(def overlay p/overlay)
+(import-vars p
+             ->Event ->Pattern ->Overlay make-pattern parse-mini
+             with-param set-param overlay)
 
 ;; DSL Modifiers
-(def s p/s)
-(def simul p/simul)
-(def note p/note)
-(def gain p/gain)
-(def swing p/swing)
-(def duck p/duck)
-(def duck-trigger p/duck-trigger)
-(def duck-attack p/duck-attack)
-(def duck-release p/duck-release)
-(def lpf p/lpf)
-(def pan p/pan)
-(def resonance p/resonance)
-(def attack p/attack)
-(def decay p/decay)
-(def s-level p/s-level)
-(def sustain p/sustain)
-(def legato p/legato)
-(def monophonic p/monophonic)
-(def mono p/mono)
-(def release p/release)
-(def width p/width)
-(def carrier-ratio p/carrier-ratio)
-(def modulator-ratio p/modulator-ratio)
-(def mod-index p/mod-index)
-(def detune p/detune)
-(def add p/add)
-(def chaos p/chaos)
-(def coef p/coef)
-(def crush p/crush)
-(def distort p/distort)
-(def hpf p/hpf)
-(def bpf p/bpf)
-(def room p/room)
-(def room-size p/room-size)
-(def damp p/damp)
-(def vibrato p/vibrato)
-(def echo-delay p/echo-delay)
-(def echo-repeats p/echo-repeats)
-(def rate p/rate)
-(def speed p/speed)
-(def pshift p/pshift)
-(def fshift p/fshift)
-(def tremolo-hz p/tremolo-hz)
-(def tremolo-depth p/tremolo-depth)
-(def pan-hz p/pan-hz)
-(def pan-depth p/pan-depth)
-(def phaser-hz p/phaser-hz)
-(def phaser-depth p/phaser-depth)
-(def begin p/begin)
-(def end p/end)
-(def looping p/looping)
-(def env p/env)
-(def active p/active)
-(def fast p/fast)
-(def slow p/slow)
-(def early p/early)
-(def late p/late)
-(def ribbon p/ribbon)
-(def rev p/rev)
-(def sometimes p/sometimes)
-(def degrade p/degrade)
-(def delay-cycles p/delay-cycles)
-(def glide p/glide)
+(import-vars p
+             s simul note gain swing duck duck-trigger duck-attack
+             duck-release lpf pan resonance attack decay s-level sustain
+             legato monophonic mono release width carrier-ratio
+             modulator-ratio mod-index detune add chaos coef crush
+             distort hpf bpf room room-size damp vibrato echo-delay
+             echo-repeats rate speed pshift fshift tremolo-hz
+             tremolo-depth pan-hz pan-depth phaser-hz phaser-depth begin
+             end looping env active fast slow early late ribbon rev
+             sometimes degrade delay-cycles glide)
 
 ;; --- Player Re-exports ---
 
-(def metro player/metro)
-(def cpm player/cpm)
-(def glide-cpm player/glide-cpm)
-(def player-state player/player-state)
-(def at-metro player/at-metro)
-(def gate-off player/gate-off)
-(def update-mono-inst player/update-mono-inst)
-(def start-mono-inst player/start-mono-inst)
-(def at-metro-mono player/at-metro-mono)
-(def trigger-event player/trigger-event)
-(def trigger-single-event player/trigger-single-event)
-(def apply-swing player/apply-swing)
-(def cycle-n player/cycle-n)
-(def play-loop player/play-loop)
-(def playing player/playing)
-(def play! player/play!)
-(def play-only! player/play-only!)
-(def stop! player/stop!)
+(import-vars player
+             metro cpm glide-cpm player-state at-metro gate-off
+             update-mono-inst start-mono-inst at-metro-mono
+             trigger-event trigger-single-event apply-swing cycle-n
+             play-loop playing play! play-only! stop!)
 
 ;; --- Synths Re-exports ---
 (defmacro def-additive! [name ratios]
   `(synths/def-additive! ~name ~ratios))
 
-(def get-synth-name synths/get-synth-name)
-(def resolve-synth synths/resolve-synth)
-
-(def kick-adsr synths/kick-adsr)
-(def kick-perc synths/kick-perc)
-(def snare-adsr synths/snare-adsr)
-(def snare-perc synths/snare-perc)
-(def hat-adsr synths/hat-adsr)
-(def hat-perc synths/hat-perc)
-(def clap-adsr synths/clap-adsr)
-(def clap-perc synths/clap-perc)
-(def saw-adsr synths/saw-adsr)
-(def saw-perc synths/saw-perc)
-(def sine-adsr synths/sine-adsr)
-(def sine-perc synths/sine-perc)
-(def square-adsr synths/square-adsr)
-(def square-perc synths/square-perc)
-(def tri-adsr synths/tri-adsr)
-(def tri-perc synths/tri-perc)
-(def fm-adsr synths/fm-adsr)
-(def fm-perc synths/fm-perc)
-(def white-adsr synths/white-adsr)
-(def white-perc synths/white-perc)
-(def pink-adsr synths/pink-adsr)
-(def pink-perc synths/pink-perc)
-(def brown-adsr synths/brown-adsr)
-(def brown-perc synths/brown-perc)
-(def gray-adsr synths/gray-adsr)
-(def gray-perc synths/gray-perc)
-(def clip-adsr synths/clip-adsr)
-(def clip-perc synths/clip-perc)
-(def crackle-adsr synths/crackle-adsr)
-(def crackle-perc synths/crackle-perc)
-(def dust-adsr synths/dust-adsr)
-(def dust-perc synths/dust-perc)
-(def dust2-adsr synths/dust2-adsr)
-(def dust2-perc synths/dust2-perc)
-(def lf-noise0-adsr synths/lf-noise0-adsr)
-(def lf-noise0-perc synths/lf-noise0-perc)
-(def lf-noise1-adsr synths/lf-noise1-adsr)
-(def lf-noise1-perc synths/lf-noise1-perc)
-(def lf-noise2-adsr synths/lf-noise2-adsr)
-(def lf-noise2-perc synths/lf-noise2-perc)
-(def tb303-adsr synths/tb303-adsr)
-(def tb303-perc synths/tb303-perc)
-(def supersaw-adsr synths/supersaw-adsr)
-(def supersaw-perc synths/supersaw-perc)
-(def mooger-adsr synths/mooger-adsr)
-(def mooger-perc synths/mooger-perc)
-(def ks-stringer-adsr synths/ks-stringer-adsr)
-(def ks-stringer-perc synths/ks-stringer-perc)
-(def dub-kick-adsr synths/dub-kick-adsr)
-(def dub-kick-perc synths/dub-kick-perc)
-(def dance-kick-adsr synths/dance-kick-adsr)
-(def dance-kick-perc synths/dance-kick-perc)
-(def sampler-adsr synths/sampler-adsr)
-(def sampler-perc synths/sampler-perc)
+(import-vars synths
+             get-synth-name resolve-synth
+             kick-adsr kick-perc snare-adsr snare-perc hat-adsr hat-perc
+             clap-adsr clap-perc saw-adsr saw-perc sine-adsr sine-perc
+             square-adsr square-perc tri-adsr tri-perc fm-adsr fm-perc
+             white-adsr white-perc pink-adsr pink-perc brown-adsr
+             brown-perc gray-adsr gray-perc clip-adsr clip-perc
+             crackle-adsr crackle-perc dust-adsr dust-perc dust2-adsr
+             dust2-perc lf-noise0-adsr lf-noise0-perc lf-noise1-adsr
+             lf-noise1-perc lf-noise2-adsr lf-noise2-perc tb303-adsr
+             tb303-perc supersaw-adsr supersaw-perc mooger-adsr
+             mooger-perc ks-stringer-adsr ks-stringer-perc
+             dub-kick-adsr dub-kick-perc dance-kick-adsr
+             dance-kick-perc sampler-adsr sampler-perc)
 
 ;; --- Sampling Re-exports ---
 
-(def samples samples/samples)
-(def sample-slices samples/sample-slices)
-(def load-sample! samples/load-sample!)
-(def load-freesound! samples/load-freesound!)
-(def slice-sample! samples/slice-sample!)
-(def slice-sample-ms! samples/slice-sample-ms!)
-(def sample-info samples/sample-info)
+(import-vars samples
+             samples sample-slices load-sample! load-freesound!
+             slice-sample! slice-sample-ms! sample-info)
 
 ;; --- Main / Entry ---
 
