@@ -13,7 +13,7 @@
   (play! :add (-> (note [:c3 :e3 :g3 :b3])
                 (s :organ)
                 (fast 2)
-                (env :perc)
+                (env :adsr)
                 (gain (overlay [0.2 0.4 0.2]))
                 (lpf 1200)))
 
@@ -36,6 +36,7 @@
   ;; 1. Simple Beat with Vectors
   (play! :drums (-> (s [:kick [:snare :snare] :kick :snare])
                   (note [:c2])
+                  (swing 1/9)
                   (gain 0.8)
                   (duck-trigger 1)))
 
