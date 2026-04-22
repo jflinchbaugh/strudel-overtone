@@ -72,11 +72,19 @@
   ;; Requires internet and Freesound API key if applicable,
   ;; but let's assume a sample is loaded.
   (load-freesound! :break 202537) ;; Amen Break
-  (slice-sample! :bd :break 0 0.05)
-  (slice-sample! :sd :break 0.12 0.18)
+  (slice-sample! :amen-bd :break 0 1/34)
 
-  (play! :amen (-> (s [:bd [:bd :bd] :sd [:sd :_]])
-                   (fast 1)
+  (slice-sample! :amen-sd :break 13/200 1/10)
+
+  (play! :amen (-> (s [:amen-sd])
+                 (gain 0.8)))
+
+  (play! :amen (-> (s [:break])
+                 (slow 4)
+                 (gain 0.8)))
+
+  (play! :amen (-> (s [:amen-bd [:amen-bd :amen-bd] :amen-sd [:amen-sd :_]])
+                   (slow 1)
                    (gain 0.8)))
 
   ;; 6. Dynamic Tempo
