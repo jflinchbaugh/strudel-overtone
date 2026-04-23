@@ -27,6 +27,8 @@ Modify the timing and structure of your loops.
 *   `rev`: Reverses the events within a cycle.
 *   `ribbon offset len`: Loops a specific segment of a pattern.
 *   `sometimes func`: Randomly applies a function to events.
+*   `delay-cycles n`: Delays the start of a pattern by n cycles.
+*   `stop-after n`: Automatically stops the pattern after n cycles.
 
 ## 3. Modular Synths
 

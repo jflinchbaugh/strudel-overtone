@@ -36,7 +36,6 @@
   ;; 1. Simple Beat with Vectors
   (play! :drums (-> (s [:kick [:snare :snare] :kick :snare])
                   (note [:c2])
-                  (swing 1/9)
                   (gain 0.8)
                   (duck-trigger 1)))
 
@@ -54,6 +53,8 @@
   (play! :plucks (-> (note (choose-n 8 (ov/chord :c5 :major7)))
                    (s :ks-stringer)
                    (fast 2)
+                   (delay-cycles 0)
+                   (stop-after 2)
                    (pan (srand -1 1))
                    (room 0.6)
                    (echo-delay 0.25)
@@ -62,10 +63,13 @@
   ;; 4. Atmospheric Pad (Overlay)
   (play! :pad (-> (note [#{:c3 :e3 :g3 :b3}])
                   (s :mooger)
-                  (slow 4)
+                  (glide 0.2)
+                  (fast 2)
                   (attack 2)
                   (release 2)
-                  (gain (overlay [0.2 0.4 0.2]))
+                  #_(gain (overlay [0.2 0.4 0.2]))
+                  (gain (sine 1/40 0 1))
+                  (mono)
                   (lpf 1200)))
 
 
@@ -94,5 +98,7 @@
 
   ;; 7. Stop everything
   (stop!)
+
+  (ov/stop)
 
 )

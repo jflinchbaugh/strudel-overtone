@@ -4,7 +4,7 @@
 ;; --- Data Structures ---
 
 (defrecord Event [time duration params])
-(defrecord Pattern [events cycles delay-cycles length])
+(defrecord Pattern [events cycles delay-cycles stop-cycles length])
 (defrecord Overlay [val])
 
 (defn overlay
@@ -17,7 +17,7 @@
   (let [num-cycles (if (seq events)
                      (inc (long (apply max (map :time events))))
                      1)]
-    (->Pattern events (constantly 1) 0 num-cycles)))
+    (->Pattern events (constantly 1) 0 nil num-cycles)))
 
 ;; --- Randomness ---
 
@@ -753,3 +753,8 @@
    Only affects the initial scheduling (when the pattern is first played)."
   [pattern n]
   (assoc pattern :delay-cycles n))
+
+(defn stop-after
+  "Automatically stops the pattern after n cycles."
+  [pattern n]
+  (assoc pattern :stop-cycles n))

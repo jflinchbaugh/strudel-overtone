@@ -25,7 +25,7 @@
             ;; now=10.5. next-quant=12.0. delay=8.0. start-beat=20.0
             (let [call (first @mock-calls)]
               (is (= 20000.0 (:ms call)))
-              (is (= [:p1 20.0] (:args call))))))
+              (is (= [:p1 20.0 20.0] (:args call))))))
 
         (testing "fractional delay (0.5 cycles = 2 beats)"
           (reset! mock-calls [])
@@ -34,7 +34,7 @@
             ;; now=10.5. next-quant=12.0. delay=2.0. start-beat=14.0
             (let [call (first @mock-calls)]
               (is (= 14000.0 (:ms call)))
-              (is (= [:p2 14.0] (:args call))))))
+              (is (= [:p2 14.0 14.0] (:args call))))))
 
         (testing "no delay (default 0)"
           (reset! mock-calls [])
@@ -43,4 +43,4 @@
             ;; now=10.5. next-quant=12.0. delay=0. start-beat=12.0
             (let [call (first @mock-calls)]
               (is (= 12000.0 (:ms call)))
-              (is (= [:p3 12.0] (:args call))))))))))
+              (is (= [:p3 12.0 12.0] (:args call))))))))))

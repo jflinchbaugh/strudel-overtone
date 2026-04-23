@@ -47,7 +47,7 @@
              echo-repeats rate speed pshift fshift tremolo-hz
              tremolo-depth pan-hz pan-depth phaser-hz phaser-depth begin
              end looping env active fast slow early late ribbon rev
-             sometimes degrade delay-cycles glide)
+             sometimes degrade delay-cycles stop-after glide)
 
 ;; --- Player Re-exports ---
 

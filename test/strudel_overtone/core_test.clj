@@ -32,7 +32,7 @@
           ;; 10.5 -> next multiple of 4 is 12.0
           (let [call (first @mock-calls)]
             (is (= 12000.0 (:ms call)))
-            (is (= [:p1 12.0] (:args call)))))
+            (is (= [:p1 12.0 12.0] (:args call)))))
 
         (testing "subsequent loops align to 4-beat cycle (quant = 4)"
           (reset! mock-calls [])
@@ -41,7 +41,7 @@
           ;; 10.5 -> next multiple of 4 is 12.0
           (let [call (first @mock-calls)]
             (is (= 12000.0 (:ms call)))
-            (is (= [:p2 12.0] (:args call))))))))
+            (is (= [:p2 12.0 12.0] (:args call))))))))
 
 (deftest play!-return-value-test
   (testing "play! returns the names of the patterns"
@@ -127,7 +127,7 @@
                                                                       :sound])}))]
         (sut/play! :sine (-> (sut/note [:c4]) (sut/s [:sine-synth])))
         ;; Simulate the loop running one iteration
-        (player/play-loop :sine 12.0)
+        (player/play-loop :sine 12.0 12.0)
         (let [trigger-call (first (filter :event @mock-calls))]
           (is (= :sine-synth (:sound trigger-call))))))))
 

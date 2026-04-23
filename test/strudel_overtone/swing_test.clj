@@ -61,7 +61,7 @@
     (let [tasks (atom [])
           mock-metro (constantly 1000)
           ;; Mock trigger-event to capture the event map it receives
-          mock-trigger-event (fn [key ev beat dur-beats]
+          mock-trigger-event (fn [key ev beat dur-beats vidx]
                                (swap! tasks conj ev))
           
           ;; Define a pattern with swing
@@ -79,7 +79,7 @@
                     ov/metro-bpm (constantly 120)]
         
         ;; Run one loop iteration
-        (sut/play-loop :test 0)
+        (sut/play-loop :test 0 0)
         
         ;; Expect 2 events.
         ;; Event 1: Start 0.0. Even index (0). No swing. Effective = 0.0

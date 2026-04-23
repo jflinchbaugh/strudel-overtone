@@ -20,20 +20,20 @@
         (with-redefs [player/player-state player-state
                       player/metro (fn ([] 0) ([b] (* b 1000)))
                       ov/apply-by (fn [& _] nil)
-                      player/trigger-event (fn [key ev beat dur]
+                      player/trigger-event (fn [key ev beat dur vidx]
                                              (swap! trigger-calls conj (get-in ev [:params :sound])))]
           
           ;; cycle-idx (mod 0 0.5) = 0.0
           ;; schedules t in [0, 0.5)
           ;; plus second iteration starting at 0.5
-          (sut/play-loop :test 0)
+          (sut/play-loop :test 0 0)
           (is (= [:bd :sd :bd :sd] @trigger-calls))
 
           (reset! trigger-calls [])
           ;; beat 2 is cycle 0.5
           ;; but play-loop is quantized to 1-cycle (4 beats) intervals by default
           ;; so let's check beat 4
-          (sut/play-loop :test 4)
+          (sut/play-loop :test 4 0)
           (is (= [:bd :sd :bd :sd] @trigger-calls) "Should repeat in next 1-cycle block"))))))
 
 (deftest ribbon-freezes-randomness-test
@@ -47,19 +47,19 @@
       (with-redefs [player/player-state player-state
                     player/metro (fn ([] 0) ([b] (* b 1000)))
                     ov/apply-by (fn [& _] nil)
-                    player/trigger-event (fn [key ev beat dur]
+                    player/trigger-event (fn [key ev beat dur vidx]
                                            (let [note (get-in ev [:params :note])
                                                  resolved-note (if (fn? note) (note beat :note) note)]
                                              (swap! results conj resolved-note)))]
 
         ;; Play first cycle (beat 0)
-        (sut/play-loop :test 0)
+        (sut/play-loop :test 0 0)
         (let [cycle1 @results]
           (is (= 4 (count cycle1)))
 
           (reset! results [])
           ;; Play second cycle (beat 4)
-          (sut/play-loop :test 4)
+          (sut/play-loop :test 4 0)
           (let [cycle2 @results]
             ;; Should be identical to cycle 1 even though absolute beat changed
             (is (= cycle1 cycle2) "Random notes should be frozen by ribbon"))))))
@@ -75,15 +75,15 @@
       (with-redefs [player/player-state player-state
                     player/metro (fn ([] 0) ([b] (* b 1000)))
                     ov/apply-by (fn [& _] nil)
-                    player/trigger-event (fn [key ev beat dur]
+                    player/trigger-event (fn [key ev beat dur vidx]
                                            (let [pan (get-in ev [:params :pan])
                                                  resolved-pan (if (fn? pan) (pan beat :pan) pan)]
                                              (swap! results conj resolved-pan)))]
 
-        (sut/play-loop :test 0)
+        (sut/play-loop :test 0 0)
         (let [pan1 (first @results)]
           (reset! results [])
-          (sut/play-loop :test 4)
+          (sut/play-loop :test 4 0)
           (let [pan2 (first @results)]
             (is (not= pan1 pan2) "Pan added after ribbon should still be random")))))))
 
