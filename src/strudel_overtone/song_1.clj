@@ -1,6 +1,5 @@
 (ns strudel-overtone.song-1
-  (:require [overtone.core :as ov]
-            [strudel-overtone.core :refer :all]))
+  (:require [strudel-overtone.core :refer :all]))
 
 (comment
   (cpm)
@@ -13,15 +12,16 @@
 
   (play!
    :plucks (->
-            (note (choose-n 8 (ov/chord :c6 :minor7)))
+            (note (choose-n 8 (chord :c6 :minor7)))
             (add 0)
             (ribbon 9 2)
             (room (overlay [0.9 0.6 0.3]))
             (s :ks-stringer)
+            #_(env :adsr)
             #_(echo-delay 0.02)
             (crush (overlay [0.1 0.3 0.6]))
             #_(distort 0.5)
-            #_(release 0.01)
+            (release 0.01)
             #_(pan-hz 1)
             #_(pan-depth 0.9)
             (duck-trigger 1)
@@ -39,7 +39,7 @@
            (s [:- [:snare :snare] :- :snare])
            (slow 1)
            (gain [0.6 0.8])
-           (note (choose-n 2 (ov/chord :e3 :minor))))
+           (note (choose-n 2 (chord :e3 :minor))))
    :hat (->
          (s (map (fn [n] (cons  n [:- :-])) (take 8 (cycle [:hat]))))
          (gain 0.6)

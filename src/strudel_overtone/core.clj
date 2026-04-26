@@ -76,6 +76,14 @@
              dub-kick-adsr dub-kick-perc dance-kick-adsr
              dance-kick-perc sampler-adsr sampler-perc)
 
+;; --- Pitch/Music Re-exports ---
+(import-vars ov
+             chord scale chord-degree invert-chord find-chord
+             find-note-name degree->interval)
+
+(def note->midi ov/note)
+(alter-meta! (var note->midi) merge (select-keys (meta #'ov/note) [:doc :arglists]))
+
 ;; --- Sampling Re-exports ---
 
 (import-vars samples
