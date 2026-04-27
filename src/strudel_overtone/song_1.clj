@@ -89,4 +89,12 @@
 
   (stop!)
 
+  (play! :test (->
+                 (s :snare)
+                 (note [[:b5 :b5 :- :b5 :b5 :b5 :b5 :b5] [:c5 :c5] [:a5 :a5] [:- :c5 :c5]])
+                 #_(perc 0.5 0.1)
+                 (adsr 0.01 0.1 0.9 0.5)
+                 (echo )
+                 ))
+
   .)

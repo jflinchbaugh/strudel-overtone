@@ -341,6 +341,12 @@
         overlay?)
        (with-param pattern key (wrap-number-fn (transform-fn v)))))))
 
+(defn params
+  "Sets multiple parameters at once from a map.
+   Example: (params pat {:attack 0.1 :release 0.5})"
+  [pattern param-map]
+  (reduce-kv (fn [p k v] (set-param p k v)) pattern param-map))
+
 ;; --- DSL Modifiers ---
 
 (defn s
@@ -631,6 +637,40 @@
    n: glide time in cycles (relative to cycle duration)"
   [pattern n]
   (set-param pattern :slide n))
+
+;; --- Grouping Helpers ---
+
+(defn adsr
+  "Sets all ADSR envelope parameters at once.
+   Usage: (adsr pat attack decay sustain-level release)"
+  [pattern attack delay sustain-level release]
+  (params pattern {:env :adsr
+                   :attack attack
+                   :decay delay
+                   :s-level sustain-level
+                   :release release}))
+
+(defn perc
+  "Sets percussive envelope parameters at once.
+   Usage: (perc pat attack sustain)"
+  [pattern attack sustain]
+  (params pattern {:env :perc
+                   :attack attack
+                   :sustain sustain}))
+
+(defn fm
+  "Sets FM synthesis parameters at once.
+   Usage: (fm pat carrier-ratio modulator-ratio mod-index)"
+  [pattern carrier-ratio modulator-ratio mod-index]
+  (params pattern {:carrier-ratio carrier-ratio
+                   :modulator-ratio modulator-ratio
+                   :mod-index mod-index}))
+
+(defn echo
+  "Sets delay/echo parameters at once.
+   Usage: (echo pat delay-time repeats)"
+  [pattern delay repeats]
+  (params pattern {:echo-delay delay :echo-repeats repeats}))
 
 ;; --- Time/Structural Modifiers ---
 

@@ -35,7 +35,7 @@
 ;; Pattern records & builders
 (import-vars p
              ->Event ->Pattern ->Overlay make-pattern parse-mini
-             with-param set-param overlay)
+             with-param set-param params overlay)
 
 ;; DSL Modifiers
 (import-vars p
@@ -47,7 +47,8 @@
              echo-repeats rate speed pshift fshift tremolo-hz
              tremolo-depth pan-hz pan-depth phaser-hz phaser-depth begin
              end looping env active fast slow early late ribbon rev
-             sometimes degrade delay-cycles stop-after glide)
+             sometimes degrade delay-cycles stop-after glide
+             adsr perc fm echo)
 
 ;; --- Player Re-exports ---
 

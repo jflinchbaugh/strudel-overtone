@@ -53,11 +53,10 @@
   (play! :plucks (-> (note (choose-n 8 (ov/chord :c5 :major7)))
                    (s :ks-stringer)
                    (fast 2)
-                   (delay-cycles 0)
-                   (stop-after 2)
                    (pan (srand -1 1))
                    (room 0.6)
-                   (echo-delay 0.25)
+                   (echo-delay 0.55)
+                   (echo-repeats 2)
                    (gain 0.6)))
 
   ;; 4. Atmospheric Pad (Overlay)
