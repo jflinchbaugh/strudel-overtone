@@ -55,8 +55,7 @@
                    (fast 2)
                    (pan (srand -1 1))
                    (room 0.6)
-                   (echo-delay 0.55)
-                   (echo-repeats 2)
+                   (echo 0.7 5)
                    (gain 0.6)))
 
   ;; 4. Atmospheric Pad (Overlay)

@@ -34,9 +34,33 @@
         (is (= 10 ((:mod-index params) 0 :mod-index)))
         (is (= 8 ((:repeats params) 0 :repeats)))))))
 
+(deftest echo-params-test
+  (testing "echo and echo-delay set correct parameters"
+    (let [pat (-> (sut/s [:bd])
+                  (sut/echo-delay 0.25)
+                  (sut/echo-repeats 10))
+          ev (first (:events pat))
+          params (:params ev)]
+      (is (= 0.25 ((:delay params) 0 :delay)))
+      (is (= 10 ((:repeats params) 0 :repeats))))
+
+    (let [pat (-> (sut/s [:bd])
+                  (sut/echo 0.3 5))
+          ev (first (:events pat))
+          params (:params ev)]
+      (is (= 0.3 ((:delay params) 0 :delay)))
+      (is (= 5 ((:repeats params) 0 :repeats))))
+
+    (let [pat (-> (sut/s [:bd])
+                  (sut/echo))
+          ev (first (:events pat))
+          params (:params ev)]
+      (is (= 0.25 ((:delay params) 0 :delay)))
+      (is (= 4 ((:repeats params) 0 :repeats))))))
+
 (deftest trigger-event-params-test
   (testing "trigger-event passes parameters to synth"
-     (let [mock-calls (atom [])]
+    (let [mock-calls (atom [])]
       (with-redefs [ov/metro-bpm (constantly 120)
                     player/metro (constantly 0)
                     ov/apply-at (fn [ms func & args] (swap! mock-calls conj {:func func :args args}))

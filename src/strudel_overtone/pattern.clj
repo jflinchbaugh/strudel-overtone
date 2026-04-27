@@ -669,8 +669,10 @@
 (defn echo
   "Sets delay/echo parameters at once.
    Usage: (echo pat delay-time repeats)"
-  [pattern delay repeats]
-  (params pattern {:echo-delay delay :echo-repeats repeats}))
+  ([pattern] (echo pattern 0.25 4))
+  ([pattern delay] (echo pattern delay 4))
+  ([pattern delay repeats]
+   (params pattern {:delay delay :repeats repeats})))
 
 ;; --- Time/Structural Modifiers ---
 

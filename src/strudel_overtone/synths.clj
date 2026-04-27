@@ -170,7 +170,7 @@
                                     ~'dly (let [~'dry ~'gated
                                                 ~'wet (+ ~'dry
                                                          (ov/comb-n
-                                                          ~'dry 0.5
+                                                          ~'dry 2.0
                                                           (s-max 0.0001 ~'delay)
                                                           (*
                                                            ~'delay
@@ -218,15 +218,13 @@
                     `(let [auto-gate# (ov/line:kr 1 0 ~'sustain)
                            effective-gate# (ov/select:kr ~'monophonic [auto-gate# ~'gate])]
                        (ov/env-gen (ov/adsr ~'attack ~'decay ~'s-level ~'release)
-                                   :gate effective-gate#
-                                   :action ov/FREE))
+                                   :gate effective-gate#))
                     adsr-defaults)
        ~(make-synth "-perc"
                     `(let [auto-gate# (ov/line:kr 1 0 ~'sustain)
                            effective-gate# (ov/select:kr ~'monophonic [auto-gate# ~'gate])]
                        (ov/env-gen (ov/perc ~'attack ~'sustain)
-                                   :gate effective-gate#
-                                   :action ov/FREE))
+                                   :gate effective-gate#))
                     perc-defaults))))
 
 (defmacro def-additive!
