@@ -265,14 +265,17 @@
 
 (defn- make-event-list [pat key transform-fn]
   (let [parsed (parse-mini pat)]
-    (keep (fn [p]
-            (let [v (:value p)
-                  res (wrap-number-fn (transform-fn v))]
-              (when-not (is-rest? v)
-                (->Event (:start p)
-                         (:duration p)
-                         {key res}))))
-          parsed)))
+    (map (fn [p]
+           (let [v (:value p)]
+             (if (is-rest? v)
+               (->Event (:start p)
+                        (:duration p)
+                        {:active 0})
+               (let [res (wrap-number-fn (transform-fn v))]
+                 (->Event (:start p)
+                          (:duration p)
+                          {key res})))))
+         parsed)))
 
 (defn- combine-patterns
   ([base-pat new-pat key] (combine-patterns base-pat new-pat key false))

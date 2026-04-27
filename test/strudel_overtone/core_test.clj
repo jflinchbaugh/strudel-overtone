@@ -156,11 +156,12 @@
 
   (testing "s function with underscores in list"
     (let [pat (sut/s [:bd :_ :sd])]
-      (is (= 2 (count (:events pat))))
+      (is (= 3 (count (:events pat))))
       (is (= :bd (get-in (first (:events pat)) [:params :sound])))
-      (is (= :sd (get-in (second (:events pat)) [:params :sound])))
+      (is (= 0 (get-in (second (:events pat)) [:params :active])))
+      (is (= :sd (get-in (nth (:events pat) 2) [:params :sound])))
       ;; Check timing for the gap: 3 elements, so sd should be at 2/3
-      (is (approx= 0.666 (:time (second (:events pat))))))))
+      (is (approx= 0.666 (:time (nth (:events pat) 2))))))))
 
 (deftest active-test
   (testing "active function marks events as inactive"
@@ -217,7 +218,7 @@
     (let [pat {:cycles (constantly 1)}
           slow-pat (sut/slow pat 2)
           cycles-fn (:cycles slow-pat)]
-      (is (== 0.5 (cycles-fn 0 :cycles)))))))
+      (is (== 0.5 (cycles-fn 0 :cycles))))))
 
 (deftest def-additive-test
   (testing "def-additive! macro defines expected synths"

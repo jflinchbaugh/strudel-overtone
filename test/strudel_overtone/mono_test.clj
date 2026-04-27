@@ -34,5 +34,15 @@
             (sut/trigger-event :p1 ev 1 1)
             (is (= 2 (count @mono-calls)))
             (let [args-map (apply hash-map (:args (second @mono-calls)))]
-              (is (== (double (ov/midi->hz (ov/note :g3))) (double (:freq args-map)))))))))))
+              (is (== (double (ov/midi->hz (ov/note :g3))) (double (:freq args-map)))))))
+
+        (testing "rest triggers gate-off"
+          (let [gate-offs (atom 0)]
+            (with-redefs [player/gate-off (fn [inst] (swap! gate-offs inc))]
+              (let [pat (-> (sut/note [:c3 :-]) (sut/mono))
+                    rest-ev (second (:events pat))]
+                (is (= 0 (get-in rest-ev [:params :active])))
+                (sut/trigger-event :p1 rest-ev 2 1)
+                (is (= 1 @gate-offs))
+                (is (nil? (get-in @player-state [:active-synths [:p1 0]])))))))))))
 
