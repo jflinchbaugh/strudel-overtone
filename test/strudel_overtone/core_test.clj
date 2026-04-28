@@ -9,6 +9,10 @@
 (defn approx= [a b]
   (< (abs (- a b)) 0.01))
 
+(defn active-val [ev]
+  (let [v (get-in ev [:params :active] (constantly 1))]
+    (if (fn? v) (v 0 :active) v)))
+
 (deftest play!-test
   (testing "play! quantization logic"
     (let [player-state (atom {:playing? false :patterns {} :loops #{}})
@@ -158,7 +162,7 @@
     (let [pat (sut/s [:bd :_ :sd])]
       (is (= 3 (count (:events pat))))
       (is (= :bd (get-in (first (:events pat)) [:params :sound])))
-      (is (= 0 (get-in (second (:events pat)) [:params :active])))
+      (is (= 0 (active-val (second (:events pat)))))
       (is (= :sd (get-in (nth (:events pat) 2) [:params :sound])))
       ;; Check timing for the gap: 3 elements, so sd should be at 2/3
       (is (approx= 0.666 (:time (nth (:events pat) 2))))))))
@@ -166,12 +170,12 @@
 (deftest active-test
   (testing "active function marks events as inactive"
     (let [pat (-> (sut/s [:bd :sd]) (sut/active [0 0]))]
-      (is (= 0 ((get-in (first (:events pat)) [:params :active]) 0 :active)))
-      (is (= 0 ((get-in (second (:events pat)) [:params :active]) 0 :active))))
+      (is (= 0 (active-val (first (:events pat)))))
+      (is (= 0 (active-val (second (:events pat))))))
 
     (let [pat (-> (sut/s [:bd :sd]) (sut/active [1 0]))]
-      (is (= 1 ((get-in (first (:events pat)) [:params :active]) 0 :active)))
-      (is (= 0 ((get-in (second (:events pat)) [:params :active]) 0 :active))))))
+      (is (= 1 (active-val (first (:events pat)))))
+      (is (= 0 (active-val (second (:events pat))))))))
 
 (deftest trigger-event-respects-active-test
   (testing "trigger-event respects active parameter"

@@ -237,13 +237,6 @@
 
 ;; --- Core Pattern Builders ---
 
-(defn with-param
-  "Updates pattern events with a specific parameter."
-  [pattern key value]
-  (update pattern :events
-          (fn [evs]
-            (map (fn [e] (assoc-in e [:params key] value)) evs))))
-
 (defn ->name
   [v]
   (cond
@@ -263,6 +256,25 @@
 (defn- wrap-number-fn [v]
   (if (number? v) (constantly v) v))
 
+(defn- is-rest-params? [params]
+  (let [v (get params :active (constantly 1))]
+    (cond
+      (fn? v) (try (zero? (v 0 :active)) (catch Exception _ false))
+      (number? v) (zero? v)
+      :else false)))
+
+(defn with-param
+  "Updates pattern events with a specific parameter.
+   Only applies to active events (not rests)."
+  [pattern key value]
+  (update pattern :events
+          (fn [evs]
+            (map (fn [e]
+                   (if (is-rest-params? (:params e))
+                     e
+                     (assoc-in e [:params key] (wrap-number-fn value))))
+                 evs))))
+
 (defn- make-event-list [pat key transform-fn]
   (let [parsed (parse-mini pat)]
     (map (fn [p]
@@ -270,7 +282,7 @@
              (if (is-rest? v)
                (->Event (:start p)
                         (:duration p)
-                        {:active 0})
+                        {:active (constantly 0)})
                (let [res (wrap-number-fn (transform-fn v))]
                  (->Event (:start p)
                           (:duration p)
@@ -305,7 +317,12 @@
                                                     (and (<= n-start b-start) (< b-start n-end))))
                                                 unrolled-new))]
                        (if match
-                         (assoc-in be [:params key] (get-in match [:params key]))
+                         (let [merged-params (merge (:params be) (:params match))]
+                           (assoc be :params
+                                  (if (or (is-rest-params? (:params be))
+                                          (is-rest-params? (:params match)))
+                                    (assoc merged-params :active (constantly 0))
+                                    merged-params)))
                          be)))
                    base-events)
               (mapcat (fn [be]
@@ -322,11 +339,15 @@
                                          n-end (+ n-start (:duration match))
                                          i-start (max b-start n-start)
                                          i-end (min b-end n-end)
-                                         i-dur (- i-end i-start)]
+                                         i-dur (- i-end i-start)
+                                         merged-params (merge (:params be) (:params match))]
                                      (assoc be
                                             :time i-start
                                             :duration i-dur
-                                            :params (assoc (:params be) key (get-in match [:params key])))))
+                                            :params (if (or (is-rest-params? (:params be))
+                                                            (is-rest-params? (:params match)))
+                                                      (assoc merged-params :active (constantly 0))
+                                                      merged-params))))
                                  matches)
                             [be])))
                       base-events))))))
