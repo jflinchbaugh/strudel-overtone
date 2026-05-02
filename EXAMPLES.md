@@ -91,8 +91,14 @@ Every synth supports both ADSR and Percussive envelopes. You can shape your soun
 ```
 
 ```clojure
-;; Define a custom additive organ
+;; 1. Standard Organ (integer harmonics: 1, 2, 3, 4)
 (def-additive! :organ [1.0 0.5 0.33 0.25])
+
+;; 2. Hollow Sound (odd harmonics: 1, 3, 5, 7)
+(def-additive! :hollow [1.0 0.6 0.4 0.2] :step 2)
+
+;; 3. Metallic/Bell (inharmonic: 1, 2.5, 4, 5.5)
+(def-additive! :bell [1.0 0.8 0.6 0.4] :step 1.5)
 
 ;; Play it
 (play! :melody (-> (note [:c3 :e3 :g3]) (s :organ) (attack 0.5)))

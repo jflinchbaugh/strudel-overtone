@@ -48,7 +48,7 @@
              tremolo-depth pan-hz pan-depth phaser-hz phaser-depth begin
              end looping env active fast slow early late ribbon rev
              sometimes degrade delay-cycles stop-after glide
-             adsr perc fm echo)
+             adsr perc fm echo step)
 
 ;; --- Player Re-exports ---
 
@@ -59,8 +59,8 @@
              play-loop playing play! play-only! stop!)
 
 ;; --- Synths Re-exports ---
-(defmacro def-additive! [name ratios]
-  `(synths/def-additive! ~name ~ratios))
+(defmacro def-additive! [name ratios & opts]
+  `(synths/def-additive! ~name ~ratios ~@opts))
 
 (import-vars synths
              get-synth-name resolve-synth

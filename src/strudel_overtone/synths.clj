@@ -230,15 +230,16 @@
 (defmacro def-additive!
   "Defines a new additive synth from a sequence of harmonic volume ratios.
    The resulting synth will be named `name` (e.g. :my-synth) and
-   will have the usual strudel-overtone parameters available."
-  [name ratios]
+   will have the usual strudel-overtone parameters available.
+   Optionally accepts a :step size between harmonics (defaults to 1)."
+  [name ratios & {:keys [step] :or {step 1}}]
   (let [ratios-val (if (vector? ratios) ratios (eval ratios))]
-    `(def-strudel-synth ~name [~'freq 440]
+    `(def-strudel-synth ~name [~'freq 440 ~'step ~step]
        (with-glide ~'freq
          (ov/mix
           (map-indexed
            (fn [i# r#]
-             (* r# (ov/sin-osc (* ~'actual-f (inc i#)))))
+             (* r# (ov/sin-osc (* ~'actual-f (+ 1 (* i# ~'step))))))
            ~ratios-val))))))
 
 (def-strudel-synth kick [freq 50]

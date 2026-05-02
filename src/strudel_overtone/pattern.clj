@@ -581,6 +581,11 @@
    Values: Number of repeats (e.g. 4). Default is 4."
   [pattern val] (set-param pattern :repeats val))
 
+(defn step
+  "Sets the step parameter, primarily used by additive synths.
+   Determines the spacing between harmonics."
+  [pattern val] (set-param pattern :step val))
+
 (defn rate
   "Sets the playback rate for samples.
    Values: 1.0 (normal), 0.5 (half speed), -1.0 (reverse), etc."
