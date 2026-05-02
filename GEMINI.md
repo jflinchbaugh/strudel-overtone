@@ -8,3 +8,4 @@
 - when introducing new names, avoid conflicting with existing keywords.
   i don't want to need to exclude other names in a namespace,
   so suggest alternate names for my new functionality.
+- always use keyword notes (like :a4) and rests (:-)
