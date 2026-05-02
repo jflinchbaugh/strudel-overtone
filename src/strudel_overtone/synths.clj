@@ -336,20 +336,9 @@
 
 (def-strudel-synth supersaw [freq 440]
   (with-glide freq
-    (let [input (ov/lf-saw actual-f)
-          shift1 (ov/lf-saw 4)
-          shift2 (ov/lf-saw 7)
-          shift3 (ov/lf-saw 5)
-          shift4 (ov/lf-saw 2)
-          comp1 (> input shift1)
-          comp2 (> input shift2)
-          comp3 (> input shift3)
-          comp4 (> input shift4)]
-      (ov/leak-dc:ar
-       (* (- (+ (- input comp1)
-                (- input comp2)
-                (- input comp3)
-                (- input comp4)) input) 0.25)))))
+    (let [detunes [1.0 1.001 0.999 1.005 0.995 1.01 0.99]
+          saws (map #(ov/saw (* actual-f %)) detunes)]
+      (ov/leak-dc:ar (* 0.3 (ov/mix saws))))))
 
 (def-strudel-synth mooger
   [freq 440
