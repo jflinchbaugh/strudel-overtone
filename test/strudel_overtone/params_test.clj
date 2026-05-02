@@ -70,7 +70,9 @@
         (let [pat (-> (sut/note [:c4])
                       (sut/s [:saw])
                       (sut/pan 0.5)
-                      (sut/resonance 0.2))
+                      (sut/resonance 0.2)
+                      (sut/detune 10)
+                      (sut/vibrato 5))
               ev (first (:events pat))]
 
           (sut/trigger-event :test-key ev 0 1)
@@ -82,7 +84,15 @@
             ;; args is a list/vector of keywords and values
             (let [args-map (apply hash-map (first args))]
               (is (= 0.5 (:pan args-map)))
-              (is (= 0.2 (:resonance args-map))))))))))
+              (is (= 0.2 (:resonance args-map)))
+              (is (= 10 (:detune args-map)))
+              (is (= 5 (:vibrato args-map))))))))))
+
+(deftest with-glide-expansion-test
+  (testing "with-glide macro expansion includes detune and vibrato"
+    (let [expansion (macroexpand '(strudel-overtone.synths/with-glide 440 (ov/saw actual-f)))]
+      (is (clojure.string/includes? (str expansion) "detune"))
+      (is (clojure.string/includes? (str expansion) "vibrato")))))
 
 (deftest env-param-test
   (testing "env parameter is combinable"

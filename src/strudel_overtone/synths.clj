@@ -16,13 +16,16 @@
 (defonce duck-bus (ov/control-bus))
 
 (defmacro with-glide [freq & body]
-  `(let [~'actual-f (ov/select:kr ~'monophonic
-                                 [(ov/line:kr ~'slide-from ~freq ~'slide)
-                                  (ov/varlag ~freq ~'slide)])]
+  `(let [~'base-f (ov/select:kr ~'monophonic
+                               [(ov/line:kr ~'slide-from ~freq ~'slide)
+                                (ov/varlag ~freq ~'slide)])
+         ~'detuned-f (* ~'base-f (ov/pow 2 (/ ~'detune 1200)))
+         ~'actual-f (ov/vibrato:kr ~'detuned-f ~'vibrato 0.02)]
      ~@body))
 
 (defmacro def-strudel-synth [name extra-args & body]
   (let [common-args '{amp 1 sustain 0.2 lpf 2000 resonance 0.1 pan 0
+                      detune 0 vibrato 0
                       crush 0 distort 0
                       pshift 0 fshift 0
                       tremolo-hz 0 tremolo-depth 0
@@ -65,6 +68,8 @@
                                   ~'distort ~(varlag-param 'distort)
                                   ~'fshift ~(varlag-param 'fshift)
                                   ~'pshift ~(varlag-param 'pshift)
+                                  ~'detune ~(varlag-param 'detune)
+                                  ~'vibrato ~(varlag-param 'vibrato)
 
                                   ~'env ~env-gen-form
                                   ;; Trigger Sidechain
@@ -260,43 +265,31 @@
 (def-strudel-synth clap [freq 1200]
   (ov/bpf (ov/white-noise) freq resonance))
 
-(def-strudel-synth saw [freq 440 detune 0 vibrato 0]
+(def-strudel-synth saw [freq 440]
   (with-glide freq
-    (let [f-raw (* actual-f (ov/pow 2 (/ detune 1200)))
-          f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
-      (ov/saw f-vib))))
+    (ov/saw actual-f)))
 
-(def-strudel-synth sine [freq 440 detune 0 vibrato 0]
+(def-strudel-synth sine [freq 440]
   (with-glide freq
-    (let [f-raw (* actual-f (ov/pow 2 (/ detune 1200)))
-          f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
-      (ov/sin-osc f-vib))))
+    (ov/sin-osc actual-f)))
 
-(def-strudel-synth square [freq 440 detune 0 vibrato 0 width 0.5]
+(def-strudel-synth square [freq 440 width 0.5]
   (with-glide freq
-    (let [f-raw (* actual-f (ov/pow 2 (/ detune 1200)))
-          f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
-      (ov/pulse f-vib width))))
+    (ov/pulse actual-f width)))
 
-(def-strudel-synth tri [freq 440 detune 0 vibrato 0]
+(def-strudel-synth tri [freq 440]
   (with-glide freq
-    (let [f-raw (* actual-f (ov/pow 2 (/ detune 1200)))
-          f-vib (ov/vibrato:kr f-raw vibrato 0.02)]
-      (ov/lf-tri f-vib))))
+    (ov/lf-tri actual-f)))
 
 (def-strudel-synth fm
   [freq 440
-   detune 0
-   vibrato 0
    carrier-ratio 1
    modulator-ratio 2
    mod-index 5]
   (with-glide freq
-    (let [f-raw (* actual-f (ov/pow 2 (/ detune 1200)))
-          f-vib (ov/vibrato:kr f-raw vibrato 0.02)
-          modulator (ov/sin-osc (* f-vib modulator-ratio))
-          carrier (ov/sin-osc (+ (* f-vib carrier-ratio)
-                                 (* modulator mod-index f-vib)))]
+    (let [modulator (ov/sin-osc (* actual-f modulator-ratio))
+          carrier (ov/sin-osc (+ (* actual-f carrier-ratio)
+                                 (* modulator mod-index actual-f)))]
       carrier)))
 
 (def-strudel-synth white [freq 440] (ov/white-noise))
@@ -310,25 +303,25 @@
    chaos 1.5]
   (ov/crackle chaos))
 
-(def-strudel-synth dust [freq 440 detune 0]
-  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
-    (ov/dust f-raw)))
+(def-strudel-synth dust [freq 440]
+  (with-glide freq
+    (ov/dust actual-f)))
 
-(def-strudel-synth dust2 [freq 440 detune 0]
-  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
-    (ov/dust2 f-raw)))
+(def-strudel-synth dust2 [freq 440]
+  (with-glide freq
+    (ov/dust2 actual-f)))
 
-(def-strudel-synth lf-noise0 [freq 440 detune 0]
-  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
-    (ov/lf-noise0 f-raw)))
+(def-strudel-synth lf-noise0 [freq 440]
+  (with-glide freq
+    (ov/lf-noise0 actual-f)))
 
-(def-strudel-synth lf-noise1 [freq 440 detune 0]
-  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
-    (ov/lf-noise1 f-raw)))
+(def-strudel-synth lf-noise1 [freq 440]
+  (with-glide freq
+    (ov/lf-noise1 actual-f)))
 
-(def-strudel-synth lf-noise2 [freq 440 detune 0]
-  (let [f-raw (* freq (ov/pow 2 (/ detune 1200)))]
-    (ov/lf-noise2 f-raw)))
+(def-strudel-synth lf-noise2 [freq 440]
+  (with-glide freq
+    (ov/lf-noise2 actual-f)))
 
 (def-strudel-synth tb303 [freq 440 wave 1 env-amount 1000]
   (with-glide freq
