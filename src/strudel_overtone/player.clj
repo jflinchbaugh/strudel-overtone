@@ -329,8 +329,8 @@
                                    ev-beat (+ beat (* swung-start cycle-dur))
                                    ev-dur-beats (* rel-dur cycle-dur)]
                                (trigger-event key ev ev-beat ev-dur-beats vidx)))
-                           
-                           ;; After triggering all events at this time, if any are monophonic, 
+
+                           ;; After triggering all events at this time, if any are monophonic,
                            ;; gate off any extra voices that were active from previous events.
                            (let [first-ev (first evs)
                                  raw-mono (get-in first-ev [:params :monophonic] 0)
