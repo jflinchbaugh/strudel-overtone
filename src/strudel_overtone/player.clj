@@ -169,7 +169,8 @@
             sustain-sec (calculate-sustain params sample-buf dur-beats monophonic)
             synth-key (synths/get-synth-name base params)
             synth-var (or (synths/resolve-synth synth-key) (synths/resolve-synth base))
-            freq (when n (resolve-note (+ (if (keyword? n) (ov/note n) n) note-offset)))
+            freq (when (and n (not (p/is-rest? n)))
+                   (resolve-note (+ (if (keyword? n) (ov/note n) n) note-offset)))
             default-freq (if (synths/percussive-synths base) 65.406 440.0)
             effective-freq (or freq default-freq)
             last-f (get-in @player-state [:last-freq [key voice-idx]])
@@ -217,7 +218,9 @@
          ;; Use source-time if available to keep random params stable across ribbon loops
          param-beat (get ev :source-time beat)
          params (resolve-params raw-params param-beat)
-         active? (is-active? (get params :active 1))]
+         active? (and (is-active? (get params :active 1))
+                      (not (p/is-rest? (:note params)))
+                      (not (p/is-rest? (:sound params))))]
      (if active?
        (let [n (:note params)]
          (cond

@@ -88,6 +88,32 @@
               (is (= 10 (:detune args-map)))
               (is (= 5 (:vibrato args-map))))))))))
 
+(deftest note-rests-test
+  (testing "note handles :- and :_ as rests"
+    (let [pat (sut/note [:c3 :- :e3 :_])
+          events (:events pat)]
+      (is (= 4 (count events)))
+      (let [e2 (nth events 1)
+            e4 (nth events 3)
+            active2 ((get-in e2 [:params :active]) 0 :active)
+            active4 ((get-in e4 [:params :active]) 0 :active)]
+        (is (= 0 active2) "middle rest :- should be inactive")
+        (is (= 0 active4) "end rest :_ should be inactive")))))
+
+(deftest trigger-event-rest-test
+  (testing "trigger-event handles rests without MIDI parsing error"
+    (let [mock-calls (atom [])]
+      (with-redefs [ov/metro-bpm (constantly 120)
+                    player/metro (constantly 0)
+                    ov/apply-at (fn [ms func & args] (func))
+                    player/at-metro (fn [beat synth-var args] (swap! mock-calls conj {:func synth-var :args [args]}))
+                    synths/saw-adsr (fn [& args] args)]
+
+        (let [pat (-> (sut/note [:-]) (sut/s [:saw]))
+              ev (first (:events pat))]
+          ;; This should not throw an IllegalArgumentException
+          (is (nil? (sut/trigger-event :test-rest ev 0 1))))))))
+
 (deftest with-glide-expansion-test
   (testing "with-glide macro expansion includes detune and vibrato"
     (let [expansion (macroexpand '(strudel-overtone.synths/with-glide 440 (ov/saw actual-f)))]

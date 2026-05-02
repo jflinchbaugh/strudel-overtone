@@ -244,7 +244,7 @@
     (instance? clojure.lang.Named v) (keyword (name v))
     :else (keyword (str v))))
 
-(defn- is-rest? [v]
+(defn is-rest? [v]
   (#{:- :_} (->name v)))
 
 (defn- try-parse-number [v]
