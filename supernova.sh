@@ -1,20 +1,8 @@
 #!/bin/sh
 
+# Launch supernova
 pw-jack supernova -u 57110 -m 131072 2>&1 > supernova.log &
 supernova_pid=$!
-
-# Auto-connect supernova to system playback
-(
-  sleep 2
-  if command -v jack_connect >/dev/null 2>&1;
-then
-    pw-jack jack_connect supernova:output_1 system:playback_1
-    pw-jack jack_connect supernova:output_2 system:playback_2
-    echo "Connected supernova to system playback."
-  else
-    echo "Warning: 'jack_connect' not found. Please install jack-tools/jack-example-tools or connect manually."
-  fi
-) &
 
 # Start clojure with necessary dependencies
 # and run initialization before starting nREPL
