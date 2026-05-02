@@ -514,6 +514,17 @@
    Values: Semitones (e.g. 12 for +1 octave, -12 for -1 octave)."
   [pattern note-offset] (set-param pattern :add note-offset))
 
+(defn degrees
+  "Maps degree integers to MIDI notes using a scale.
+   degree-vals: a list pattern of integers (1-indexed).
+   Example: (-> (note :c4) (degrees :major [1 3 5 8]))"
+  [pattern scale-name degree-vals]
+  (set-param pattern :note degree-vals
+             (fn [d]
+               (fn [beat _]
+                 (let [root (ov/note (get-in pattern [:params :note] :c4))]
+                   (+ root (ov/degree->interval d scale-name)))))))
+
 (defn chaos
   "Sets the chaos parameter for the Crackle synth.
    Values: 1.0 (steady) to 2.0 (chaotic/crackling)."

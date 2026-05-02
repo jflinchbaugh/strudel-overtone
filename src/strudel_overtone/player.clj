@@ -214,36 +214,43 @@
 (defn trigger-event
   ([key ev beat dur-beats] (trigger-event key ev beat dur-beats 0))
   ([key ev beat dur-beats voice-idx]
-   (let [raw-params (:params ev)
-         ;; Use source-time if available to keep random params stable across ribbon loops
-         param-beat (get ev :source-time beat)
-         params (resolve-params raw-params param-beat)
-         active? (and (is-active? (get params :active 1))
-                      (not (p/is-rest? (:note params)))
-                      (not (p/is-rest? (:sound params))))]
-     (if active?
-       (let [n (:note params)]
-         (cond
-           (and (sequential? n) (not (string? n)))
-           (doseq [[idx note] (map-indexed vector n)]
-             (trigger-event key (assoc-in ev [:params :note] note) beat dur-beats (+ voice-idx idx)))
+   (try
+     (let [raw-params (:params ev)
+           ;; Use source-time if available to keep random params stable across ribbon loops
+           param-beat (get ev :source-time beat)
+           params (resolve-params raw-params param-beat)
+           active? (and (is-active? (get params :active 1))
+                        (not (p/is-rest? (:note params)))
+                        (not (p/is-rest? (:sound params))))]
+       (if active?
+         (let [n (:note params)]
+           (cond
+             (and (sequential? n) (not (string? n)))
+             (doseq [[idx note] (map-indexed vector n)]
+               (trigger-event key (assoc-in ev [:params :note] note)
+                              beat dur-beats (+ voice-idx idx)))
 
-           (set? n)
-           (doseq [[idx note] (map-indexed vector n)]
-             (trigger-event key (assoc-in ev [:params :note] note) beat dur-beats (+ voice-idx idx)))
+             (set? n)
+             (doseq [[idx note] (map-indexed vector n)]
+               (trigger-event key (assoc-in ev [:params :note] note)
+                              beat dur-beats (+ voice-idx idx)))
 
-           :else
-           (trigger-single-event key ev params beat dur-beats voice-idx)))
-       ;; Deactivated event: If it was monophonic, we should gate off any existing instances
-       (let [active-synths (:active-synths @player-state)]
-         (doseq [[k active] active-synths]
-           ;; If top-level voice-idx is 0, we gate off ALL voices for this key.
-           ;; Otherwise we gate off the specific voice (and any nested voices).
-           (when (and (vector? k) (= (first k) key) (or (zero? voice-idx) (>= (second k) voice-idx)))
-             (ov/apply-at (metro beat)
-                          (fn [& _]
-                            (gate-off (:inst active))
-                            (swap! player-state update :active-synths dissoc k))))))))))
+             :else
+             (trigger-single-event key ev params beat dur-beats voice-idx)))
+         ;; Deactivated event: If it was monophonic, we should gate off any existing instances
+         (let [active-synths (:active-synths @player-state)]
+           (doseq [[k active] active-synths]
+             ;; If top-level voice-idx is 0, we gate off ALL voices for this key.
+             ;; Otherwise we gate off the specific voice (and any nested voices).
+             (when (and (vector? k) (= (first k) key) (or (zero? voice-idx) (>= (second k) voice-idx)))
+               (ov/apply-at (metro beat)
+                            (fn [& _]
+                              (gate-off (:inst active))
+                              (swap! player-state update :active-synths dissoc k))))))))
+     (catch Exception e
+       (tel/log! :error {:msg "Error triggering event"
+                         :error (ex-message e)
+                         :event ev})))))
 
 (defn apply-swing [t amount step-size]
   (let [step-idx (long (/ t step-size))]
@@ -268,88 +275,81 @@
                               (update :patterns dissoc key)
                               (update :loops disj key))))))
 
+(defn- schedule-cycle-events [key beat cycle-dur pat cycle-total]
+  (let [events (:events pat)
+        num-cycles (or (:length pat)
+                       (if (seq events)
+                         (inc (long (apply max (map :time events))))
+                         1))
+        num-iterations (if (< num-cycles 1) (long (/ 1 num-cycles)) 1)
+        min-dur (if (seq events) (apply min (map :duration events)) 0.125)]
+    (doseq [i (range num-iterations)]
+      (let [cycle-idx (mod (+ cycle-total i) num-cycles)
+            events-by-time (group-by :time events)]
+        (doseq [[t evs] events-by-time]
+          (when (and (>= t cycle-idx) (< t (min (+ cycle-idx 1.0) num-cycles)))
+            (let [rel-t (- t cycle-idx)
+                  rel-t-iter (+ rel-t (* i num-cycles))]
+              (doseq [[vidx ev] (map-indexed vector evs)]
+                (let [swing-raw (get-in ev [:params :swing] 0)
+                      swing-fn (if (fn? swing-raw) swing-raw (constantly swing-raw))
+                      swing-amount (swing-fn beat :swing)
+                      swung-start (if (zero? swing-amount)
+                                    rel-t-iter
+                                    (apply-swing rel-t-iter swing-amount min-dur))
+                      ev (assoc ev :effective-time swung-start)
+                      rel-dur (:duration ev)
+                      ev-beat (+ beat (* swung-start cycle-dur))
+                      ev-dur-beats (* rel-dur cycle-dur)]
+                  (trigger-event key ev ev-beat ev-dur-beats vidx)))
+
+              (let [first-ev (first evs)
+                    raw-mono (get-in first-ev [:params :monophonic] 0)
+                    mono-fn (if (fn? raw-mono) raw-mono (constantly raw-mono))
+                    monophonic (is-active? (mono-fn beat :monophonic))]
+                (when monophonic
+                  (let [num-voices (count evs)
+                        active-synths (:active-synths @player-state)]
+                    (doseq [[k active] active-synths]
+                      (when (and (vector? k)
+                                 (= (first k) key)
+                                 (>= (second k) num-voices))
+                        (ov/apply-at (metro beat)
+                                     (fn [& _]
+                                       (gate-off (:inst active))
+                                       (swap! player-state update
+                                              :active-synths dissoc k)))))))))))))))
+
 (defn play-loop [key beat start-beat]
   (let [state @player-state]
-    (if (and (:playing? state)
-             (contains? (:loops state) key))
+    (if (and (:playing? state) (contains? (:loops state) key))
       (let [pat (get-in state [:patterns key])]
         (if pat
-          (let [stop-cycles (:stop-cycles pat)
-                elapsed-cycles (/ (- beat start-beat) 4.0)]
-            (if (and stop-cycles (>= (+ elapsed-cycles 0.001) stop-cycles))
-              (stop-pattern! key)
-              (let [cycles-raw (:cycles pat (constantly 1))
-                    cycles-fn (if (fn? cycles-raw) cycles-raw (constantly cycles-raw))
-                    cycles (cycles-fn beat :cycles)
-                    cycle-dur (/ 4 cycles) ;; Beats per cycle (assuming 4/4)
-                    next-beat (+ beat cycle-dur)
-                    events (:events pat)
-                    ;; Determine grid from smallest note duration, default to 1/8 (0.125) if empty
-                    min-dur (if (seq events)
-                              (apply min (map :duration events))
-                              0.125)
-                    ;; Calculate which cycle of the pattern we are on
-                    ;; (Some functions like ribbon create multi-cycle event lists)
-                    num-cycles (or (:length pat)
-                                   (if (seq events)
-                                     (inc (long (apply max (map :time events))))
-                                     1))
-                    ;; Since play-loop is quantized and incremental, we can
-                    ;; rely on beat being a multiple of cycle-dur
-                    cycle-total (Math/round (double (/ beat cycle-dur)))
-                    
-                    ;; If num-cycles is < 1, we might need to play multiple iterations of the pattern
-                    ;; within this one-cycle (cycle-dur) window.
-                    num-iterations (if (< num-cycles 1)
-                                     (long (/ 1 num-cycles))
-                                     1)]
+          (let [next-beat-atom (atom nil)]
+            (try
+              (let [stop-cycles (:stop-cycles pat)
+                    elapsed-cycles (/ (- beat start-beat) 4.0)]
+                (if (and stop-cycles (>= (+ elapsed-cycles 0.001) stop-cycles))
+                  (stop-pattern! key)
+                  (let [cycles-raw (:cycles pat (constantly 1))
+                        cycles-fn (if (fn? cycles-raw)
+                                    cycles-raw
+                                    (constantly cycles-raw))
+                        cycles (cycles-fn beat :cycles)
+                        cycle-dur (/ 4 (if (pos? cycles) cycles 1))
+                        next-beat (+ beat cycle-dur)
+                        cycle-total (Math/round (double (/ beat cycle-dur)))]
+                    (reset! next-beat-atom next-beat)
+                    (schedule-cycle-events key beat cycle-dur pat cycle-total))))
+              (catch Exception e
+                (tel/log! :error {:msg "Error in play-loop"
+                                  :error (ex-message e)})))
 
-                 ;; Schedule events for this cycle
-                 (doseq [i (range num-iterations)]
-                   (let [cycle-idx (mod (+ cycle-total i) num-cycles)
-                         ;; Group events by their start time within the cycle iteration
-                         events-by-time (group-by :time events)]
-                     (doseq [[t evs] events-by-time]
-                       ;; Support fractional pattern lengths by checking the intersection 
-                       ;; of the event's interval with the current cycle block.
-                       (when (and (>= t cycle-idx) (< t (min (+ cycle-idx 1.0) num-cycles)))
-                         (let [rel-t (- t cycle-idx)
-                               ;; offset rel-t by the iteration
-                               rel-t-iter (+ rel-t (* i num-cycles))]
-                           (doseq [[vidx ev] (map-indexed vector evs)]
-                             (let [swing-raw (get-in ev [:params :swing] 0)
-                                   swing-amount (if (fn? swing-raw) (swing-raw beat :swing) swing-raw)
-                                   swung-start (if (zero? swing-amount)
-                                                 rel-t-iter
-                                                 (apply-swing rel-t-iter swing-amount min-dur))
-                                   ;; Assoc effective start time for logging/debugging
-                                   ev (assoc ev :effective-time swung-start)
-
-                                   rel-dur (:duration ev)
-                                   ev-beat (+ beat (* swung-start cycle-dur))
-                                   ev-dur-beats (* rel-dur cycle-dur)]
-                               (trigger-event key ev ev-beat ev-dur-beats vidx)))
-
-                           ;; After triggering all events at this time, if any are monophonic,
-                           ;; gate off any extra voices that were active from previous events.
-                           (let [first-ev (first evs)
-                                 raw-mono (get-in first-ev [:params :monophonic] 0)
-                                 resolved-mono (if (fn? raw-mono) (raw-mono beat :monophonic) raw-mono)
-                                 monophonic (is-active? resolved-mono)]
-                             (when monophonic
-                               (let [num-voices (count evs)
-                                     active-synths (:active-synths @player-state)]
-                                 (doseq [[k active] active-synths]
-                                   (when (and (vector? k) (= (first k) key) (>= (second k) num-voices))
-                                     (ov/apply-at (metro beat) ;; use pattern beat for quantization
-                                                  (fn [& _]
-                                                    (gate-off (:inst active))
-                                                    (swap! player-state update :active-synths dissoc k)))))))))))))
-
-                (ov/apply-by (metro next-beat) #'play-loop [key next-beat start-beat]))))
-          ;; Pattern removed, loop dies
+            (let [nb (or @next-beat-atom (+ beat 4))]
+              (when (and (:playing? @player-state)
+                         (contains? (:loops @player-state) key))
+                (ov/apply-by (metro nb) #'play-loop [key nb start-beat]))))
           (stop-pattern! key)))
-      ;; Stopped, loop dies
       (stop-pattern! key))))
 
 (defn playing
