@@ -1,5 +1,6 @@
 (ns strudel-overtone.additive-showcase
-  (:require [strudel-overtone.core :refer :all]))
+  (:require [strudel-overtone.core :refer :all]
+            [overtone.core :as ov]))
 
 ;; --- Additive Synth Definitions ---
 
@@ -17,7 +18,7 @@
 
 (defn run []
   (stop!)
-  
+
   ;; 1. Bassline using the Organ synth
   (play! :bass
          (-> (note [:c2 :c2 :f1 :g1])
@@ -25,7 +26,7 @@
              (lpf 400)
              (attack 0.05)
              (sustain 0.2)
-             (gain 0.8)))
+             (gain 0.0)))
 
   ;; 2. Hollow melody (Woody/Clarinet-like)
   (play! :melody
@@ -33,6 +34,7 @@
              (s :add-hollow)
              (attack 0.01)
              (sustain 0.1)
+             (detune -50)
              (echo 0.25 5)
              (room 0.3)))
 
@@ -40,20 +42,21 @@
   (play! :accents
          (-> (note [:- :c5 :- :g5])
              (s :add-bell)
-             (attack 0.001)
-             (sustain 0.4)
+             (perc  0.001 0.5)
+             (detune 10)
              (room 0.6)
              (gain 0.6)))
 
   ;; 4. Industrial textural layer
   (play! :texture
-         (-> (note [:c1])
+         (-> (note [:c1 :c1 :c1 :c1])
              (s :add-industrial)
-             (attack 2)
-             (sustain 4)
+             (mono)
+             (vibrato 2)
+             (detune (irand -100 100))
              (lpf 300)
-             (gain 0.4)
-             (slow 4)))
+             (gain 0.3)
+             (slow 1)))
 
   )
 
@@ -61,5 +64,7 @@
   (run)
 
   (stop!)
+
+  (ov/stop)
 
   )
