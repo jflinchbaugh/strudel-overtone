@@ -263,7 +263,12 @@
   (ov/white-noise))
 
 (def-strudel-synth clap [freq 1200]
-  (ov/bpf (ov/white-noise) freq resonance))
+  (let [;; A simpler multi-burst envelope for the clap
+        env (ov/env-gen (ov/envelope [0 1 0 0.9 0 0.8 0]
+                                     [0.005 0.01 0.005 0.01 0.005 0.2]
+                                     -4))
+        noise (ov/white-noise)]
+    (* (ov/hpf noise freq) env)))
 
 (def-strudel-synth saw [freq 440]
   (with-glide freq

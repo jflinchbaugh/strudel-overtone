@@ -8,6 +8,8 @@
 
   (playing)
 
+  (play! :clap (-> (s [:clap :bd :snare]) (fast 1)))
+
   (stop!)
 
   (play!
