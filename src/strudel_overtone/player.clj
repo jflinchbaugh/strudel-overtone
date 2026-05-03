@@ -57,11 +57,12 @@
 (defn- resolve-note [n]
   (ov/midi->hz (ov/note n)))
 
-(defn- resolve-params [params beat]
-  (reduce-kv (fn [m k v]
-               (assoc m k (if (fn? v) (v beat k) v)))
-             {}
-             params))
+(defn resolve-params [params beat cycle]
+  (binding [p/*current-cycle* cycle]
+    (reduce-kv (fn [m k v]
+                 (assoc m k (if (fn? v) (v beat k) v)))
+               {}
+               params)))
 
 (defn- is-active? [v]
   (if (number? v) (not (zero? v)) v))
@@ -212,13 +213,14 @@
                 (at-metro beat synth-var args)))))))))
 
 (defn trigger-event
-  ([key ev beat dur-beats] (trigger-event key ev beat dur-beats 0))
-  ([key ev beat dur-beats voice-idx]
+  ([key ev beat dur-beats] (trigger-event key ev beat dur-beats 0 0))
+  ([key ev beat dur-beats voice-idx] (trigger-event key ev beat dur-beats voice-idx 0))
+  ([key ev beat dur-beats voice-idx cycle]
    (try
      (let [raw-params (:params ev)
            ;; Use source-time if available to keep random params stable across ribbon loops
            param-beat (get ev :source-time beat)
-           params (resolve-params raw-params param-beat)
+           params (resolve-params raw-params param-beat cycle)
            active? (and (is-active? (get params :active 1))
                         (not (p/is-rest? (:note params)))
                         (not (p/is-rest? (:sound params))))]
@@ -228,12 +230,12 @@
              (and (sequential? n) (not (string? n)))
              (doseq [[idx note] (map-indexed vector n)]
                (trigger-event key (assoc-in ev [:params :note] note)
-                              beat dur-beats (+ voice-idx idx)))
+                              beat dur-beats (+ voice-idx idx) cycle))
 
              (set? n)
              (doseq [[idx note] (map-indexed vector n)]
                (trigger-event key (assoc-in ev [:params :note] note)
-                              beat dur-beats (+ voice-idx idx)))
+                              beat dur-beats (+ voice-idx idx) cycle))
 
              :else
              (trigger-single-event key ev params beat dur-beats voice-idx)))
@@ -301,7 +303,7 @@
                       rel-dur (:duration ev)
                       ev-beat (+ beat (* swung-start cycle-dur))
                       ev-dur-beats (* rel-dur cycle-dur)]
-                  (trigger-event key ev ev-beat ev-dur-beats vidx)))
+                  (trigger-event key ev ev-beat ev-dur-beats vidx cycle-total)))
 
               (let [first-ev (first evs)
                     raw-mono (get-in first-ev [:params :monophonic] 0)

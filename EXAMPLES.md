@@ -1,10 +1,13 @@
 # Strudel-Overtone Capabilities & Examples
 
-This project brings Strudel-style live coding to Overtone, using Clojure data structures (vectors and keywords) for patterns with powerful SuperCollider synths.
+This project brings Strudel-style live coding to Overtone, using Clojure
+data structures (vectors and keywords) for patterns with powerful
+SuperCollider synths.
 
 ## 1. Patterns & Structure
 
-Patterns are created using `s` (sound) or `note`. They support nested vectors for subdivision and sets for simultaneous events (chords).
+Patterns are created using `s` (sound) or `note`. They support nested vectors
+for subdivision and sets for simultaneous events (chords).
 
 ```clojure
 ;; Simple beat (vectors for timing)
@@ -25,6 +28,10 @@ Modify the timing and structure of your loops.
 *   `fast n`: Speeds up the pattern by factor n.
 *   `slow n`: Slows down the pattern by factor n.
 *   `rev`: Reverses the events within a cycle.
+*   `alt v1 v2 ...`: Alternates between values cycle-by-cycle.
+*   `slowcat p1 p2 ...`: Concatenates patterns in time (sequential).
+*   `stack p1 p2 ...`: Layers patterns (simultaneous).
+*   `fastcat p1 p2 ...`: Squeezes patterns into a single cycle.
 *   `ribbon offset len`: Loops a specific segment of a pattern.
 *   `sometimes func`: Randomly applies a function to events.
 *   `delay-cycles n`: Delays the start of a pattern by n cycles.
@@ -62,12 +69,15 @@ Load and slice your own samples.
 *   **`overlay`**: Apply a parameter pattern without splitting the base rhythm.
 *   **`mono` & `glide`**: Enable monophonic mode with legato portamento.
 *   **`duck` & `duck-trigger`**: Easy sidechain compression.
-*   **`env`**: Choose between `:adsr` (default for melodic) and `:perc` (default for drums) envelopes.
+*   **`env`**: Choose between `:adsr` (default for melodic)
+               and `:perc` (default for drums) envelopes.
 *   **`def-additive!`**: Define custom additive synths using harmonic ratios.
 
 ### Envelope Examples
 
-Every synth supports both ADSR and Percussive envelopes. You can shape your sound using parameters like `attack`, `decay`, `s-level`, `release`, `sustain`, and `legato`.
+Every synth supports both ADSR and Percussive envelopes. You can shape your
+sound using parameters like `attack`, `decay`, `s-level`, `release`, `sustain`,
+and `legato`.
 
 ```clojure
 ;; 1. Slow ADSR Lead (Pads)
@@ -104,11 +114,25 @@ Every synth supports both ADSR and Percussive envelopes. You can shape your soun
 (play! :melody (-> (note [:c3 :e3 :g3]) (s :organ) (attack 0.5)))
 ```
 
+### Alternating & Combining Patterns
+
+Use `alt` to swap values every cycle, or `slowcat` to chain entire patterns.
+
+```clojure
+;; 1. Alternating sound every cycle
+(play! :beat (s [:bd (alt :sd :cp) :bd :hh]))
+
+;; 2. Concatenating different patterns
+(play! :song (slowcat (s [:bd :sd])
+                      (s [:hh :hh :hh :hh])
+                      (-> (note [:c3 :e3 :g3 :b3]) (s :saw))))
+```
+
 ## 6. Playback Control
 
-*   `play! :name pattern`: Starts/updates a loop.
-*   `play-only! :name pattern`: Stops everything else and plays this.
-*   `stop! :name`: Stops a specific loop.
-*   `stop!`: Stops all music.
-*   `cpm 120`: Sets Cycles Per Minute (default is 4 beats per cycle).
-*   `glide-cpm 80 4`: Smoothly transitions tempo over 4 cycles.
+*   `(play! :name pattern)`: Starts/updates a loop.
+*   `(play-only! :name pattern)`: Stops everything else and plays this.
+*   `(stop! :name)`: Stops a specific loop.
+*   `(stop!)`: Stops all music.
+*   `(cpm 120)`: Sets Cycles Per Minute (default is 4 beats per cycle).
+*   `(glide-cpm 80 4)`: Smoothly transitions tempo over 4 cycles.

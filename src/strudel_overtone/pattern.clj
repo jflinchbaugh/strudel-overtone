@@ -7,6 +7,8 @@
 (defrecord Pattern [events cycles delay-cycles stop-cycles length])
 (defrecord Overlay [val])
 
+(def ^:dynamic *current-cycle* 0)
+
 (defn overlay
   "Wraps a parameter value (like a pattern vector) to indicate it should
    be applied as an overlay, without splitting existing events."
@@ -370,6 +372,66 @@
    Example: (params pat {:attack 0.1 :release 0.5})"
   [pattern param-map]
   (reduce-kv (fn [p k v] (set-param p k v)) pattern param-map))
+
+(defn alt
+  "Returns a function that alternates between values every cycle.
+   Use inside a pattern vector.
+   Example: (s [:bd (alt :sd :cp) :bd :hh])"
+  [& coll]
+  (fn [_ _]
+    (let [cycle *current-cycle*
+          idx (mod (long cycle) (count coll))]
+      (nth coll idx))))
+
+(defn slowcat
+  "Concatenates multiple patterns in time.
+   Each pattern's length is respected (defaulting to 1 cycle).
+   Example: (slowcat (s [:bd :sd]) (s [:hh :hh]))"
+  [& patterns]
+  (let [pats (filter some? patterns)]
+    (if (empty? pats)
+      (make-pattern [])
+      (let [total-len (reduce + (map (fn [p] (or (:length p) 1.0)) pats))
+            new-events (mapcat (fn [[idx pat]]
+                                 (let [ps (take idx pats)
+                                       offset (reduce + (map #(or (:length %) 1.0) ps))]
+                                   (map (fn [ev] (update ev :time + offset))
+                                        (:events pat))))
+                               (map-indexed vector pats))]
+        (assoc (first pats)
+               :events new-events
+               :length total-len)))))
+
+(defn stack
+  "Layers multiple patterns to play simultaneously.
+   The resulting length is the maximum length of all patterns."
+  [& patterns]
+  (let [pats (filter some? patterns)]
+    (if (empty? pats)
+      (make-pattern [])
+      (let [max-len (apply max (map (fn [p] (or (:length p) 1.0)) pats))]
+        (assoc (first pats)
+               :events (mapcat :events pats)
+               :length max-len)))))
+
+(defn fastcat
+  "Squeezes multiple patterns into a single cycle.
+   Each pattern is scaled to take 1/n of the cycle."
+  [& patterns]
+  (let [pats (filter some? patterns)
+        n (count pats)]
+    (if (zero? n)
+      (make-pattern [])
+      (let [new-events (mapcat (fn [[idx pat]]
+                                 (let [offset (/ (double idx) n)
+                                       scale (/ 1.0 n)]
+                                   (map (fn [ev]
+                                          (-> ev
+                                              (update :time #(+ offset (* % scale)))
+                                              (update :duration * scale)))
+                                        (:events pat))))
+                               (map-indexed vector pats))]
+        (assoc (first pats) :events new-events :length 1.0)))))
 
 ;; --- DSL Modifiers ---
 

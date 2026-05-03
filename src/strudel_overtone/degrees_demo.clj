@@ -20,7 +20,7 @@
         lead (-> (note base-note)
                (add 12)
                (degrees :minor [1 3 4 5 4 3 7 8])
-               (degrade 0.1)
+               #_(degrade 0.1)
                (s :supersaw)
                (gain 0.8)
                (lpf (sine 0.125 500 4000))

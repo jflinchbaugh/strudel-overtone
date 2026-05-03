@@ -20,7 +20,7 @@
         (with-redefs [player/player-state player-state
                       player/metro (fn ([] 0) ([b] (* b 1000)))
                       ov/apply-by (fn [& _] nil)
-                      player/trigger-event (fn [key ev beat dur vidx]
+                      player/trigger-event (fn [key ev beat dur vidx cycle]
                                              (swap! trigger-calls conj (get-in ev [:params :sound])))]
           
           ;; cycle-idx (mod 0 0.5) = 0.0
@@ -47,7 +47,7 @@
       (with-redefs [player/player-state player-state
                     player/metro (fn ([] 0) ([b] (* b 1000)))
                     ov/apply-by (fn [& _] nil)
-                    player/trigger-event (fn [key ev beat dur vidx]
+                    player/trigger-event (fn [key ev beat dur vidx cycle]
                                            (let [note (get-in ev [:params :note])
                                                  resolved-note (if (fn? note) (note beat :note) note)]
                                              (swap! results conj resolved-note)))]
@@ -75,7 +75,7 @@
       (with-redefs [player/player-state player-state
                     player/metro (fn ([] 0) ([b] (* b 1000)))
                     ov/apply-by (fn [& _] nil)
-                    player/trigger-event (fn [key ev beat dur vidx]
+                    player/trigger-event (fn [key ev beat dur vidx cycle]
                                            (let [pan (get-in ev [:params :pan])
                                                  resolved-pan (if (fn? pan) (pan beat :pan) pan)]
                                              (swap! results conj resolved-pan)))]

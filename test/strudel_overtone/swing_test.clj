@@ -61,7 +61,7 @@
     (let [tasks (atom [])
           mock-metro (constantly 1000)
           ;; Mock trigger-event to capture the event map it receives
-          mock-trigger-event (fn [key ev beat dur-beats vidx]
+          mock-trigger-event (fn [key ev beat dur-beats vidx cycle]
                                (swap! tasks conj ev))
           
           ;; Define a pattern with swing
