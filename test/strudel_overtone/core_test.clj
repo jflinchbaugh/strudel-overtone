@@ -13,6 +13,12 @@
   (let [v (get-in ev [:params :active] (constantly 1))]
     (if (fn? v) (v 0 :active) v)))
 
+(use-fixtures :each
+  (fn [f]
+    (sut/stop!)
+    (f)
+    (sut/stop!)))
+
 (deftest play!-test
   (testing "play! quantization logic"
     (let [player-state (atom {:playing? false :patterns {} :loops #{}})
@@ -120,11 +126,12 @@
           mock-calls (atom [])]
       (with-redefs [player/player-state player-state
                     player/metro (fn ([] 10.5) ([b] (* b 1000)))
+                    ov/metro-bpm (constantly 120)
                     ov/apply-at (fn [ms func & args]
                                   (swap! mock-calls
                                     conj {:func func :args args}))
                     ov/apply-by (fn [& _] nil)
-                    player/trigger-event (fn [key ev b d]
+                    player/trigger-event (fn [key ev b d & _]
                                            (swap! mock-calls
                                              conj {:event ev
                                                    :sound (get-in ev [:params
