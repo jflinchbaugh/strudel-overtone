@@ -193,22 +193,22 @@
                     player/metro (constantly 0)]
         (testing "active event is triggered"
           (reset! mock-calls [])
-          (sut/trigger-event :test-key (sut/->Event 0 1 {:sound :bd :active (constantly 1)}) 0 1)
+          (sut/trigger-event :test-key (sut/->Event 0 1 {:sound :bd :active (constantly 1)}) 0 1 0)
           (is (= 2 (count @mock-calls)))) ;; log-called and at-metro-called
 
         (testing "inactive event is not triggered"
           (reset! mock-calls [])
-          (sut/trigger-event :test-key (sut/->Event 0 1 {:sound :bd :active (constantly 0)}) 0 1)
+          (sut/trigger-event :test-key (sut/->Event 0 1 {:sound :bd :active (constantly 0)}) 0 1 0)
           (is (empty? @mock-calls)))
 
         (testing "inactive event with boolean false is not triggered"
           (reset! mock-calls [])
-          (sut/trigger-event :test-key (sut/->Event 0 1 {:sound :bd :active (constantly false)}) 0 1)
+          (sut/trigger-event :test-key (sut/->Event 0 1 {:sound :bd :active (constantly false)}) 0 1 0)
           (is (empty? @mock-calls)))
 
         (testing "event without active param is triggered"
           (reset! mock-calls [])
-          (sut/trigger-event :test-key (sut/->Event 0 1 {:sound :bd}) 0 1)
+          (sut/trigger-event :test-key (sut/->Event 0 1 {:sound :bd}) 0 1 0)
           (is (= 2 (count @mock-calls))))))))
 
 (deftest fast-slow-test

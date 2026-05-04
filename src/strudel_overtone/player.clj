@@ -55,10 +55,12 @@
 (defonce player-state (atom {:playing? false :patterns {} :loops #{} :last-freq {}}))
 
 (defn- resolve-note [n]
-  (ov/midi->hz (ov/note n)))
+  (if (number? n)
+    (ov/midi->hz n)
+    (ov/midi->hz (ov/note n))))
 
 (defn resolve-params [params beat cycle]
-  (binding [p/*current-cycle* cycle]
+  (binding [p/*current-cycle* (or cycle 0)]
     (reduce-kv (fn [m k v]
                  (assoc m k (if (fn? v) (v beat k) v)))
                {}
@@ -152,33 +154,40 @@
 
 (defn trigger-single-event [key ev params beat dur-beats voice-idx]
   (let [sound-param (:sound params)
-        n (:note params)
+        n-raw (:note params)
+        degree (or (get params :degree) 0)
+        ;; Resolve actual MIDI note by adding degree interval to root note
+        n (when n-raw
+            (if (number? n-raw)
+              (+ (double n-raw) (double degree))
+              (let [root (ov/note n-raw)]
+                (+ (double root) (double degree)))))
         sound-name (or sound-param (if n :saw nil))
         slice (when sound-name (get @samples/sample-slices sound-name))
         effective-sound (if slice (:source slice) sound-name)
         sample-buf (when effective-sound (get @samples/samples effective-sound))
         params (adjust-slice-params params sound-name)
-        note-offset (get params :add 0)
+        note-offset (or (get params :add) 0)
         amp (try-parse-number (or (:amp params) 1.0))
         lpf (try-parse-number (or (:lpf params) 2000))
-        slide (try-parse-number (get params :slide 0))
-        cycle-sec (* 4 (/ 60 (ov/metro-bpm metro)))
-        monophonic-param (is-active? (get params :monophonic 0))]
+        slide (try-parse-number (or (get params :slide) 0))
+        cycle-sec (* 4 (/ 60 (or (ov/metro-bpm metro) 120)))
+        monophonic-param (is-active? (or (get params :monophonic) 0))]
     (when sound-name
       (let [base (if sample-buf :sampler (get synths/synth-aliases sound-name sound-name))
             monophonic (and monophonic-param (synths/supports-mono? base))
             sustain-sec (calculate-sustain params sample-buf dur-beats monophonic)
             synth-key (synths/get-synth-name base params)
             synth-var (or (synths/resolve-synth synth-key) (synths/resolve-synth base))
-            freq (when (and n (not (p/is-rest? n)))
-                   (resolve-note (+ (if (keyword? n) (ov/note n) n) note-offset)))
+            freq (when (and n (not (p/is-rest? n-raw)))
+                   (resolve-note (+ (double n) (double note-offset))))
             default-freq (if (synths/percussive-synths base) 65.406 440.0)
             effective-freq (or freq default-freq)
             last-f (get-in @player-state [:last-freq [key voice-idx]])
-            has-glide (and monophonic (pos? slide) last-f freq)
+            has-glide (and monophonic (pos? (double slide)) last-f freq)
             effective-slide-from (if has-glide last-f effective-freq)
-            effective-slide-time (if has-glide (min sustain-sec (* slide cycle-sec)) 0.001)
-            reserved #{:sound :note :active :start :duration :env :add :swing :slide :legato :monophonic :gate}
+            effective-slide-time (if has-glide (min sustain-sec (* (double slide) cycle-sec)) 0.001)
+            reserved #{:sound :note :degree :active :start :duration :env :add :swing :slide :legato :monophonic :gate}
             handled #{:amp :lpf :sustain :freq :slide-from :gate :monophonic}
             args (cond-> (reduce-kv (fn [acc k v] (if (or (reserved k) (handled k)) acc (conj acc k v))) [] params)
                    true (conj :amp amp)
@@ -197,13 +206,11 @@
                       vec)]
         (when freq (swap! player-state assoc-in [:last-freq [key voice-idx]] freq))
         (when synth-var
-          (let [log-data (assoc (into {} ev) :params params)]
+          (let [log-data (assoc (into {} ev) :params (assoc params :note n))]
+            (ov/apply-at (metro beat) (fn [& _] (tel/log! :info {:event log-data})))
             (if monophonic
+              (at-metro-mono beat key voice-idx synth-var args)
               (do
-                (ov/apply-at (metro beat) (fn [& _] (when (contains? (:loops @player-state) key) (tel/log! :info {:event log-data}))))
-                (at-metro-mono beat key voice-idx synth-var args))
-              (do
-                (ov/apply-at (metro beat) (fn [& _] (tel/log! :info {:event log-data})))
                 ;; If we were monophonic but now polyphonic, gate off the old synth
                 (when-let [existing (get-in @player-state [:active-synths [key voice-idx]])]
                   (ov/apply-at (metro beat)

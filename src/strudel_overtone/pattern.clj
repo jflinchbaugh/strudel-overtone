@@ -8,6 +8,7 @@
 (defrecord Overlay [val])
 
 (def ^:dynamic *current-cycle* 0)
+(def ^:dynamic *current-event* nil)
 
 (defn overlay
   "Wraps a parameter value (like a pattern vector) to indicate it should
@@ -274,7 +275,15 @@
             (map (fn [e]
                    (if (is-rest-params? (:params e))
                      e
-                     (assoc-in e [:params key] (wrap-number-fn param-value))))
+                     (let [v (wrap-number-fn param-value)]
+                       (assoc-in e [:params key]
+                                 (if (and (= key :note) (contains? (:params e) :note))
+                                   ;; Special case for :note to allow composition
+                                   (let [old-v (get-in e [:params :note])]
+                                     (fn [beat k]
+                                       (let [root (if (fn? old-v) (old-v beat k) old-v)]
+                                         (if (fn? v) (v beat k) v))))
+                                   v)))))
                  evs))))
 
 (defn- make-event-list [pat key transform-fn]
@@ -581,11 +590,10 @@
    degree-vals: a list pattern of integers (1-indexed).
    Example: (-> (note :c4) (degrees :major [1 3 5 8]))"
   [pattern scale-name degree-vals]
-  (set-param pattern :note degree-vals
+  (set-param pattern :degree degree-vals
              (fn [d]
-               (fn [beat _]
-                 (let [root (ov/note (get-in pattern [:params :note] :c4))]
-                   (+ root (ov/degree->interval d scale-name)))))))
+               (fn [beat key]
+                 (ov/degree->interval d scale-name)))))
 
 (defn chaos
   "Sets the chaos parameter for the Crackle synth.

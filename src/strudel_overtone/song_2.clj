@@ -42,8 +42,7 @@
     :snare (->
              (s [:- :snare :- :snare]))
 
-    :bass (->
-            (s :sine)
+    :bass (-s :sine)
             (note (choose-n 6 [:a0 :c1 :b0 :c1 :a0 :c1]))
             (add 2)
             (degrade 3/5)
@@ -70,21 +69,20 @@
   (play-only!
     :lead (->
            (s :supersaw)
-           (note :g4)
+           (note (alt :d3 :c4))
            (degrees :pentatonic [1 [2 2] 3 4 5 6 7 8 9 10])
            (perc 0.001 0.1)
            (pan (overlay [-0.75 0.75 -0.75 0.75]))
-           (gain 0.2)))
+           (gain 0.3)))
 
   (stop!)
 
   (ov/stop)
 
-  (scale :a4 :minor)
-  ;; => (69 71 72 74 76 77 79 81)
-
-  (chord :a4 :minor7)
-  ;; => (69 72 76 79)
-  ;; => (69 72 76)
+  (play-only!
+    :lead (->
+            (s :supersaw)
+            (note :a6)
+            (degrees :major [0 1 1 1])))
 
   .)
