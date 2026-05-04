@@ -42,7 +42,7 @@
     :snare (->
              (s [:- :snare :- :snare]))
 
-    :bass (-s :sine)
+    :bass (-> (s :sine)
             (note (choose-n 6 [:a0 :c1 :b0 :c1 :a0 :c1]))
             (add 2)
             (degrade 3/5)
@@ -53,22 +53,22 @@
             (tremolo-hz 4)
             (vibrato 4)
             (ribbon 2 1)
-            (duck 1)
-            )
+            (duck 1))
 
     :lead (->
             (s :supersaw)
             (note (choose-n 4 (chord :g4 :minor)))
             (perc 0.001 0.6)
-            (fast 8)
+            (fast 4)
             (pan [-0.75 0.75 -0.75 0.75])
-            (degrade 7/8)
+            (degrade 1/8)
             (ribbon 2 16)
-            (gain 0.2)))
+            (gain 0.2))
+    )
 
   (play-only!
     :lead (->
-           (s :supersaw)
+            s :supersaw
            (note (alt :d3 :c4))
            (degrees :pentatonic [1 [2 2] 3 4 5 6 7 8 9 10])
            (perc 0.001 0.1)

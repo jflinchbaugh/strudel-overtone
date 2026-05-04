@@ -29,7 +29,10 @@
   "Sets or gets the cycles per minute.
    Assumes 4 beats per cycle."
   ([] (/ (ov/metro-bpm metro) 4))
-  ([n] (metro :bpm (* n 4)) n))
+  ([n]
+   (metro :bpm (* n 4))
+   (tel/log! :info {:cpm n})
+   n))
 
 (defn glide-cpm
   "Smoothly transitions the CPM to a new value over a duration (in cycles).
@@ -206,7 +209,11 @@
                       vec)]
         (when freq (swap! player-state assoc-in [:last-freq [key voice-idx]] freq))
         (when synth-var
-          (let [log-data (assoc (into {} ev) :params (assoc params :note n))]
+          (let [effective-note (when (and n (not (p/is-rest? n-raw)))
+                                 (+ (double n) (double note-offset)))
+                log-data (cond-> (assoc (into {} ev) :params (assoc params :note n))
+                           effective-note (assoc :effective-note effective-note)
+                           effective-freq (assoc :effective-freq effective-freq))]
             (ov/apply-at (metro beat) (fn [& _] (tel/log! :info {:event log-data})))
             (if monophonic
               (at-metro-mono beat key voice-idx synth-var args)
