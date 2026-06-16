@@ -19,23 +19,23 @@
   (ov/stop)
 
   (play-only!
-   #_#_:snare (->
+   :snare (->
            (s [:snare [:snare :snare] :snare [:snare :snare]])
            (legato 1/4)
            (swing 4/8)
            )
-   #_#_:dnb (->
+   :dnb (->
          (s [[:bd :bd] :snare [:- [:bd :bd]] :snare])
          (note :d2)
          (gain 1.5)
          (fast 1)
          (duck-trigger 1))
-   #_#_:bass (->
+   :bass (->
           (s [:bd :bd])
           (note :d1)
           (legato 1/2)
           )
-   #_#_:rg (->
+   :rg (->
           (s :supersaw)
           (note :d2)
           (swing 1/8)
@@ -44,15 +44,16 @@
           (gain 1)
           (distort (overlay [3/4 0.5 0.5 3/4 0.5 0.5 0.5 0.5]))
           (duck 1))
-   #_#_:pad (->
+   :pad (->
          (s :sine)
          (note :d1)
          (swing 1/2)
          (slow 2)
          (degrees :minor [1 2 1 [1 2 3 2]])
-         (gain 3)
+         (gain 4)
          (duck 1)))
 
+  (stop!)
 
   (cpm 22)
 
@@ -63,6 +64,7 @@
            (gain 0.25)
            (adsr 0.07 0.05 0.3 0)
            (note :d#4)
+           (lpf 500)
            (slow 2)
            (legato 1.1)
            (degrees :major [#{1 3} #{1 3} #{1 3} #{1 3} #{2 4} #{2 4} #{2 4} #{2 4}]))
@@ -71,6 +73,7 @@
             (note :d#4)
             (adsr 0.07 0.05 0.3 0.1)
             (gain 1)
+            (lpf  1000)
             (slow 2)
             (degrees :major [:- :- :- :- :- :- [#{1} #{2}] [:- #{4}]])
             (legato 3))
@@ -79,8 +82,10 @@
            (gain 0.5)
            (legato 1/4))
    :bd (->
-           (s [:bd :- :bd :-])
+        (s [:bd :- [[:bd :bd] :-] :-])
+        (swing 1/8)
            (gain 0.5)
+           (legato [0.5 1])
            )
    )
 
