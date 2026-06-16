@@ -16,7 +16,7 @@
 ;; 4. Industrial Drone: Wide spacing (step 4.5)
 (def-additive! :add-industrial [1.0 0.9 0.8] :step 4.5)
 
-(defn run []
+(comment
   (stop!)
 
   ;; 1. Bassline using the Organ synth
@@ -58,9 +58,7 @@
              (gain 0.3)
              (slow 1)))
 
-  )
 
-(comment
   (run)
 
   (stop!)

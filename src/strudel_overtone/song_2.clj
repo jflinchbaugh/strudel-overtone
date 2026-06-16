@@ -68,8 +68,8 @@
 
   (play-only!
     :lead (->
-            s :supersaw
-           (note (alt :d3 :c4))
+           (s :add)
+           (note (alt :d3 :d5))
            (degrees :pentatonic [1 [2 2] 3 4 5 6 7 8 9 10])
            (perc 0.001 0.1)
            (pan (overlay [-0.75 0.75 -0.75 0.75]))

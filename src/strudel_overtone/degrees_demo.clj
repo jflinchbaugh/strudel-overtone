@@ -22,12 +22,14 @@
                (degrees :major [1 3 4 5 4 3 7 8])
                (s :supersaw)
                (gain 0.8)
-               (lpf (sine 0.0525 500 4000))
+               #_(lpf (sine 0.0525 500 4000))
                (echo 0.375 0.6))
 
         ;; Some drums to keep time
-        drums (-> (s [:kick [:- :hat] [:- :hat] [:- :snare]])
-                (gain 0.5))]
+        drums (-> (s [:kick :- :- :-])
+                (gain 0.3)
+                (lpf (sine 0.0525 500 4000))
+                )]
 
     (play-only!
       :bass bass
