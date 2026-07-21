@@ -14,33 +14,47 @@
                  (fast 1/2)
                  (gain 3/10)
                  (lpf 100)
+                 (duck 0.8)
+                 (legato 0.8))
+
+        more-bass (-> (note base-note)
+                 (degrees :major [1 1 4 5])
+                 (s :sine)
+                 (add -12)
+                 (fast 1/2)
+                 (gain 10/10)
+                 (lpf 100)
+                 (duck 0.8)
                  (legato 0.8))
 
         ;; A lead melody using a slightly more complex degree pattern
         lead (-> (note base-note)
                  (add 24)
                  (s :supersaw)
-                 #_(swing 1/10)
-                 (degrees :major [1 3 4 5 7 6 7 8])
+                 (degrees :major [1 3 4 1 6 7 3 8])
                  (gain 5/5)
+                 (degrade 5/8)
+                 #_(ribbon 1 2)
                  (pan (sine 4/30 1 -1))
                  (lpf (sine 1/60 400 4000))
+                 (duck-trigger 1)
                  (echo 0.375 0.6))
 
         ;; Some drums to keep time
-        drums (-> (s [:kick :- :- :-])
+        drums (-> (s [:kick :kick [:- :kick] :-])
                   (gain 4/10)
-                  (slow 2)
-                  #_(lpf 400))
+                  (slow 1)
+                  #_(lpf 100))
 
         hat (-> (s [[:hat :hat] :- :hat :-])
-                  (gain 1/10)
-                  (legato 1/2)
-                  (slow 1)
-                  (lpf (sine 1/30 800 5000)))]
+                (gain 1/10)
+                (legato 1/2)
+                (slow 1)
+                (lpf (sine 1/30 800 5000)))]
 
     (play-only!
      :bass bass
+     :more-bass more-bass
      :lead lead
      :drums drums
      :hat hat))
