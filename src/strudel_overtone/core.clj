@@ -30,7 +30,7 @@
 
 ;; Signals
 (import-vars p
-             sine saw tri square cosine sig-range)
+             sine saw tri square cosine sig-range adsr-sig)
 
 ;; Pattern records & builders
 (import-vars p

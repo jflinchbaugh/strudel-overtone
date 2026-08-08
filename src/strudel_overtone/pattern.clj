@@ -204,6 +204,32 @@
   ([freq low high]
    (sig-range (cosine freq) low high)))
 
+(defn adsr-sig
+  "Generates an ADSR envelope function over step duration (0 to 1).
+   Multi-arity:
+   [attack decay sustain-level release] -> envelope value [0.0, 1.0]
+   [attack decay sustain-level release min-val max-val] -> scaled envelope value [min-val, max-val]"
+  ([attack decay sustain-level release]
+   (fn [t _]
+     (let [rel-t (mod t 1)
+           env-val (cond
+                     (< rel-t attack)
+                     (/ rel-t (max 0.001 attack))
+
+                     (< rel-t (+ attack decay))
+                     (let [decay-t (/ (- rel-t attack) (max 0.001 decay))]
+                       (- 1.0 (* (- 1.0 sustain-level) decay-t)))
+
+                     (< rel-t (- 1.0 release))
+                     sustain-level
+
+                     :else
+                     (let [rel-phase (/ (- rel-t (- 1.0 release)) (max 0.001 release))]
+                       (* sustain-level (- 1.0 rel-phase))))]
+       (double env-val))))
+  ([attack decay sustain-level release min-val max-val]
+   (sig-range (adsr-sig attack decay sustain-level release) min-val max-val)))
+
 ;; --- Mini-notation Parser ---
 
 (defn parse-mini

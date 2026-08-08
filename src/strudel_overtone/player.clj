@@ -64,10 +64,11 @@
 
 (defn resolve-params [params beat cycle]
   (binding [p/*current-cycle* (or cycle 0)]
-    (reduce-kv (fn [m k v]
-                 (assoc m k (if (fn? v) (v beat k) v)))
-               {}
-               params)))
+    (let [cycle-t (/ (double beat) 4.0)]
+      (reduce-kv (fn [m k v]
+                   (assoc m k (if (fn? v) (v cycle-t k) v)))
+                 {}
+                 params))))
 
 (defn- is-active? [v]
   (if (number? v) (not (zero? v)) v))

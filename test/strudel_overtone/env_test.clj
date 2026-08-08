@@ -49,3 +49,11 @@
              (let [synth-call (second @mock-calls)]
                (is (= #'synths/saw-perc (:func synth-call))))))))))
 
+(deftest adsr-sig-test
+  (testing "adsr-sig evaluates attack, decay, sustain, and release phases"
+    (let [sig (sut/adsr-sig 0.1 0.2 0.5 0.2 100 1000)]
+      (is (= 100.0 (sig 0.0 nil)))
+      (is (= 1000.0 (sig 0.1 nil)))
+      (is (= 550.0 (sig 0.3 nil)))
+      (is (= 550.0 (sig 0.5 nil)))
+      (is (= 100.0 (sig 1.0 nil))))))
