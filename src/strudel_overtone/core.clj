@@ -40,15 +40,15 @@
 ;; DSL Modifiers
 (import-vars p
              s simul note gain swing duck duck-trigger duck-attack
-             duck-release lpf pan resonance attack decay s-level sustain
-             legato monophonic mono release width carrier-ratio
+             duck-release lpf pan resonance sustain
+             legato monophonic mono width carrier-ratio
              modulator-ratio mod-index detune add chaos coef crush
              distort hpf bpf room room-size damp vibrato echo-delay
              echo-repeats rate speed pshift fshift tremolo-hz
              tremolo-depth pan-hz pan-depth phaser-hz phaser-depth begin
              end looping env active fast slow early late ribbon rev
              sometimes degrade delay-cycles stop-after glide
-             adsr perc fm echo step degrees
+             adsr perc lpfe lpf-adsr lpf-perc fm echo step degrees
              alt slowcat stack fastcat)
 
 ;; --- Player Re-exports ---
@@ -120,8 +120,15 @@
   (cpm 140)
   (glide-cpm 80 4)
 
-  ;; Monophonic example
-  (play! :mono (-> (note [:c3 :e3 :g3 :b3]) (s :saw) (mono) (glide 0.1) (fast 2)))
+  ;; Acid 303 Bassline with Filter Envelope Sweep
+  (play! :acid
+         (-> (note [:c2 :c3 :c2 :eb2 :g2])
+             (s :tb303)
+             (lpf 300)                      ; Base cutoff frequency = 300 Hz
+             (lpfe 5000)                    ; Envelope modulation depth = 5000 Hz
+             (lpf-adsr 0.01 0.15 0.1 0.2)   ; Plucky filter sweep
+             (adsr 0.01 0.2 0.8 0.1)        ; Volume envelope
+             (resonance 0.1)))
 
   (stop!)
 )

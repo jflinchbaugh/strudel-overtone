@@ -6,15 +6,12 @@
             [overtone.core :as ov]))
 
 (deftest param-functions-test
-  (testing "new parameter functions exist and work on patterns"
+  (testing "parameter functions exist and work on patterns"
     (let [pat (-> (sut/note [:c4])
                   (sut/s [:saw])
                   (sut/pan 0.5)
                   (sut/resonance 0.2)
-                  (sut/attack 0.05)
-                  (sut/decay 0.2)
-                  (sut/s-level 0.4)
-                  (sut/release 0.5)
+                  (sut/adsr 0.05 0.2 0.4 0.5)
                   (sut/width 0.6)
                   (sut/carrier-ratio 2)
                   (sut/modulator-ratio 3)
@@ -24,6 +21,7 @@
             params (:params ev)]
         (is (= 0.5 ((:pan params) 0 :pan)))
         (is (= 0.2 ((:resonance params) 0 :resonance)))
+        (is (= :adsr (get-in ev [:params :env])))
         (is (= 0.05 ((:attack params) 0 :attack)))
         (is (= 0.2 ((:decay params) 0 :decay)))
         (is (= 0.4 ((:s-level params) 0 :s-level)))

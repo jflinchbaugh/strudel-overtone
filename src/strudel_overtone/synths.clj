@@ -39,7 +39,10 @@
                       monophonic 0
                       gate 1
                       env-type 0
-                      attack 0.01 decay 0.1 s-level 0.5 release 0.3}
+                      attack 0.01 decay 0.1 s-level 0.5 release 0.3
+                      lpf-env 0
+                      lpf-env-type 0
+                      lpf-attack 0.01 lpf-decay 0.1 lpf-s-level 0.5 lpf-release 0.3}
         varlag-param (fn [name]
                        `(ov/select:kr ~'monophonic [~name (ov/varlag ~name ~'slide)]))
         extra-map (apply hash-map extra-args)
@@ -51,6 +54,7 @@
          ~final-args-vec
          (let [;; Smoothed parameters for mono mode
                ~'lpf ~(varlag-param 'lpf)
+               ~'lpf-env ~(varlag-param 'lpf-env)
                ~'resonance ~(varlag-param 'resonance)
                ~'amp ~(varlag-param 'amp)
                ~'pan ~(varlag-param 'pan)
@@ -70,6 +74,13 @@
                perc-env# (ov/env-gen (ov/perc ~'attack ~'sustain)
                                      :gate effective-gate#)
                ~'env (ov/select:kr ~'env-type [adsr-env# perc-env#])
+
+               lpf-adsr-env# (ov/env-gen (ov/adsr ~'lpf-attack ~'lpf-decay ~'lpf-s-level ~'lpf-release)
+                                         :gate effective-gate#)
+               lpf-perc-env# (ov/env-gen (ov/perc ~'lpf-attack ~'sustain)
+                                         :gate effective-gate#)
+               lpf-env-sig# (ov/select:kr ~'lpf-env-type [lpf-adsr-env# lpf-perc-env#])
+               effective-lpf# (s-max 20 (+ ~'lpf (* ~'lpf-env lpf-env-sig#)))
                ;; Trigger Sidechain
                _# (let [trig-env# (ov/env-gen
                                    (ov/perc
@@ -147,7 +158,7 @@
                             0 1 -1 1)))
                  ~'filt (ov/rlpf
                          ~'filt
-                         (s-max 20 ~'lpf)
+                         effective-lpf#
                          ~'resonance)
 
                  ~'dst (ov/distort

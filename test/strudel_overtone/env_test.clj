@@ -47,3 +47,18 @@
       (is (= 550.0 (sig 0.3 nil)))
       (is (= 550.0 (sig 0.5 nil)))
       (is (= 100.0 (sig 1.0 nil))))))
+
+(deftest lpf-env-param-test
+  (testing "lpfe, lpf-adsr, and lpf-perc set pattern parameters correctly"
+    (let [pat (-> (sut/s [:saw])
+                  (sut/lpf 300)
+                  (sut/lpfe 5000)
+                  (sut/lpf-adsr 0.01 0.15 0.1 0.2))
+          ev (first (:events pat))
+          params (:params ev)]
+      (is (= 5000 ((:lpf-env params) 0 :lpf-env)))
+      (is (= :adsr (:lpf-env-type params)))
+      (is (= 0.01 ((:lpf-attack params) 0 :lpf-attack)))
+      (is (= 0.15 ((:lpf-decay params) 0 :lpf-decay)))
+      (is (= 0.1 ((:lpf-s-level params) 0 :lpf-s-level)))
+      (is (= 0.2 ((:lpf-release params) 0 :lpf-release))))))

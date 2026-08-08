@@ -541,21 +541,6 @@
    so lower values mean MORE resonance."
   [pattern res-amount] (set-param pattern :resonance res-amount))
 
-(defn attack
-  "Sets the envelope attack time.
-   Values: Time in seconds."
-  [pattern attack-sec] (set-param pattern :attack attack-sec))
-
-(defn decay
-  "Sets the envelope decay time.
-   Values: Time in seconds."
-  [pattern decay-sec] (set-param pattern :decay decay-sec))
-
-(defn s-level
-  "Sets the envelope sustain level.
-   Values: Amplitude fraction (0.0 to 1.0) relative to peak."
-  [pattern sustain-level] (set-param pattern :s-level sustain-level))
-
 (defn sustain
   "Sets the note duration (sustain time) in seconds.
    If not set, it defaults to the duration of the step."
@@ -575,11 +560,6 @@
   ([pattern monophonic-active] (set-param pattern :monophonic monophonic-active)))
 
 (def mono monophonic)
-
-(defn release
-  "Sets the envelope release time.
-   Values: Time in seconds."
-  [pattern release-sec] (set-param pattern :release release-sec))
 
 (defn width
   "Sets the pulse width for square waves.
@@ -793,6 +773,29 @@
   (params pattern {:env :perc
                    :attack attack-sec
                    :sustain sustain-sec}))
+
+(defn lpfe
+  "Sets the filter envelope modulation depth in Hz.
+   Usage: (lpfe pat depth-hz)"
+  [pattern depth-hz]
+  (set-param pattern :lpf-env depth-hz))
+
+(defn lpf-adsr
+  "Sets all filter ADSR envelope parameters at once.
+   Usage: (lpf-adsr pat attack decay sustain-level release)"
+  [pattern attack decay sustain-level release]
+  (params pattern {:lpf-env-type :adsr
+                   :lpf-attack attack
+                   :lpf-decay decay
+                   :lpf-s-level sustain-level
+                   :lpf-release release}))
+
+(defn lpf-perc
+  "Sets filter percussive envelope parameters at once.
+   Usage: (lpf-perc pat attack-sec)"
+  [pattern attack-sec]
+  (params pattern {:lpf-env-type :perc
+                   :lpf-attack attack-sec}))
 
 (defn fm
   "Sets FM synthesis parameters at once.

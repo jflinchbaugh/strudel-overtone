@@ -194,8 +194,10 @@
             default-env (if (synths/percussive-synths base) :perc :adsr)
             env-param (get params :env default-env)
             env-type (if (= env-param :perc) 1 0)
-            reserved #{:sound :note :degree :active :start :duration :env :add :swing :slide :legato :monophonic :gate}
-            handled #{:amp :lpf :sustain :freq :slide-from :gate :monophonic :env-type}
+            lpf-env-param (get params :lpf-env-type default-env)
+            lpf-env-type (if (= lpf-env-param :perc) 1 0)
+            reserved #{:sound :note :degree :active :start :duration :env :lpf-env-type :add :swing :slide :legato :monophonic :gate}
+            handled #{:amp :lpf :sustain :freq :slide-from :gate :monophonic :env-type :lpf-env-type}
             args (cond-> (reduce-kv (fn [acc k v] (if (or (reserved k) (handled k)) acc (conj acc k v))) [] params)
                    true (conj :amp amp)
                    true (conj :freq effective-freq)
@@ -206,6 +208,7 @@
                    true (conj :gate 1)
                    true (conj :monophonic (if monophonic 1 0))
                    true (conj :env-type env-type)
+                   true (conj :lpf-env-type lpf-env-type)
                    sample-buf (conj :buf (:id sample-buf)))
             ;; Filter out any nils (e.g. if lpf or sample-buf was nil)
             args (->> (partition 2 args)
