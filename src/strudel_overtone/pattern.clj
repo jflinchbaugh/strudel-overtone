@@ -121,46 +121,46 @@
     (let [v (sig t seed)]
       (+ low (* v (- high low))))))
 
-(defn sine
+(defn sine-sig
   "Returns a continuous sine wave signal (0 to 1).
    Multi-arity:
    [] -> function [t _] returning sine at freq 1
    [t _] -> value at time t
    [freq] -> function [t _] returning sine at freq
    [freq low high] -> function [t _] returning sine at freq scaled to [low, high]"
-  ([] (sine 1))
+  ([] (sine-sig 1))
   ([t _]
    (+ 0.5 (* 0.5 (Math/sin (tau t)))))
   ([freq]
    (fn [t _]
-     (sine (* t freq) nil)))
+     (sine-sig (* t freq) nil)))
   ([freq low high]
-   (sig-range (sine freq) low high)))
+   (sig-range (sine-sig freq) low high)))
 
-(defn saw
+(defn saw-sig
   "Returns a continuous sawtooth wave signal (0 to 1).
    Multi-arity:
    [] -> function [t _] returning saw at freq 1
    [t _] -> value at time t
    [freq] -> function [t _] returning saw at freq
    [freq low high] -> function [t _] returning saw at freq scaled to [low, high]"
-  ([] (saw 1))
+  ([] (saw-sig 1))
   ([t _]
    (mod t 1))
   ([freq]
    (fn [t _]
-     (saw (* t freq) nil)))
+     (saw-sig (* t freq) nil)))
   ([freq low high]
-   (sig-range (saw freq) low high)))
+   (sig-range (saw-sig freq) low high)))
 
-(defn tri
+(defn tri-sig
   "Returns a continuous triangle wave signal (0 to 1).
    Multi-arity:
    [] -> function [t _] returning tri at freq 1
    [t _] -> value at time t
    [freq] -> function [t _] returning tri at freq
    [freq low high] -> function [t _] returning tri at freq scaled to [low, high]"
-  ([] (tri 1))
+  ([] (tri-sig 1))
   ([t _]
    (let [x (mod t 1)]
      (if (< x 0.5)
@@ -168,41 +168,41 @@
        (- 2 (* 2 x)))))
   ([freq]
    (fn [t _]
-     (tri (* t freq) nil)))
+     (tri-sig (* t freq) nil)))
   ([freq low high]
-   (sig-range (tri freq) low high)))
+   (sig-range (tri-sig freq) low high)))
 
-(defn square
+(defn square-sig
   "Returns a continuous square wave signal (0 to 1).
    Multi-arity:
    [] -> function [t _] returning square at freq 1
    [t _] -> value at time t
    [freq] -> function [t _] returning square at freq
    [freq low high] -> function [t _] returning square at freq scaled to [low, high]"
-  ([] (square 1))
+  ([] (square-sig 1))
   ([t _]
    (if (< (mod t 1) 0.5) 1 0))
   ([freq]
    (fn [t _]
-     (square (* t freq) nil)))
+     (square-sig (* t freq) nil)))
   ([freq low high]
-   (sig-range (square freq) low high)))
+   (sig-range (square-sig freq) low high)))
 
-(defn cosine
+(defn cosine-sig
   "Returns a continuous cosine wave signal (0 to 1).
    Multi-arity:
    [] -> function [t _] returning cosine at freq 1
    [t _] -> value at time t
    [freq] -> function [t _] returning cosine at freq
    [freq low high] -> function [t _] returning cosine at freq scaled to [low, high]"
-  ([] (cosine 1))
+  ([] (cosine-sig 1))
   ([t _]
    (+ 0.5 (* 0.5 (Math/cos (tau t)))))
   ([freq]
    (fn [t _]
-     (cosine (* t freq) nil)))
+     (cosine-sig (* t freq) nil)))
   ([freq low high]
-   (sig-range (cosine freq) low high)))
+   (sig-range (cosine-sig freq) low high)))
 
 (defn adsr-sig
   "Generates an ADSR envelope function over step duration (0 to 1).

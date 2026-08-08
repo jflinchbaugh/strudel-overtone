@@ -65,7 +65,7 @@
                     player/metro (constantly 0)
                     ov/apply-at (fn [ms func & args] (swap! mock-calls conj {:func func :args args}))
                     player/at-metro (fn [beat synth-var args] (swap! mock-calls conj {:func synth-var :args [args]}))
-                    synths/saw-adsr (fn [& args] args)] ;; Mock synth
+                    synths/saw (fn [& args] args)] ;; Mock synth
 
         (let [pat (-> (sut/note [:c4])
                       (sut/s [:saw])
@@ -107,7 +107,7 @@
                     player/metro (constantly 0)
                     ov/apply-at (fn [ms func & args] (func))
                     player/at-metro (fn [beat synth-var args] (swap! mock-calls conj {:func synth-var :args [args]}))
-                    synths/saw-adsr (fn [& args] args)]
+                    synths/saw (fn [& args] args)]
 
         (let [pat (-> (sut/note [:-]) (sut/s [:saw]))
               ev (first (:events pat))]

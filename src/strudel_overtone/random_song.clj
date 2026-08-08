@@ -82,7 +82,7 @@
     (play-only!
       :chords (-> (note (choose-n 6 chords))
                       (add -12)
-                      (swing 0.5)
+                      #_(swing 0.5)
                        (s :ks-stringer)
                        (ribbon 1 2) ;; Freeze the random 4-chord progression
                        (gain 0.6)
@@ -112,6 +112,7 @@
                    (decay 1)
                    (s-level 1)
                    (sustain 1)
+                   (mono)
                    (glide 1/3) ;; Slide between notes over 0.3 cycles
                    #_(legato 1.1) ;; Overlap notes slightly for better glide
                    (lpf (sig-range sine 200 2000))
@@ -135,7 +136,7 @@
 
   ;; Example: Monophonic lead
   ;; A single synth instance is reused, updating frequency for each note
-  (play! :mono-lead (-> (note (choose [:c3 :d3 :e3 :g3 :a3]))
+  (play-only! :mono-lead (-> (note (choose [:c3 :d3 :e3 :g3 :a3]))
                         (s :ks-stringer)
                         (mono)
                         (glide 0.1)
@@ -147,10 +148,13 @@
 
   ;; Example: Monophonic chords (paraphonic)
   ;; Each note in the chord is tracked as a separate monophonic voice
-  (play! :mono-chords (-> (note (choose-n 3 [:c2 :e2 :g2 :a2 :c3 :e3 :g3]))
-                          (s :saw)
+
+  (def g (atom 0.05))
+
+  (play-only! :mono-chords (-> (note (choose-n 3 [:c2 :e2 :g2 :a2 :c3 :e3 :g3]))
+                          (s :tri)
                           (mono)
-                          (glide 0.2)
+                          (glide g)
                           (s-level 1.0)
                           (attack 0.05)
                           (gain 0.15)

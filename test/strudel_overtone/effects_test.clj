@@ -35,7 +35,7 @@
                     ov/apply-at (fn [ms func & args] (swap! mock-calls conj {:func func :args args}))
                     player/at-metro (fn [beat synth-var args] (swap! mock-calls conj {:func synth-var :args [args]}))
                     samples/samples (atom {"test" {:id 1 :duration 1}})
-                    synths/sampler-adsr (fn [& args] args)]
+                    synths/sampler (fn [& args] args)]
 
         (let [pat (-> (sut/s [:test])
                       (sut/pshift 7)

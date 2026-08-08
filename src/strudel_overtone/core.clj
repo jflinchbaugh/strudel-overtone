@@ -30,7 +30,7 @@
 
 ;; Signals
 (import-vars p
-             sine saw tri square cosine sig-range adsr-sig)
+             sine-sig saw-sig tri-sig square-sig cosine-sig sig-range adsr-sig)
 
 ;; Pattern records & builders
 (import-vars p
@@ -65,18 +65,10 @@
 
 (import-vars synths
              get-synth-name resolve-synth
-             kick-adsr kick-perc snare-adsr snare-perc hat-adsr hat-perc
-             clap-adsr clap-perc saw-adsr saw-perc sine-adsr sine-perc
-             square-adsr square-perc tri-adsr tri-perc fm-adsr fm-perc
-             white-adsr white-perc pink-adsr pink-perc brown-adsr
-             brown-perc gray-adsr gray-perc clip-adsr clip-perc
-             crackle-adsr crackle-perc dust-adsr dust-perc dust2-adsr
-             dust2-perc lf-noise0-adsr lf-noise0-perc lf-noise1-adsr
-             lf-noise1-perc lf-noise2-adsr lf-noise2-perc tb303-adsr
-             tb303-perc supersaw-adsr supersaw-perc mooger-adsr
-             mooger-perc ks-stringer-adsr ks-stringer-perc
-             dub-kick-adsr dub-kick-perc dance-kick-adsr
-             dance-kick-perc sampler-adsr sampler-perc)
+             kick snare hat clap saw sine square tri fm
+             white pink brown gray clip crackle dust dust2
+             lf-noise0 lf-noise1 lf-noise2 tb303 supersaw mooger
+             ks-stringer dub-kick dance-kick sampler)
 
 ;; --- Pitch/Music Re-exports ---
 (import-vars ov
@@ -120,7 +112,7 @@
           (note :a4)
           (fast 32)
           (gain (overlay [0.2 0.5 0.3 0.8]))
-          (pan (sine 0.1 -1 1))))
+          (pan (sine-sig 0.1 -1 1))))
 
   (stop! :sd)
 

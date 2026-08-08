@@ -232,11 +232,9 @@
       (is (== 0.5 (cycles-fn 0 :cycles))))))
 
 (deftest def-additive-test
-  (testing "def-additive! macro defines expected synths"
+  (testing "def-additive! macro defines expected synth"
     (sut/def-additive! :test-organ [1.0 0.5])
-    (is (some? (ns-resolve 'strudel-overtone.synths 'test-organ-adsr)))
-    (is (some? (ns-resolve 'strudel-overtone.synths 'test-organ-perc))))
+    (is (some? (ns-resolve 'strudel-overtone.synths 'test-organ))))
   (testing "def-additive! with custom step"
     (sut/def-additive! :test-step [1.0 0.5] :step 2)
-    (is (some? (ns-resolve 'strudel-overtone.synths 'test-step-adsr)))
-    (is (some? (ns-resolve 'strudel-overtone.synths 'test-step-perc)))))
+    (is (some? (ns-resolve 'strudel-overtone.synths 'test-step))))

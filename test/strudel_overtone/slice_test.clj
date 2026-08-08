@@ -16,7 +16,7 @@
                     player/at-metro (fn [beat synth-var args] (swap! mock-calls conj {:func synth-var :args [args]}))
                     samples/samples (atom {:break {:id 1 :duration 4.0}})
                     samples/sample-slices (atom {})
-                    synths/sampler-adsr (fn [& args] args)]
+                    synths/sampler (fn [& args] args)]
 
         (sut/slice-sample! :kick :break 0.0 0.1)
         (sut/slice-sample! :snare :break 0.5 0.6)
