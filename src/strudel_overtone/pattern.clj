@@ -292,6 +292,34 @@
       (number? v) (zero? v)
       :else false)))
 
+(def additive-keys
+  "Set of parameter keys whose values combine additively when set multiple times."
+  #{:amp :add :detune :pshift :fshift :vibrato
+    :lpf-env :hpf-env :bpf-env :res-env :phaser-env :crush-env
+    :detune-env :pshift-env :fshift-env :pan-env :distort-env})
+
+(defn- combine-param-values [key old-v new-v]
+  (cond
+    (and (= key :note) (some? old-v))
+    (fn [beat k]
+      (let [root (if (fn? old-v) (old-v beat k) old-v)]
+        (if (fn? new-v) (new-v beat k) new-v)))
+
+    (and (contains? additive-keys key) (some? old-v))
+    (fn [beat k]
+      (+ (double (if (fn? old-v) (old-v beat k) old-v))
+         (double (if (fn? new-v) (new-v beat k) new-v))))
+
+    :else
+    new-v))
+
+(defn- merge-event-params [params1 params2]
+  (reduce-kv (fn [m k v]
+               (let [old-v (get m k)]
+                 (assoc m k (combine-param-values k old-v v))))
+             params1
+             params2))
+
 (defn with-param
   "Updates pattern events with a specific parameter.
    Only applies to active events (not rests)."
@@ -301,15 +329,9 @@
             (map (fn [e]
                    (if (is-rest-params? (:params e))
                      e
-                     (let [v (wrap-number-fn param-value)]
-                       (assoc-in e [:params key]
-                                 (if (and (= key :note) (contains? (:params e) :note))
-                                   ;; Special case for :note to allow composition
-                                   (let [old-v (get-in e [:params :note])]
-                                     (fn [beat k]
-                                       (let [root (if (fn? old-v) (old-v beat k) old-v)]
-                                         (if (fn? v) (v beat k) v))))
-                                   v)))))
+                     (let [v (wrap-number-fn param-value)
+                           old-v (get-in e [:params key])]
+                       (assoc-in e [:params key] (combine-param-values key old-v v)))))
                  evs))))
 
 (defn- make-event-list [pat key transform-fn]
@@ -354,7 +376,7 @@
                                                     (and (<= n-start b-start) (< b-start n-end))))
                                                 unrolled-new))]
                        (if match
-                         (let [merged-params (merge (:params be) (:params match))]
+                         (let [merged-params (merge-event-params (:params be) (:params match))]
                            (assoc be :params
                                   (if (or (is-rest-params? (:params be))
                                           (is-rest-params? (:params match)))
@@ -377,7 +399,7 @@
                                          i-start (max b-start n-start)
                                          i-end (min b-end n-end)
                                          i-dur (- i-end i-start)
-                                         merged-params (merge (:params be) (:params match))]
+                                         merged-params (merge-event-params (:params be) (:params match))]
                                      (assoc be
                                             :time i-start
                                             :duration i-dur

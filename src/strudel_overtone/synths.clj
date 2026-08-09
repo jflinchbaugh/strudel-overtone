@@ -233,10 +233,11 @@
                           (ov/lin-lin effective-phaser-depth# 0 1 -1 1)))
 
                  ~'filt (ov/hpf ~'phs effective-hpf#)
-                 ~'filt (let [~'bpf-sig (ov/bpf
+                 ~'filt (let [~'bpf-rq (ov/lin-lin effective-res# 0 1 1.0 0.05)
+                              ~'bpf-sig (ov/bpf
                                          ~'filt
                                          effective-bpf#
-                                         1)]
+                                         ~'bpf-rq)]
                           (ov/x-fade2
                            ~'filt
                            ~'bpf-sig
