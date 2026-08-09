@@ -196,8 +196,18 @@
             env-type (if (= env-param :perc) 1 0)
             lpf-env-param (get params :lpf-env-type default-env)
             lpf-env-type (if (= lpf-env-param :perc) 1 0)
-            reserved #{:sound :note :degree :active :start :duration :env :lpf-env-type :add :swing :slide :legato :monophonic :gate}
-            handled #{:amp :lpf :sustain :freq :slide-from :gate :monophonic :env-type :lpf-env-type}
+            hpf-env-param (get params :hpf-env-type default-env)
+            hpf-env-type (if (= hpf-env-param :perc) 1 0)
+            bpf-env-param (get params :bpf-env-type default-env)
+            bpf-env-type (if (= bpf-env-param :perc) 1 0)
+            res-env-param (get params :res-env-type default-env)
+            res-env-type (if (= res-env-param :perc) 1 0)
+            phaser-env-param (get params :phaser-env-type default-env)
+            phaser-env-type (if (= phaser-env-param :perc) 1 0)
+            crush-env-param (get params :crush-env-type default-env)
+            crush-env-type (if (= crush-env-param :perc) 1 0)
+            reserved #{:sound :note :degree :active :start :duration :env :lpf-env-type :hpf-env-type :bpf-env-type :res-env-type :phaser-env-type :crush-env-type :add :swing :slide :legato :monophonic :gate}
+            handled #{:amp :lpf :sustain :freq :slide-from :gate :monophonic :env-type :lpf-env-type :hpf-env-type :bpf-env-type :res-env-type :phaser-env-type :crush-env-type}
             args (cond-> (reduce-kv (fn [acc k v] (if (or (reserved k) (handled k)) acc (conj acc k v))) [] params)
                    true (conj :amp amp)
                    true (conj :freq effective-freq)
@@ -209,6 +219,11 @@
                    true (conj :monophonic (if monophonic 1 0))
                    true (conj :env-type env-type)
                    true (conj :lpf-env-type lpf-env-type)
+                   true (conj :hpf-env-type hpf-env-type)
+                   true (conj :bpf-env-type bpf-env-type)
+                   true (conj :res-env-type res-env-type)
+                   true (conj :phaser-env-type phaser-env-type)
+                   true (conj :crush-env-type crush-env-type)
                    sample-buf (conj :buf (:id sample-buf)))
             ;; Filter out any nils (e.g. if lpf or sample-buf was nil)
             args (->> (partition 2 args)

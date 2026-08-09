@@ -48,11 +48,11 @@
       (is (= 550.0 (sig 0.5 nil)))
       (is (= 100.0 (sig 1.0 nil))))))
 
-(deftest lpf-env-param-test
-  (testing "lpfe, lpf-adsr, and lpf-perc set pattern parameters correctly"
+(deftest filter-env-param-test
+  (testing "lpf-env, lpf-adsr, and lpf-perc set pattern parameters correctly"
     (let [pat (-> (sut/s [:saw])
                   (sut/lpf 300)
-                  (sut/lpfe 5000)
+                  (sut/lpf-env 5000)
                   (sut/lpf-adsr 0.01 0.15 0.1 0.2))
           ev (first (:events pat))
           params (:params ev)]
@@ -61,4 +61,36 @@
       (is (= 0.01 ((:lpf-attack params) 0 :lpf-attack)))
       (is (= 0.15 ((:lpf-decay params) 0 :lpf-decay)))
       (is (= 0.1 ((:lpf-s-level params) 0 :lpf-s-level)))
-      (is (= 0.2 ((:lpf-release params) 0 :lpf-release))))))
+      (is (= 0.2 ((:lpf-release params) 0 :lpf-release)))))
+
+  (testing "hpfe and bpf-adsr set pattern parameters correctly"
+    (let [pat (-> (sut/s [:saw])
+                  (sut/hpf-env 2000)
+                  (sut/hpf-adsr 0.02 0.1 0.5 0.3)
+                  (sut/bpf-env 1000)
+                  (sut/bpf-perc 0.05))
+          ev (first (:events pat))
+          params (:params ev)]
+      (is (= 2000 ((:hpf-env params) 0 :hpf-env)))
+      (is (= :adsr (:hpf-env-type params)))
+      (is (= 0.02 ((:hpf-attack params) 0 :hpf-attack)))
+      (is (= 1000 ((:bpf-env params) 0 :bpf-env)))
+      (is (= :perc (:bpf-env-type params)))
+      (is (= 0.05 ((:bpf-attack params) 0 :bpf-attack)))))
+
+  (testing "res-env, phaser-env, and crush-env set pattern parameters correctly"
+    (let [pat (-> (sut/s [:saw])
+                  (sut/res-env 0.8)
+                  (sut/res-adsr 0.01 0.1 0.0 0.1)
+                  (sut/phaser-env 0.5)
+                  (sut/phaser-perc 0.2)
+                  (sut/crush-env 0.9)
+                  (sut/crush-adsr 0.001 0.05 0.0 0.1))
+          ev (first (:events pat))
+          params (:params ev)]
+      (is (= 0.8 ((:res-env params) 0 :res-env)))
+      (is (= :adsr (:res-env-type params)))
+      (is (= 0.5 ((:phaser-env params) 0 :phaser-env)))
+      (is (= :perc (:phaser-env-type params)))
+      (is (= 0.9 ((:crush-env params) 0 :crush-env)))
+      (is (= :adsr (:crush-env-type params))))))

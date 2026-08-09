@@ -92,14 +92,14 @@ Load and slice your own samples.
 
 Every synth supports both volume and filter envelopes (`:adsr` or `:perc`).
 You can shape volume with `(adsr attack decay sustain-level release)` or `(perc attack sustain)`,
-and modulate the low-pass filter cutoff with `(lpfe depth-hz)`, `(lpf-adsr ...)` or `(lpf-perc ...)`.
+and modulate filter cutoff with `(lpf-env depth-hz)`, `(lpf-adsr ...)` or `(lpf-perc ...)`.
 
 ```clojure
 ;; 1. Classic Acid 303 Bass (Filter ADSR Sweep)
 (play! :acid (-> (note [:c2 :c3 :c2 :eb2 :g2])
                  (s :tb303)
                  (lpf 300)                      ; Resting base cutoff = 300 Hz
-                 (lpfe 5000)                    ; Peak envelope sweep depth = 5000 Hz
+                 (lpf-env 5000)                 ; Peak envelope sweep depth = 5000 Hz
                  (lpf-adsr 0.01 0.15 0.1 0.2)   ; Plucky filter sweep (att dec sus rel)
                  (adsr 0.01 0.2 0.8 0.1)        ; Volume envelope
                  (resonance 0.1)))
@@ -108,7 +108,7 @@ and modulate the low-pass filter cutoff with `(lpfe depth-hz)`, `(lpf-adsr ...)`
 (play! :pluck (-> (note [:c3 :g3 :c4 :eb4])
                   (s :saw)
                   (lpf 6000)                    ; Start bright at 6000 Hz cutoff
-                  (lpfe -5000)                  ; Sweep DOWN by 5000 Hz as envelope decays
+                  (lpf-env -5000)               ; Sweep DOWN by 5000 Hz as envelope decays
                   (lpf-adsr 0.005 0.25 0.0 0.1) ; Fast decay to 0 sustain
                   (adsr 0.005 0.3 0.6 0.1)))
 
@@ -116,7 +116,7 @@ and modulate the low-pass filter cutoff with `(lpfe depth-hz)`, `(lpf-adsr ...)`
 (play! :pad (-> (note [#{:c3 :eb3 :g3 :bb3}])
                 (s :saw)
                 (lpf 500)                       ; Dark baseline cutoff
-                (lpfe 3000)                     ; Gentle 3kHz filter swell
+                (lpf-env 3000)                  ; Gentle 3kHz filter swell
                 (lpf-adsr 1.5 2.0 0.7 2.0)      ; Slow filter swell
                 (adsr 1.0 1.0 0.8 2.0)          ; Slow volume swell
                 (legato 1.0)))

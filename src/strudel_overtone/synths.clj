@@ -42,7 +42,22 @@
                       attack 0.01 decay 0.1 s-level 0.5 release 0.3
                       lpf-env 0
                       lpf-env-type 0
-                      lpf-attack 0.01 lpf-decay 0.1 lpf-s-level 0.5 lpf-release 0.3}
+                      lpf-attack 0.01 lpf-decay 0.1 lpf-s-level 0.5 lpf-release 0.3
+                      hpf-env 0
+                      hpf-env-type 0
+                      hpf-attack 0.01 hpf-decay 0.1 hpf-s-level 0.5 hpf-release 0.3
+                      bpf-env 0
+                      bpf-env-type 0
+                      bpf-attack 0.01 bpf-decay 0.1 bpf-s-level 0.5 bpf-release 0.3
+                      res-env 0
+                      res-env-type 0
+                      res-attack 0.01 res-decay 0.1 res-s-level 0.5 res-release 0.3
+                      phaser-env 0
+                      phaser-env-type 0
+                      phaser-attack 0.01 phaser-decay 0.1 phaser-s-level 0.5 phaser-release 0.3
+                      crush-env 0
+                      crush-env-type 0
+                      crush-attack 0.01 crush-decay 0.1 crush-s-level 0.5 crush-release 0.3}
         varlag-param (fn [name]
                        `(ov/select:kr ~'monophonic [~name (ov/varlag ~name ~'slide)]))
         extra-map (apply hash-map extra-args)
@@ -55,12 +70,17 @@
          (let [;; Smoothed parameters for mono mode
                ~'lpf ~(varlag-param 'lpf)
                ~'lpf-env ~(varlag-param 'lpf-env)
+               ~'hpf ~(varlag-param 'hpf)
+               ~'hpf-env ~(varlag-param 'hpf-env)
+               ~'bpf ~(varlag-param 'bpf)
+               ~'bpf-env ~(varlag-param 'bpf-env)
                ~'resonance ~(varlag-param 'resonance)
+               ~'res-env ~(varlag-param 'res-env)
+               ~'phaser-env ~(varlag-param 'phaser-env)
+               ~'crush ~(varlag-param 'crush)
+               ~'crush-env ~(varlag-param 'crush-env)
                ~'amp ~(varlag-param 'amp)
                ~'pan ~(varlag-param 'pan)
-               ~'hpf ~(varlag-param 'hpf)
-               ~'bpf ~(varlag-param 'bpf)
-               ~'crush ~(varlag-param 'crush)
                ~'distort ~(varlag-param 'distort)
                ~'fshift ~(varlag-param 'fshift)
                ~'pshift ~(varlag-param 'pshift)
@@ -81,6 +101,41 @@
                                          :gate effective-gate#)
                lpf-env-sig# (ov/select:kr ~'lpf-env-type [lpf-adsr-env# lpf-perc-env#])
                effective-lpf# (s-max 20 (+ ~'lpf (* ~'lpf-env lpf-env-sig#)))
+
+               hpf-adsr-env# (ov/env-gen (ov/adsr ~'hpf-attack ~'hpf-decay ~'hpf-s-level ~'hpf-release)
+                                         :gate effective-gate#)
+               hpf-perc-env# (ov/env-gen (ov/perc ~'hpf-attack ~'sustain)
+                                         :gate effective-gate#)
+               hpf-env-sig# (ov/select:kr ~'hpf-env-type [hpf-adsr-env# hpf-perc-env#])
+               effective-hpf# (s-max 20 (+ ~'hpf (* ~'hpf-env hpf-env-sig#)))
+
+               bpf-adsr-env# (ov/env-gen (ov/adsr ~'bpf-attack ~'bpf-decay ~'bpf-s-level ~'bpf-release)
+                                         :gate effective-gate#)
+               bpf-perc-env# (ov/env-gen (ov/perc ~'bpf-attack ~'sustain)
+                                         :gate effective-gate#)
+               bpf-env-sig# (ov/select:kr ~'bpf-env-type [bpf-adsr-env# bpf-perc-env#])
+               effective-bpf# (s-max 20 (+ ~'bpf (* ~'bpf-env bpf-env-sig#)))
+
+               res-adsr-env# (ov/env-gen (ov/adsr ~'res-attack ~'res-decay ~'res-s-level ~'res-release)
+                                         :gate effective-gate#)
+               res-perc-env# (ov/env-gen (ov/perc ~'res-attack ~'sustain)
+                                         :gate effective-gate#)
+               res-env-sig# (ov/select:kr ~'res-env-type [res-adsr-env# res-perc-env#])
+               effective-res# (ov/clip (+ ~'resonance (* ~'res-env res-env-sig#)) 0.001 1.0)
+
+               phaser-adsr-env# (ov/env-gen (ov/adsr ~'phaser-attack ~'phaser-decay ~'phaser-s-level ~'phaser-release)
+                                            :gate effective-gate#)
+               phaser-perc-env# (ov/env-gen (ov/perc ~'phaser-attack ~'sustain)
+                                            :gate effective-gate#)
+               phaser-env-sig# (ov/select:kr ~'phaser-env-type [phaser-adsr-env# phaser-perc-env#])
+               effective-phaser-depth# (ov/clip (+ ~'phaser-depth (* ~'phaser-env phaser-env-sig#)) 0 1)
+
+               crush-adsr-env# (ov/env-gen (ov/adsr ~'crush-attack ~'crush-decay ~'crush-s-level ~'crush-release)
+                                           :gate effective-gate#)
+               crush-perc-env# (ov/env-gen (ov/perc ~'crush-attack ~'sustain)
+                                           :gate effective-gate#)
+               crush-env-sig# (ov/select:kr ~'crush-env-type [crush-adsr-env# crush-perc-env#])
+               effective-crush# (ov/clip (+ ~'crush (* ~'crush-env crush-env-sig#)) 0 1)
                ;; Trigger Sidechain
                _# (let [trig-env# (ov/env-gen
                                    (ov/perc
@@ -143,12 +198,12 @@
                          (ov/x-fade2
                           ~'dry
                           ~'wet
-                          (ov/lin-lin ~'phaser-depth 0 1 -1 1)))
+                          (ov/lin-lin effective-phaser-depth# 0 1 -1 1)))
 
-                 ~'filt (ov/hpf ~'phs (s-max 20 ~'hpf))
+                 ~'filt (ov/hpf ~'phs effective-hpf#)
                  ~'filt (let [~'bpf-sig (ov/bpf
                                          ~'filt
-                                         (s-max 20 ~'bpf)
+                                         effective-bpf#
                                          1)]
                           (ov/x-fade2
                            ~'filt
@@ -159,7 +214,7 @@
                  ~'filt (ov/rlpf
                          ~'filt
                          effective-lpf#
-                         ~'resonance)
+                         effective-res#)
 
                  ~'dst (ov/distort
                         (* ~'filt
@@ -170,14 +225,14 @@
                              ~'wet (ov/decimator
                                     ~'dry
                                     (ov/lin-lin
-                                     ~'crush 0 1 44100 2000)
+                                     effective-crush# 0 1 44100 2000)
                                     (ov/lin-lin
-                                     ~'crush 0 1 24 4))]
+                                     effective-crush# 0 1 24 4))]
                        (ov/x-fade2
                         ~'dry
                         ~'wet
                         (ov/lin-lin
-                         (> ~'crush 0)
+                         (> effective-crush# 0)
                          0 1 -1 1)))
 
                  ~'gated (* ~'crs ~'env)

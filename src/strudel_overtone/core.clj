@@ -48,7 +48,7 @@
              tremolo-depth pan-hz pan-depth phaser-hz phaser-depth begin
              end looping env active fast slow early late ribbon rev
              sometimes degrade delay-cycles stop-after glide
-             adsr perc lpfe lpf-adsr lpf-perc fm echo step degrees
+             adsr perc lpf-env lpf-adsr lpf-perc hpf-env hpf-adsr hpf-perc bpf-env bpf-adsr bpf-perc res-env res-adsr res-perc phaser-env phaser-adsr phaser-perc crush-env crush-adsr crush-perc fm echo step degrees
              alt slowcat stack fastcat)
 
 ;; --- Player Re-exports ---
@@ -125,7 +125,7 @@
          (-> (note [:c2 :c3 :c2 :eb2 :g2])
              (s :tb303)
              (lpf 300)                      ; Base cutoff frequency = 300 Hz
-             (lpfe 5000)                    ; Envelope modulation depth = 5000 Hz
+             (lpf-env 5000)                  ; Envelope modulation depth = 5000 Hz
              (lpf-adsr 0.01 0.15 0.1 0.2)   ; Plucky filter sweep
              (adsr 0.01 0.2 0.8 0.1)        ; Volume envelope
              (resonance 0.1)))
