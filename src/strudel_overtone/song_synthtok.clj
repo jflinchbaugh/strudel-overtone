@@ -6,22 +6,25 @@
 (let [bp [:b2]
       bi [4 1 1 1 2 2 1 1]
       g [0.6]
-      lpf-v 90]
-  (cpm 174/8)
+      lpf-v 200]
+  (cpm 174/16)
   (play-only!
    :b1 (-> (s :saw)
            (note bp)
            (degrees :minor bi)
            (gain g)
-           (legato 1/4)
-           (lpf lpf-v))
+           (legato 1)
+           (lpf 300)
+           (lpf-env 1000)
+           (lpf-adsr 0.01 0.4 0.0 0))
    :b2 (-> (s :sine)
            (note bp)
            (degrees :minor bi)
+           (detune 50)
            (add -12)
-           (legato 1/3)
+           (legato 1)
            (gain g)
-           (lpf lpf-v))
+           (lpf 300))
    :drum (-> (s [:bd :- :- :- :- :bd :- :-])
              (lpf 150))
    :snare (-> (s [:- :- :sd :- :- :- :sd :-]))
