@@ -48,7 +48,7 @@
              tremolo-depth pan-hz pan-depth phaser-hz phaser-depth begin
              end looping env active fast slow early late ribbon rev
              sometimes degrade delay-cycles stop-after glide
-             adsr perc lpf-env lpf-adsr lpf-perc hpf-env hpf-adsr hpf-perc bpf-env bpf-adsr bpf-perc res-env res-adsr res-perc phaser-env phaser-adsr phaser-perc crush-env crush-adsr crush-perc fm echo step degrees
+             adsr perc lpf-env lpf-adsr lpf-perc hpf-env hpf-adsr hpf-perc bpf-env bpf-adsr bpf-perc res-env res-adsr res-perc phaser-env phaser-adsr phaser-perc crush-env crush-adsr crush-perc detune-env detune-adsr detune-perc pshift-env pshift-adsr pshift-perc fshift-env fshift-adsr fshift-perc pan-env pan-adsr pan-perc distort-env distort-adsr distort-perc fm echo step degrees
              alt slowcat stack fastcat)
 
 ;; --- Player Re-exports ---

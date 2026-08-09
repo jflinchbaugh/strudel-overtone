@@ -206,8 +206,18 @@
             phaser-env-type (if (= phaser-env-param :perc) 1 0)
             crush-env-param (get params :crush-env-type default-env)
             crush-env-type (if (= crush-env-param :perc) 1 0)
-            reserved #{:sound :note :degree :active :start :duration :env :lpf-env-type :hpf-env-type :bpf-env-type :res-env-type :phaser-env-type :crush-env-type :add :swing :slide :legato :monophonic :gate}
-            handled #{:amp :lpf :sustain :freq :slide-from :gate :monophonic :env-type :lpf-env-type :hpf-env-type :bpf-env-type :res-env-type :phaser-env-type :crush-env-type}
+            detune-env-param (get params :detune-env-type default-env)
+            detune-env-type (if (= detune-env-param :perc) 1 0)
+            pshift-env-param (get params :pshift-env-type default-env)
+            pshift-env-type (if (= pshift-env-param :perc) 1 0)
+            fshift-env-param (get params :fshift-env-type default-env)
+            fshift-env-type (if (= fshift-env-param :perc) 1 0)
+            pan-env-param (get params :pan-env-type default-env)
+            pan-env-type (if (= pan-env-param :perc) 1 0)
+            distort-env-param (get params :distort-env-type default-env)
+            distort-env-type (if (= distort-env-param :perc) 1 0)
+            reserved #{:sound :note :degree :active :start :duration :env :lpf-env-type :hpf-env-type :bpf-env-type :res-env-type :phaser-env-type :crush-env-type :detune-env-type :pshift-env-type :fshift-env-type :pan-env-type :distort-env-type :add :swing :slide :legato :monophonic :gate}
+            handled #{:amp :lpf :sustain :freq :slide-from :gate :monophonic :env-type :lpf-env-type :hpf-env-type :bpf-env-type :res-env-type :phaser-env-type :crush-env-type :detune-env-type :pshift-env-type :fshift-env-type :pan-env-type :distort-env-type}
             args (cond-> (reduce-kv (fn [acc k v] (if (or (reserved k) (handled k)) acc (conj acc k v))) [] params)
                    true (conj :amp amp)
                    true (conj :freq effective-freq)
@@ -224,6 +234,11 @@
                    true (conj :res-env-type res-env-type)
                    true (conj :phaser-env-type phaser-env-type)
                    true (conj :crush-env-type crush-env-type)
+                   true (conj :detune-env-type detune-env-type)
+                   true (conj :pshift-env-type pshift-env-type)
+                   true (conj :fshift-env-type fshift-env-type)
+                   true (conj :pan-env-type pan-env-type)
+                   true (conj :distort-env-type distort-env-type)
                    sample-buf (conj :buf (:id sample-buf)))
             ;; Filter out any nils (e.g. if lpf or sample-buf was nil)
             args (->> (partition 2 args)

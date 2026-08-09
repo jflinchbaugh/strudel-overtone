@@ -57,19 +57,24 @@
                       phaser-attack 0.01 phaser-decay 0.1 phaser-s-level 0.5 phaser-release 0.3
                       crush-env 0
                       crush-env-type 0
-                      crush-attack 0.01 crush-decay 0.1 crush-s-level 0.5 crush-release 0.3}
+                      crush-attack 0.01 crush-decay 0.1 crush-s-level 0.5 crush-release 0.3
+                      detune-env 0
+                      detune-env-type 0
+                      detune-attack 0.01 detune-decay 0.1 detune-s-level 0.5 detune-release 0.3
+                      pshift-env 0
+                      pshift-env-type 0
+                      pshift-attack 0.01 pshift-decay 0.1 pshift-s-level 0.5 pshift-release 0.3
+                      fshift-env 0
+                      fshift-env-type 0
+                      fshift-attack 0.01 fshift-decay 0.1 fshift-s-level 0.5 fshift-release 0.3
+                      pan-env 0
+                      pan-env-type 0
+                      pan-attack 0.01 pan-decay 0.1 pan-s-level 0.5 pan-release 0.3
+                      distort-env 0
+                      distort-env-type 0
+                      distort-attack 0.01 distort-decay 0.1 distort-s-level 0.5 distort-release 0.3}
         varlag-param (fn [name]
                        `(ov/select:kr ~'monophonic [~name (ov/varlag ~name ~'slide)]))
-        build-env-sig (fn [prefix gate-sym]
-                        (let [p-name (fn [suffix] (symbol (if (empty? prefix) suffix (str prefix "-" suffix))))
-                              attack   (p-name "attack")
-                              decay    (p-name "decay")
-                              s-level  (p-name "s-level")
-                              release  (p-name "release")
-                              env-type (p-name "env-type")]
-                          `(let [adsr# (ov/env-gen (ov/adsr ~attack ~decay ~s-level ~release) :gate ~gate-sym)
-                                 perc# (ov/env-gen (ov/perc ~attack ~'sustain) :gate ~gate-sym)]
-                             (ov/select:kr ~env-type [adsr# perc#]))))
         extra-map (apply hash-map extra-args)
         final-args-map (merge common-args extra-map)
         final-args-vec (reduce-kv (fn [acc k v] (conj acc k v)) [] final-args-map)
@@ -89,12 +94,17 @@
                ~'phaser-env ~(varlag-param 'phaser-env)
                ~'crush ~(varlag-param 'crush)
                ~'crush-env ~(varlag-param 'crush-env)
-               ~'amp ~(varlag-param 'amp)
-               ~'pan ~(varlag-param 'pan)
-               ~'distort ~(varlag-param 'distort)
-               ~'fshift ~(varlag-param 'fshift)
-               ~'pshift ~(varlag-param 'pshift)
                ~'detune ~(varlag-param 'detune)
+               ~'detune-env ~(varlag-param 'detune-env)
+               ~'pshift ~(varlag-param 'pshift)
+               ~'pshift-env ~(varlag-param 'pshift-env)
+               ~'fshift ~(varlag-param 'fshift)
+               ~'fshift-env ~(varlag-param 'fshift-env)
+               ~'pan ~(varlag-param 'pan)
+               ~'pan-env ~(varlag-param 'pan-env)
+               ~'distort ~(varlag-param 'distort)
+               ~'distort-env ~(varlag-param 'distort-env)
+               ~'amp ~(varlag-param 'amp)
                ~'vibrato ~(varlag-param 'vibrato)
 
                auto-gate# (ov/line:kr 1 0 ~'sustain)
@@ -132,6 +142,32 @@
                crush-perc# (ov/env-gen (ov/perc ~'crush-attack ~'sustain) :gate effective-gate#)
                crush-env-sig# (ov/select:kr ~'crush-env-type [crush-adsr# crush-perc#])
                effective-crush# (ov/clip (+ ~'crush (* ~'crush-env crush-env-sig#)) 0 1)
+
+               detune-adsr# (ov/env-gen (ov/adsr ~'detune-attack ~'detune-decay ~'detune-s-level ~'detune-release) :gate effective-gate#)
+               detune-perc# (ov/env-gen (ov/perc ~'detune-attack ~'sustain) :gate effective-gate#)
+               detune-env-sig# (ov/select:kr ~'detune-env-type [detune-adsr# detune-perc#])
+               ~'effective-detune (+ ~'detune (* ~'detune-env detune-env-sig#))
+
+               pshift-adsr# (ov/env-gen (ov/adsr ~'pshift-attack ~'pshift-decay ~'pshift-s-level ~'pshift-release) :gate effective-gate#)
+               pshift-perc# (ov/env-gen (ov/perc ~'pshift-attack ~'sustain) :gate effective-gate#)
+               pshift-env-sig# (ov/select:kr ~'pshift-env-type [pshift-adsr# pshift-perc#])
+               effective-pshift# (+ ~'pshift (* ~'pshift-env pshift-env-sig#))
+
+               fshift-adsr# (ov/env-gen (ov/adsr ~'fshift-attack ~'fshift-decay ~'fshift-s-level ~'fshift-release) :gate effective-gate#)
+               fshift-perc# (ov/env-gen (ov/perc ~'fshift-attack ~'sustain) :gate effective-gate#)
+               fshift-env-sig# (ov/select:kr ~'fshift-env-type [fshift-adsr# fshift-perc#])
+               effective-fshift# (+ ~'fshift (* ~'fshift-env fshift-env-sig#))
+
+               pan-adsr# (ov/env-gen (ov/adsr ~'pan-attack ~'pan-decay ~'pan-s-level ~'pan-release) :gate effective-gate#)
+               pan-perc# (ov/env-gen (ov/perc ~'pan-attack ~'sustain) :gate effective-gate#)
+               pan-env-sig# (ov/select:kr ~'pan-env-type [pan-adsr# pan-perc#])
+               effective-pan# (ov/clip (+ ~'pan (* ~'pan-env pan-env-sig#)) -1 1)
+
+               distort-adsr# (ov/env-gen (ov/adsr ~'distort-attack ~'distort-decay ~'distort-s-level ~'distort-release) :gate effective-gate#)
+               distort-perc# (ov/env-gen (ov/perc ~'distort-attack ~'sustain) :gate effective-gate#)
+               distort-env-sig# (ov/select:kr ~'distort-env-type [distort-adsr# distort-perc#])
+               effective-distort# (ov/clip (+ ~'distort (* ~'distort-env distort-env-sig#)) 0 1)
+
                ;; Trigger Sidechain
                _# (let [trig-env# (ov/env-gen
                                    (ov/perc
@@ -148,12 +184,12 @@
                ~'snd (do ~@body)
                ;; Effect Chain
                  ;; Pitch Shift bypass
-                 ~'ps (let [~'use-ps (> (ov/absdif ~'pshift 0)
+                 ~'ps (let [~'use-ps (> (ov/absdif effective-pshift# 0)
                                         0.01)
                             ~'ps-sig (ov/pitch-shift
                                       ~'snd 0.2
                                       (ov/pow 2
-                                              (/ ~'pshift 12)))]
+                                              (/ effective-pshift# 12)))]
                         (ov/x-fade2
                          ~'snd
                          ~'ps-sig
@@ -161,9 +197,9 @@
 
                  ;; Freq Shift bypass
                  ~'fs (let [~'use-fs (>
-                                      (ov/absdif ~'fshift 0)
+                                      (ov/absdif effective-fshift# 0)
                                       0.01)
-                            ~'fs-sig (ov/freq-shift ~'ps ~'fshift)]
+                            ~'fs-sig (ov/freq-shift ~'ps effective-fshift#)]
                         (ov/x-fade2
                          ~'ps
                          ~'fs-sig
@@ -214,7 +250,7 @@
 
                  ~'dst (ov/distort
                         (* ~'filt
-                           (ov/dbamp (* ~'distort 24))))
+                           (ov/dbamp (* effective-distort# 24))))
 
                  ;; Decimator bypass - critical for ringing
                  ~'crs (let [~'dry ~'dst

@@ -814,6 +814,11 @@
 (def-env-helpers res)
 (def-env-helpers phaser)
 (def-env-helpers crush)
+(def-env-helpers detune)
+(def-env-helpers pshift)
+(def-env-helpers fshift)
+(def-env-helpers pan)
+(def-env-helpers distort)
 
 (defn fm
   "Sets FM synthesis parameters at once.
