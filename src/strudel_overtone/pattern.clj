@@ -774,143 +774,46 @@
                    :attack attack-sec
                    :sustain sustain-sec}))
 
-(defn lpf-adsr
-  "Sets all filter ADSR envelope parameters at once.
-   Usage: (lpf-adsr pat attack decay sustain-level release)"
-  [pattern attack decay sustain-level release]
-  (params pattern {:lpf-env-type :adsr
-                   :lpf-attack attack
-                   :lpf-decay decay
-                   :lpf-s-level sustain-level
-                   :lpf-release release}))
+(defmacro def-env-helpers
+  "Generates depth, ADSR, and Percussive pattern helper functions for a target envelope prefix."
+  [prefix]
+  (let [prefix-str (name prefix)
+        env-fn-name   (symbol (str prefix-str "-env"))
+        adsr-fn-name  (symbol (str prefix-str "-adsr"))
+        perc-fn-name  (symbol (str prefix-str "-perc"))
+        depth-key     (keyword (str prefix-str "-env"))
+        type-key      (keyword (str prefix-str "-env-type"))
+        att-key       (keyword (str prefix-str "-attack"))
+        dec-key       (keyword (str prefix-str "-decay"))
+        sus-level-key (keyword (str prefix-str "-s-level"))
+        rel-key       (keyword (str prefix-str "-release"))]
+    `(do
+       (defn ~env-fn-name
+         ~(str "Sets the " prefix-str " envelope modulation depth.")
+         [~'pattern ~'depth]
+         (set-param ~'pattern ~depth-key ~'depth))
 
-(defn lpf-perc
-  "Sets LPF percussive envelope parameters at once.
-   Usage: (lpf-perc pat attack-sec)"
-  [pattern attack-sec]
-  (params pattern {:lpf-env-type :perc
-                   :lpf-attack attack-sec}))
+       (defn ~adsr-fn-name
+         ~(str "Sets all " prefix-str " ADSR envelope parameters at once.")
+         [~'pattern ~'attack ~'decay ~'sustain-level ~'release]
+         (params ~'pattern {~type-key :adsr
+                            ~att-key ~'attack
+                            ~dec-key ~'decay
+                            ~sus-level-key ~'sustain-level
+                            ~rel-key ~'release}))
 
-(defn hpf-adsr
-  "Sets all HPF ADSR envelope parameters at once.
-   Usage: (hpf-adsr pat attack decay sustain-level release)"
-  [pattern attack decay sustain-level release]
-  (params pattern {:hpf-env-type :adsr
-                   :hpf-attack attack
-                   :hpf-decay decay
-                   :hpf-s-level sustain-level
-                   :hpf-release release}))
+       (defn ~perc-fn-name
+         ~(str "Sets " prefix-str " percussive envelope parameters at once.")
+         [~'pattern ~'attack-sec]
+         (params ~'pattern {~type-key :perc
+                            ~att-key ~'attack-sec})))))
 
-(defn hpf-perc
-  "Sets HPF percussive envelope parameters at once.
-   Usage: (hpf-perc pat attack-sec)"
-  [pattern attack-sec]
-  (params pattern {:hpf-env-type :perc
-                   :hpf-attack attack-sec}))
-
-(defn bpf-adsr
-  "Sets all BPF ADSR envelope parameters at once.
-   Usage: (bpf-adsr pat attack decay sustain-level release)"
-  [pattern attack decay sustain-level release]
-  (params pattern {:bpf-env-type :adsr
-                   :bpf-attack attack
-                   :bpf-decay decay
-                   :bpf-s-level sustain-level
-                   :bpf-release release}))
-
-(defn bpf-perc
-  "Sets BPF percussive envelope parameters at once.
-   Usage: (bpf-perc pat attack-sec)"
-  [pattern attack-sec]
-  (params pattern {:bpf-env-type :perc
-                   :bpf-attack attack-sec}))
-
-(defn lpf-env
-  "Sets the low-pass filter envelope modulation depth in Hz.
-   Usage: (lpf-env pat depth-hz)"
-  [pattern depth-hz]
-  (set-param pattern :lpf-env depth-hz))
-
-(defn hpf-env
-  "Sets the high-pass filter envelope modulation depth in Hz.
-   Usage: (hpf-env pat depth-hz)"
-  [pattern depth-hz]
-  (set-param pattern :hpf-env depth-hz))
-
-(defn bpf-env
-  "Sets the band-pass filter envelope modulation depth in Hz.
-   Usage: (bpf-env pat depth-hz)"
-  [pattern depth-hz]
-  (set-param pattern :bpf-env depth-hz))
-
-(defn res-env
-  "Sets the filter resonance envelope modulation depth.
-   Usage: (res-env pat depth)"
-  [pattern depth]
-  (set-param pattern :res-env depth))
-
-(defn res-adsr
-  "Sets all resonance ADSR envelope parameters at once.
-   Usage: (res-adsr pat attack decay sustain-level release)"
-  [pattern attack decay sustain-level release]
-  (params pattern {:res-env-type :adsr
-                   :res-attack attack
-                   :res-decay decay
-                   :res-s-level sustain-level
-                   :res-release release}))
-
-(defn res-perc
-  "Sets resonance percussive envelope parameters at once.
-   Usage: (res-perc pat attack-sec)"
-  [pattern attack-sec]
-  (params pattern {:res-env-type :perc
-                   :res-attack attack-sec}))
-
-(defn phaser-env
-  "Sets the phaser depth envelope modulation amount.
-   Usage: (phaser-env pat depth)"
-  [pattern depth]
-  (set-param pattern :phaser-env depth))
-
-(defn phaser-adsr
-  "Sets all phaser ADSR envelope parameters at once.
-   Usage: (phaser-adsr pat attack decay sustain-level release)"
-  [pattern attack decay sustain-level release]
-  (params pattern {:phaser-env-type :adsr
-                   :phaser-attack attack
-                   :phaser-decay decay
-                   :phaser-s-level sustain-level
-                   :phaser-release release}))
-
-(defn phaser-perc
-  "Sets phaser percussive envelope parameters at once.
-   Usage: (phaser-perc pat attack-sec)"
-  [pattern attack-sec]
-  (params pattern {:phaser-env-type :perc
-                   :phaser-attack attack-sec}))
-
-(defn crush-env
-  "Sets the bitcrush envelope modulation amount.
-   Usage: (crush-env pat depth)"
-  [pattern depth]
-  (set-param pattern :crush-env depth))
-
-(defn crush-adsr
-  "Sets all bitcrush ADSR envelope parameters at once.
-   Usage: (crush-adsr pat attack decay sustain-level release)"
-  [pattern attack decay sustain-level release]
-  (params pattern {:crush-env-type :adsr
-                   :crush-attack attack
-                   :crush-decay decay
-                   :crush-s-level sustain-level
-                   :crush-release release}))
-
-(defn crush-perc
-  "Sets bitcrush percussive envelope parameters at once.
-   Usage: (crush-perc pat attack-sec)"
-  [pattern attack-sec]
-  (params pattern {:crush-env-type :perc
-                   :crush-attack attack-sec}))
+(def-env-helpers lpf)
+(def-env-helpers hpf)
+(def-env-helpers bpf)
+(def-env-helpers res)
+(def-env-helpers phaser)
+(def-env-helpers crush)
 
 (defn fm
   "Sets FM synthesis parameters at once.
