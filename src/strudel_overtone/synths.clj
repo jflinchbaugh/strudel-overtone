@@ -16,9 +16,10 @@
 (defonce duck-bus (ov/control-bus))
 
 (defmacro with-glide [freq & body]
-  `(let [~'base-f (ov/select:kr ~'monophonic
+  `(let [~'start-f (ov/select:kr (< ~'slide-from 0) [~'slide-from ~freq])
+         ~'base-f (ov/select:kr ~'monophonic
                                [(ov/line:kr ~'slide-from ~freq ~'slide)
-                                (ov/varlag ~freq ~'slide)])
+                                (ov/varlag ~freq ~'slide 0 1 ~'start-f)])
          ~'detuned-f (* ~'base-f (ov/pow 2 (/ ~'detune 1200)))
          ~'actual-f (ov/vibrato:kr ~'detuned-f ~'vibrato 0.02)]
      ~@body))
@@ -290,10 +291,11 @@
                              ~'room-size
                              ~'damp)
                  _# (ov/detect-silence
-                     ~'reverbed
-                     :amp 0.0001
-                     :time 0.2
-                     :action ov/FREE)
+                      (ov/select:ar ~'monophonic
+                                    [~'reverbed 1.0])
+                      :amp 0.0001
+                      :time 0.2
+                      :action ov/FREE)
                  ~'actual-pan (+
                                ~'pan
                                (let [~'mod (*

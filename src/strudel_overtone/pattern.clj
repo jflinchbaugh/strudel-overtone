@@ -250,7 +250,9 @@
                             {:value val
                              :start s-time
                              :duration dur})
-                          v)
+                          ;; Sort for deterministic voice-idx
+                          ;; assignment across cycles.
+                          (sort-by str v))
 
                      (and (sequential? v) (not (string? v)))
                      (parse-mini v s-time dur)
@@ -274,7 +276,7 @@
     :else (keyword (str v))))
 
 (defn is-rest? [v]
-  (#{:- :_} (->name v)))
+  (and (not (coll? v)) (#{:- :_} (->name v))))
 
 (defn- try-parse-number [v]
   (cond
@@ -508,8 +510,9 @@
   (set pattern))
 
 (defn note
-  "Creates a pattern from a note string (mini-notation),
-   or sets the note of an existing pattern."
+  "Creates a pattern from a sequence of note keywords,
+   or sets the note of an existing pattern.
+   Example: (note [:c4 :e4 :g4])"
   ([pat]
    (make-pattern (make-event-list pat :note identity)))
   ([pattern note-val]

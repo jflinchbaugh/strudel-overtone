@@ -4,9 +4,10 @@
             [strudel-overtone.player :as player]
             [strudel-overtone.synths :as synths]
             [overtone.core :as ov]))
+
 (deftest monophonic-logic-test
   (testing "monophonic mode reuses synth instance"
-    (let [player-state (atom {:playing? true :patterns {} :loops #{} :active-synths {} :last-freq {}})
+    (let [player-state (atom {:playing? true :patterns {} :loops #{:p1 :p2} :active-synths {} :last-freq {}})
           mono-calls (atom [])
           mock-inst {:id 123}]
       (with-redefs [player/player-state player-state
@@ -47,5 +48,18 @@
                   (is (= 0 (active-val rest-ev)))
                   (sut/trigger-event :p1 rest-ev 2 1)
                   (is (= 1 @gate-offs))
-                  (is (nil? (get-in @player-state [:active-synths [:p1 0]]))))))))))))
+                  (is (nil? (get-in @player-state [:active-synths [:p1 0]])))))))
 
+          (testing "chord followed by single note gates off extra voices"
+            (let [gate-offs (atom 0)]
+              (with-redefs [player/gate-off (fn [inst] (swap! gate-offs inc))]
+                ;; Trigger 3-note chord as a Clojure set
+                (let [pat (-> (sut/note [#{:c3 :e3 :g3}]) (sut/s :saw) (sut/mono))]
+                  (doseq [[vidx ev] (map-indexed vector (:events pat))]
+                    (sut/trigger-event :p2 ev 0 1 vidx)))
+                ;; Trigger 1-note melody
+                (let [pat (-> (sut/note [:c3]) (sut/s :saw) (sut/mono))]
+                  (doseq [[vidx ev] (map-indexed vector (:events pat))]
+                    (sut/trigger-event :p2 ev 1 1 vidx)))
+                ;; Voices 1 & 2 from chord should have been gated off
+                (is (= 2 @gate-offs))))))))))

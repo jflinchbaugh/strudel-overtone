@@ -1,5 +1,6 @@
 (ns strudel-overtone.song-synthtok
-  (:require [strudel-overtone.core :refer :all]))
+  (:require [strudel-overtone.core :refer :all]
+            [overtone.core :as ov]))
 
 (def lpf-a (atom 100))
 
@@ -66,16 +67,15 @@
                        (phaser-perc 0.1)))
 
 ;; 3. Slow Ambient Pad with Soft Filter Envelope
-(play-only! :pad (-> (note (set [:c3 :eb3 :g3 :bb3]))
+(play-only! :pad (-> (note #{:c3 :eb3 :g3 :bb3})
                      (add 12)
                      (s :saw)
-                     (lpf 100)                       ; Dark baseline cutoff
-                     (lpf-env 1000)                     ; Gentle 3kHz filter swell
-                     (lpf-adsr 1.5 2.0 0.7 2.0)      ; Slow filter swell
-                     (adsr 0.5 0 0.8 0.5)          ; Slow volume swell
-                     (legato 1.2)))
+                     #_(lpf 100)                       ; Dark baseline cutoff
+                     #_(lpf-env 1000)                     ; Gentle 3kHz filter swell
+                     #_(lpf-adsr 1.5 2.0 0.7 2.0)      ; Slow filter swell
+                     #_(adsr 0.5 0 0.8 0.5)          ; Slow volume swell
+                     #_(legato 0.9)))
 
-(stop!)
 
 ;; Telephone / Radio Vocoder Sweep
 (play-only!
@@ -85,3 +85,13 @@
      (bpf-env 2400)          ; Envelope sweeps center freq up to +2400 Hz
      (bpf-perc 0.05)         ; Percussive envelope attack/decay
      (resonance 0.8)))        ; Sharp resonant peak for a vocal "wah" effect
+
+
+(play-only! :pad (-> (note [#{:c3 :eb3} #{:c4 :eb4}])
+                     (glide 1)
+                     (mono)
+                     (s :saw)))
+
+(stop!)
+
+(ov/stop)
