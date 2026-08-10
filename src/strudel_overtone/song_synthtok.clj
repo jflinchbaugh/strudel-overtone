@@ -87,9 +87,9 @@
      (resonance 0.8)))        ; Sharp resonant peak for a vocal "wah" effect
 
 
-(play-only! :pad (-> (note [#{:c3 :eb3} #{:c4 :eb4}])
-                     (glide 1)
+(play-only! :pad (-> (note [#{:c3 :eb3} #{:c4 :g3}])
                      (mono)
+                     (glide 0.5)
                      (s :saw)))
 
 (stop!)

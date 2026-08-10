@@ -23,7 +23,6 @@
             #_(echo-delay 0.02)
             (crush (overlay [0.1 0.3 0.6]))
             #_(distort 0.5)
-            (release 0.01)
             #_(pan-hz 1)
             #_(pan-depth 0.9)
             (duck-trigger 1)
@@ -55,10 +54,8 @@
          (resonance 3)
          (distort 0.5)
          (add [-12 -12])
-         (attack 1.2)
-         (release 0.01)
+         (adsr 1.2 0.1 1 0.01)
          (gain [0.2 0.1])
-         (s-level 1)
          (duck 0.8)))
 
   (stop! :hat)
@@ -80,12 +77,7 @@
                      (s [:mooger])
                      (resonance 3)
                      (distort 0.5)
-                     (add [-12 -12])
-                     (attack 1.2)
-                     (release 0.01)
-                     (gain [0.3 0.3])
-                     (s-level 1)
-                     (duck 0.8)))
+                     (gain [0.3 0.3])))
 
   (playing)
 
@@ -93,10 +85,10 @@
 
   (play! :test (->
                  (s :snare)
-                 (note [[:b5 :ba :- :b5 :a3 :b5 :b5 :b5] [:c5 :c5] [:a5 :a5] [:- :c5 :c5]])
+                 (note [[:b5 :b5 :- :b5 :a3 :b5 :b5 :b5] [:c5 :c5] [:a5 :a5] [:- :c5 :c5]])
                  #_(perc 0.5 0.1)
                  #_(adsr 0.01 0.1 0.9 0.5)
-                 #_(echo )
+                 (echo 0.05)
                  ))
 
   .)
