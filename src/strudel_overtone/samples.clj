@@ -4,8 +4,13 @@
             [clojure.string :as str]
             [strudel-overtone.pattern :as p]))
 
-(defonce samples (atom {}))
-(defonce sample-slices (atom {}))
+(defonce
+  ^{:doc "Registry atom mapping sample keywords to loaded Overtone sound buffer objects."}
+  samples (atom {}))
+
+(defonce
+  ^{:doc "Registry atom mapping slice keywords to slice specification maps."}
+  sample-slices (atom {}))
 
 (defn- clean-name [n]
   (keyword (str/replace (clojure.core/name (p/->name n)) #"^:" "")))

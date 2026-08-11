@@ -19,7 +19,9 @@
   [val]
   (->Overlay val))
 
-(defn make-pattern [events]
+(defn make-pattern
+  "Constructs a Pattern record from a sequence of events."
+  [events]
   (let [num-cycles (if (seq events)
                      (inc (long (apply max (map :time events))))
                      1)]
@@ -221,6 +223,7 @@
                       base-events))))))
 
 (defn set-param
+  "Sets a single parameter on pattern events to value v."
   ([pattern key param-value] (set-param pattern key param-value try-parse-number))
   ([pattern key param-value transform-fn]
    (let [overlay? (instance? Overlay param-value)
@@ -391,7 +394,9 @@
   ([pattern] (set-param pattern :monophonic 1))
   ([pattern monophonic-active] (set-param pattern :monophonic monophonic-active)))
 
-(def mono monophonic)
+(def mono
+  "Alias for monophonic."
+  monophonic)
 
 (defn width
   "Sets the pulse width for square waves.
@@ -577,7 +582,9 @@
   ([pattern env-name]
    (set-param pattern :env env-name ->name)))
 
-(defn active [pattern active-val]
+(defn active
+  "Sets the active status of pattern events (1 for active, 0 for silent)."
+  [pattern active-val]
   (set-param pattern :active active-val try-parse-number))
 
 (defn glide
@@ -670,7 +677,9 @@
 
 ;; --- Time/Structural Modifiers ---
 
-(defn fast [pattern amount]
+(defn fast
+  "Speeds up the pattern playback speed by amount multiplier."
+  [pattern amount]
   (let [amount-fn (wrap-number-fn amount)]
     (update pattern :cycles
             (fn [old-val]
@@ -678,7 +687,9 @@
                 (fn [t seed]
                   (* (old-fn t seed) (amount-fn t seed))))))))
 
-(defn slow [pattern amount]
+(defn slow
+  "Slows down the pattern playback speed by amount divisor."
+  [pattern amount]
   (let [amount-fn (wrap-number-fn amount)]
     (update pattern :cycles
             (fn [old-val]

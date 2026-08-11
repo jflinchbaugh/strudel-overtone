@@ -46,7 +46,9 @@
              play-loop playing play! play-only! stop!)
 
 ;; --- Synths Re-exports ---
-(defmacro def-additive! [name ratios & opts]
+(defmacro def-additive!
+  "Defines a new additive synth from a sequence of harmonic volume ratios."
+  [name ratios & opts]
   `(synths/def-additive! ~name ~ratios ~@opts))
 
 (import-vars synths
@@ -72,7 +74,9 @@
 
 ;; --- Main / Entry ---
 
-(defn -main [& args]
+(defn -main
+  "Main entry point that connects to SuperCollider server and logs readiness."
+  [& args]
   (ov/connect-server)
   (tel/log! :info {:studel-overtone :ready}))
 

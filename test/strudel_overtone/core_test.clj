@@ -19,6 +19,18 @@
     (f)
     (sut/stop!)))
 
+(deftest all-core-vars-have-docstrings-test
+  (testing "All public vars in strudel-overtone.core have docstrings"
+    (let [public-vars (ns-publics 'strudel-overtone.core)
+          missing-docs (reduce-kv (fn [acc sym v]
+                                    (if (and (var? v) (nil? (:doc (meta v))))
+                                      (conj acc sym)
+                                      acc))
+                                  []
+                                  public-vars)]
+      (is (empty? missing-docs)
+          (str "Public vars missing docstrings: " (pr-str missing-docs))))))
+
 (deftest play!-test
   (testing "play! quantization logic"
     (let [player-state (atom {:playing? false :patterns {} :loops #{}})

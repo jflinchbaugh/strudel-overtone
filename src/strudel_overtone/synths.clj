@@ -79,7 +79,8 @@
         extra-map (apply hash-map extra-args)
         final-args-map (merge common-args extra-map)
         final-args-vec (reduce-kv (fn [acc k v] (conj acc k v)) [] final-args-map)
-        synth-symbol (symbol (clojure.core/name name))]
+        synth-symbol (symbol (clojure.core/name name))
+        doc-str (str "Strudel synth voice: " (clojure.core/name name))]
     `(do
        (ov/defsynth ~synth-symbol
          ~final-args-vec
@@ -311,6 +312,7 @@
                        ~'amp
                        ~'amp-duck)
                       ~'actual-pan))))
+       (alter-meta! (var ~synth-symbol) assoc :doc ~doc-str)
        (let [synth-var# (var ~synth-symbol)]
          (when-not (= *ns* (find-ns 'strudel-overtone.synths))
            (intern 'strudel-overtone.synths
@@ -480,14 +482,20 @@
 (def percussive-synths
   #{:kick :snare :hat :clap :bd :sd :hh :cp :dub-kick :dance-kick :ks-stringer})
 
-(defn supports-mono? [sound-name]
+(defn supports-mono?
+  "Checks if a synth sound supports monophonic play mode."
+  [sound-name]
   (not (or (percussive-synths sound-name)
            (#{:sampler :white :pink :brown} sound-name))))
 
-(defn get-synth-name [sound _params]
+(defn get-synth-name
+  "Resolves the synth name keyword, mapping aliases (e.g., :bd -> :kick)."
+  [sound _params]
   (get synth-aliases sound sound))
 
-(defn resolve-synth [name]
+(defn resolve-synth
+  "Resolves a synth var symbol by name keyword within the synths namespace."
+  [name]
   (let [s (symbol (clojure.core/name name))]
     (when-let [ns (find-ns 'strudel-overtone.synths)]
       (ns-resolve ns s))))

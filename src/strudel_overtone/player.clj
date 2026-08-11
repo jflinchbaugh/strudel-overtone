@@ -23,7 +23,9 @@
             (or (force msg_) data)
             "\n")))}))
 
-(defonce metro (ov/metronome 120))
+(defonce
+  ^{:doc "Default Overtone metronome instance running at 120 BPM."}
+  metro (ov/metronome 120))
 
 (defn cpm
   "Sets or gets the cycles per minute.
@@ -55,14 +57,18 @@
                         (tel/log! :info {:cpm target-val})
                         (cpm target-val))))))))
 
-(defonce player-state (atom {:playing? false :patterns {} :loops #{} :last-freq {}}))
+(defonce
+  ^{:doc "Atom holding the global playback state including active loops, patterns, and synth instances."}
+  player-state (atom {:playing? false :patterns {} :loops #{} :last-freq {}}))
 
 (defn- resolve-note [n]
   (if (number? n)
     (ov/midi->hz n)
     (ov/midi->hz (ov/note n))))
 
-(defn resolve-params [params beat cycle]
+(defn resolve-params
+  "Resolves dynamic parameters for an event at the given beat and cycle."
+  [params beat cycle]
   (binding [p/*current-cycle* (or cycle 0)]
     (let [cycle-t (/ (double beat) 4.0)]
       (reduce-kv (fn [m k v]
@@ -131,20 +137,26 @@
   [beat synth-var args]
   (ov/at (metro beat) (apply synth-var args)))
 
-(defn gate-off [inst]
+(defn gate-off
+  "Gates off a synth node by setting its gate parameter to 0."
+  [inst]
   (when (and inst (ov/node-active? inst))
     (try
       (ov/ctl inst :gate 0)
       (catch Exception _ nil))))
 
-(defn update-mono-inst [inst args]
+(defn update-mono-inst
+  "Updates controls of an existing monophonic synth node instance."
+  [inst args]
   (let [update-args (->> (partition 2 args)
                          (remove (fn [[k _]] (= k :gate)))
                          (apply concat)
                          vec)]
     (apply ov/ctl inst update-args)))
 
-(defn start-mono-inst [key voice-idx synth-var args old-inst]
+(defn start-mono-inst
+  "Starts a new monophonic synth node instance and records it in player-state."
+  [key voice-idx synth-var args old-inst]
   (tel/log! :info {:action :start-mono
                    :key [key voice-idx]
                    :had-inst (some? old-inst)})
@@ -153,7 +165,9 @@
     (swap! player-state assoc-in [:active-synths [key voice-idx]]
            {:inst new-inst :synth synth-var})))
 
-(defn at-metro-mono [beat key voice-idx synth-var args]
+(defn at-metro-mono
+  "Schedules update or restart of a monophonic synth node at a specific beat."
+  [beat key voice-idx synth-var args]
   (ov/apply-at (metro beat)
                (fn [& _]
                  (when (contains? (:loops @player-state) key)
@@ -175,7 +189,9 @@
                        (start-mono-inst
                         key voice-idx synth-var args inst)))))))
 
-(defn trigger-single-event [key ev params beat dur-beats voice-idx]
+(defn trigger-single-event
+  "Triggers a single resolved event on the metronome."
+  [key ev params beat dur-beats voice-idx]
   (let [sound-param (:sound params)
         n-raw (:note params)
         degree (or (get params :degree) 0)
@@ -301,6 +317,7 @@
                 (at-metro beat synth-var args)))))))))
 
 (defn trigger-event
+  "Triggers a pattern event map at the specified beat with voice/cycle parameters."
   ([key ev beat dur-beats]
    (trigger-event key ev beat dur-beats 0 0 1))
   ([key ev beat dur-beats voice-idx]
@@ -408,7 +425,9 @@
                          :error (ex-message e)
                          :event ev})))))
 
-(defn apply-swing [t amount step-size]
+(defn apply-swing
+  "Applies swing timing shift to time t based on swing amount and step size."
+  [t amount step-size]
   (let [step-idx (long (/ t step-size))]
     (if (odd? step-idx)
       (+ t (* amount step-size))
@@ -460,7 +479,9 @@
                       ev-dur-beats (* rel-dur cycle-dur)]
                   (trigger-event key ev ev-beat ev-dur-beats vidx cycle-total num-voices-at-time))))))))))
 
-(defn play-loop [key beat start-beat]
+(defn play-loop
+  "Recursive scheduling loop function executed per cycle for playing patterns."
+  [key beat start-beat]
   (let [state @player-state]
     (if (and (:playing? state) (contains? (:loops state) key))
       (let [pat (get-in state [:patterns key])]
@@ -499,6 +520,8 @@
   (seq (:loops @player-state)))
 
 (defn play!
+  "Starts playing one or more named patterns synchronized to the metronome cycle boundary.
+   Example: (play! :bass (note [:c2 :g2]))"
   [& args]
   (let [pairs (if (= 1 (count args))
                 [[:main (first args)]]
@@ -548,6 +571,7 @@
     (apply play! args)))
 
 (defn stop!
+  "Stops all playing patterns or a specific pattern by key."
   ([]
    (swap! player-state assoc :playing? false :patterns {} :loops #{}))
   ([key]
