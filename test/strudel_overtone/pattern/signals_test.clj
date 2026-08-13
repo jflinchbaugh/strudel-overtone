@@ -27,3 +27,20 @@
       (is (approx= 150 (s 0.0 nil)))
       (is (approx= 200 (s 0.25 nil)))
       (is (approx= 100 (s 0.75 nil))))))
+
+(sig/def-sig pulse-sig
+  "Pulse signal generator."
+  [t _]
+  (if (< (mod t 1) 0.25) 1 0))
+
+(deftest def-sig-test
+  (testing "def-sig multi-arity generation"
+    (is (= 1 (pulse-sig 0.1 nil)))
+    (is (= 0 (pulse-sig 0.5 nil)))
+    (let [f (pulse-sig 2)]
+      (is (= 1 (f 0.05 nil)))
+      (is (= 0 (f 0.25 nil))))
+    (let [scaled (pulse-sig 1 10 20)]
+      (is (= 20 (scaled 0.1 nil)))
+      (is (= 10 (scaled 0.5 nil))))))
+

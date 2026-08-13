@@ -165,7 +165,7 @@
                         (s :sine)
                         (mono)
                         (glide 1.0)
-                        (pan sine)))
+                        (pan sine-sig)))
 
   (stop!)
 
