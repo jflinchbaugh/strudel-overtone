@@ -90,11 +90,15 @@
 (defn- try-parse-number [v]
   (cond
     (fn? v) v
+    (instance? clojure.lang.IDeref v) (fn [beat key] (try-parse-number @v))
     (string? v) (try (Double/parseDouble v) (catch Exception _ v))
     :else v))
 
 (defn- wrap-number-fn [v]
-  (if (number? v) (constantly v) v))
+  (cond
+    (number? v) (constantly v)
+    (instance? clojure.lang.IDeref v) (fn [beat key] @v)
+    :else v))
 
 (defn- is-rest-params? [params]
   (let [v (get params :active (constantly 1))]

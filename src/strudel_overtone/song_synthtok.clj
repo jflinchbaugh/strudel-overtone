@@ -4,28 +4,29 @@
 
 (def lpf-a (atom 100))
 
+(def g (atom 0.1))
+
 (let [bp [:b2]
       bi [4 1 1 1 2 2 1 1]
-      g [0.6]
-      lpf-v 200]
+      lpf-v lpf-a]
   (cpm 174/8)
   (play-only!
    :b1 (-> (s :saw)
            (note bp)
            (degrees :minor bi)
            (gain g)
-           (legato 1/2)
+           (legato 1)
            (lpf 300)
-           (lpf-env 1000)
+           (lpf-env lpf-a)
            (lpf-adsr 0.01 0.2 0.0 0))
    :b2 (-> (s :sine)
            (note bp)
            (degrees :minor bi)
-           (legato 1/2)
+           (legato 1)
            (add -12)
            (gain g)
            (gain 2)
-           (lpf 400))
+           (lpf lpf-a))
    :drum (-> (s [:bd :- :- :- :- :bd :- :-])
              (lpf 150))
    :snare (-> (s [:- :- :sd :- :- :- :sd :-]))
@@ -40,7 +41,8 @@
 
 (saw 1)
 
-(reset! lpf-a 200)
+(reset! lpf-a 2000)
+(reset! g 1)
 
 ;; 1. Classic Acid 303 Bass (Filter ADSR Sweep)
 (play-only! :acid (-> (note [:c2 :c2 :c2])
@@ -70,11 +72,11 @@
 (play-only! :pad (-> (note #{:c3 :eb3 :g3 :bb3})
                      (add 12)
                      (s :saw)
-                     #_(lpf 100)                       ; Dark baseline cutoff
-                     #_(lpf-env 1000)                     ; Gentle 3kHz filter swell
-                     #_(lpf-adsr 1.5 2.0 0.7 2.0)      ; Slow filter swell
-                     #_(adsr 0.5 0 0.8 0.5)          ; Slow volume swell
-                     #_(legato 0.9)))
+                     (lpf 100)                       ; Dark baseline cutoff
+                     (lpf-env 1000)                     ; Gentle 3kHz filter swell
+                     (lpf-adsr 1.5 2.0 0.7 2.0)      ; Slow filter swell
+                     (adsr 0.5 0 0.8 0.5)          ; Slow volume swell
+                     (legato 0.9)))
 
 
 ;; Telephone / Radio Vocoder Sweep

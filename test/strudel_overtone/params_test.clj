@@ -32,6 +32,19 @@
         (is (= 10 ((:mod-index params) 0 :mod-index)))
         (is (= 8 ((:repeats params) 0 :repeats)))))))
 
+(deftest atom-param-test
+  (testing "atoms passed as parameters automatically deref"
+    (let [cutoff-atom (atom 800)
+          pat (-> (sut/s [:saw])
+                  (sut/lpf cutoff-atom))
+          ev (first (:events pat))
+          lpf-fn (get-in ev [:params :lpf])]
+      (is (fn? lpf-fn))
+      (is (= 800 (lpf-fn 0 :lpf)))
+      (reset! cutoff-atom 1500)
+      (is (= 1500 (lpf-fn 0 :lpf))))))
+
+
 (deftest echo-params-test
   (testing "echo and echo-delay set correct parameters"
     (let [pat (-> (sut/s [:bd])
