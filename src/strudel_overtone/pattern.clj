@@ -659,6 +659,58 @@
 (def-env-helpers pan)
 (def-env-helpers distort)
 
+;; --- Sound Design Presets DSL ---
+
+(defn acid
+  "Applies classic TB-303 style acid filter settings.
+   Default: cutoff 800Hz, resonance 0.05 (high res), envelope 3000.
+   Optionally specify cutoff-hz, res-amount, and env-depth."
+  ([pattern]
+   (acid pattern 800 0.05 3000))
+  ([pattern cutoff-hz]
+   (acid pattern cutoff-hz 0.05 3000))
+  ([pattern cutoff-hz res-amount]
+   (acid pattern cutoff-hz res-amount 3000))
+  ([pattern cutoff-hz res-amount env-depth]
+   (params pattern {:lpf cutoff-hz
+                    :resonance res-amount
+                    :lpf-env env-depth})))
+
+(defn drive
+  "Applies warm saturation or bitcrushing distortion.
+   Default: distortion 0.4.
+   Optionally specify distortion amount and optional bitcrush amount."
+  ([pattern]
+   (drive pattern 0.4 0.0))
+  ([pattern distort-amount]
+   (drive pattern distort-amount 0.0))
+  ([pattern distort-amount crush-amount]
+   (params pattern {:distort distort-amount
+                    :crush crush-amount})))
+
+(defn space
+  "Applies reverb and delay spacial effects at once.
+   Default: room 0.5, delay 0.25 (1/16th cycle), repeats 4."
+  ([pattern]
+   (space pattern 0.5 0.25 4))
+  ([pattern room-mix]
+   (space pattern room-mix 0.25 4))
+  ([pattern room-mix delay-sec]
+   (space pattern room-mix delay-sec 4))
+  ([pattern room-mix delay-sec delay-repeats]
+   (params pattern {:room room-mix
+                    :delay delay-sec
+                    :repeats delay-repeats})))
+
+(defn lfo
+  "Applies LFO modulation to a param-key using a rate (Hz) and depth.
+   Usage: (lfo pat :lpf 2 500)"
+  [pattern param-key rate-hz depth-val]
+  (let [hz-key (keyword (str (name param-key) "-hz"))
+        depth-key (keyword (str (name param-key) "-depth"))]
+    (params pattern {hz-key rate-hz
+                     depth-key depth-val})))
+
 (defn fm
   "Sets FM synthesis parameters at once.
    Usage: (fm pat carrier-ratio modulator-ratio mod-index)"

@@ -48,3 +48,35 @@
                 args-map (apply hash-map (first (:args synth-call)))]
             (is (= 7 (:pshift args-map)))
             (is (= -50 (:fshift args-map)))))))))
+
+(deftest sound-design-dsl-test
+  (testing "acid preset shortcut"
+    (let [pat (-> (sut/s [:tb303]) (sut/acid 1200 0.02 4000))
+          ev (first (:events pat))
+          p (:params ev)]
+      (is (= 1200 ((:lpf p) 0 :lpf)))
+      (is (= 0.02 ((:resonance p) 0 :resonance)))
+      (is (= 4000 ((:lpf-env p) 0 :lpf-env)))))
+
+  (testing "drive preset shortcut"
+    (let [pat (-> (sut/s [:saw]) (sut/drive 0.8 0.3))
+          ev (first (:events pat))
+          p (:params ev)]
+      (is (= 0.8 ((:distort p) 0 :distort)))
+      (is (= 0.3 ((:crush p) 0 :crush)))))
+
+  (testing "space preset shortcut"
+    (let [pat (-> (sut/s [:synth]) (sut/space 0.7 0.5 8))
+          ev (first (:events pat))
+          p (:params ev)]
+      (is (= 0.7 ((:room p) 0 :room)))
+      (is (= 0.5 ((:delay p) 0 :delay)))
+      (is (= 8 ((:repeats p) 0 :repeats)))))
+
+  (testing "lfo shortcut"
+    (let [pat (-> (sut/s [:saw]) (sut/lfo :lpf 3 800))
+          ev (first (:events pat))
+          p (:params ev)]
+      (is (= 3 ((:lpf-hz p) 0 :lpf-hz)))
+      (is (= 800 ((:lpf-depth p) 0 :lpf-depth))))))
+
