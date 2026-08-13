@@ -2,98 +2,109 @@
   (:require [strudel-overtone.core :refer :all]
             [overtone.core :as ov]))
 
-(def lpf-a (atom 100))
+(comment
+  (def lpf-a (atom 100))
 
-(def g (atom 0.1))
+  (def g (atom 0.1))
 
-(let [bp [:b2]
-      bi [4 1 1 1 2 2 1 1]
-      lpf-v lpf-a]
-  (cpm 174/8)
+  (let [bp [:b2]
+        bi [4 1 1 1 2 2 1 1]
+        lpf-v lpf-a]
+    (cpm 174/8)
+    (play-only!
+    :b1 (-> (s :saw)
+            (note bp)
+            (degrees :minor bi)
+            (gain g)
+            (legato 1)
+            (lpf 300)
+            (lpf-env lpf-a)
+            (lpf-adsr 0.01 0.2 0.0 0))
+    :b2 (-> (s :sine)
+            (note bp)
+            (degrees :minor bi)
+            (legato 1)
+            (add -12)
+            (gain g)
+            (gain 2)
+            (lpf lpf-a))
+    :drum (-> (s [:bd :- :- :- :- :bd :- :-])
+              (lpf 150))
+    :snare (-> (s [:- :- :sd :- :- :- :sd :-]))
+    :clap (-> (s [:cp :cp :cp :cp :cp :cp :cp :cp])
+              (gain (adsr-sig 0 0 1 1)))))
+
+  (play-only! :s (s [:bd]))
+
+  (playing)
+
+  (stop!)
+
+  ((adsr-sig 0 0 1 1) 0 1)
+
+  (saw 1)
+
+  (reset! lpf-a 2000)
+  (reset! g 1)
+
+  ;; 1. Classic Acid 303 Bass (Filter ADSR Sweep)
+  (play-only! :acid (-> (note [:c2 :c2 :c2])
+                        (s :tb303)
+                        (lpf 500)                      ; Resting base cutoff = 300 Hz
+                        (lpf-env 300)                    ; Peak envelope sweep depth = 5000 Hz
+                        (lpf-adsr 0.01 0.1 0.8 0.2)   ; Plucky filter sweep (att dec sus rel)
+                        (adsr 0.01 0.2 0.8 0.1)        ; Volume envelope
+                        (legato 1/2)
+                        (resonance 0.2)
+                        (res-env 0.6)
+                        (res-adsr 0.01 0.2 0.8 0.1)))
+
+  ;; 2. Downward Filter Sweep (Bright Pluck decaying to warm tone)
+  (play-only! :pluck (-> (note [:c3 :g3 :c4 :eb4])
+                        (s :square)
+                        (lpf 6000)                    ; Start bright at 6000 Hz cutoff
+                        (lpf-env -5000)                  ; Sweep DOWN by 5000 Hz as envelope decays
+                        (lpf-adsr 0.005 0.25 0.0 0.1) ; Fast decay to 0 sustain
+                        (adsr 0.005 0.3 0.6 0.1)
+                        (phaser-hz 1)
+                        (phaser-depth 0)
+                        (phaser-env 5)
+                        (phaser-perc 0.1)))
+
+  ;; 3. Slow Ambient Pad with Soft Filter Envelope
+  (play-only! :pad (-> (note #{:c3 :eb3 :g3 :bb3})
+                      (add 12)
+                      (gain 1/2)
+                      (s :saw)
+                      (lpf 100)                     ; Dark baseline cutoff
+                      (lpf-env 1000)                ; Gentle 3kHz filter swell
+                      (lpf-adsr 1.5 2.0 0.7 2.0)    ; Slow filter swell
+                      (adsr 0.5 0 0.8 0.5)          ; Slow volume swell
+                      (legato 0.9)
+                      (duck 1.0))
+              :duck (-> (s [:bd :bd :bd :bd])
+                        (gain 0)
+                        (duck-trigger 1.0)
+                        (duck-attack 0.01)
+                        (duck-release 0.4))
+              )
+
+
+  ;; Telephone / Radio Vocoder Sweep
   (play-only!
-   :b1 (-> (s :saw)
-           (note bp)
-           (degrees :minor bi)
-           (gain g)
-           (legato 1)
-           (lpf 300)
-           (lpf-env lpf-a)
-           (lpf-adsr 0.01 0.2 0.0 0))
-   :b2 (-> (s :sine)
-           (note bp)
-           (degrees :minor bi)
-           (legato 1)
-           (add -12)
-           (gain g)
-           (gain 2)
-           (lpf lpf-a))
-   :drum (-> (s [:bd :- :- :- :- :bd :- :-])
-             (lpf 150))
-   :snare (-> (s [:- :- :sd :- :- :- :sd :-]))
-   :clap (-> (s [:cp :cp :cp :cp :cp :cp :cp :cp])
-             (gain (adsr-sig 0 0 1 1)))))
-
-(play-only! :s (s [:bd]))
-
-(stop!)
-
-((adsr-sig 0 0 1 1) 0 1)
-
-(saw 1)
-
-(reset! lpf-a 2000)
-(reset! g 1)
-
-;; 1. Classic Acid 303 Bass (Filter ADSR Sweep)
-(play-only! :acid (-> (note [:c2 :c2 :c2])
-                      (s :tb303)
-                      (lpf 500)                      ; Resting base cutoff = 300 Hz
-                      (lpf-env 300)                    ; Peak envelope sweep depth = 5000 Hz
-                      (lpf-adsr 0.01 0.1 0.8 0.2)   ; Plucky filter sweep (att dec sus rel)
-                      (adsr 0.01 0.2 0.8 0.1)        ; Volume envelope
-                      (legato 1/2)
-                      (resonance 0.2)
-                      (res-env 0.6)
-                      (res-adsr 0.01 0.2 0.8 0.1)))
-
-;; 2. Downward Filter Sweep (Bright Pluck decaying to warm tone)
-(play-only! :pluck (-> (note [:c3 :g3 :c4 :eb4])
-                       (s :square)
-                       (lpf 6000)                    ; Start bright at 6000 Hz cutoff
-                       (lpf-env -5000)                  ; Sweep DOWN by 5000 Hz as envelope decays
-                       (lpf-adsr 0.005 0.25 0.0 0.1) ; Fast decay to 0 sustain
-                       (adsr 0.005 0.3 0.6 0.1)
-                       (phaser-hz 1)
-                       (phaser-depth 0)
-                       (phaser-env 5)
-                       (phaser-perc 0.1)))
-
-;; 3. Slow Ambient Pad with Soft Filter Envelope
-(play-only! :pad (-> (note #{:c3 :eb3 :g3 :bb3})
-                     (add 12)
-                     (s :saw)
-                     (lpf 100)                       ; Dark baseline cutoff
-                     (lpf-env 1000)                     ; Gentle 3kHz filter swell
-                     (lpf-adsr 1.5 2.0 0.7 2.0)      ; Slow filter swell
-                     (adsr 0.5 0 0.8 0.5)          ; Slow volume swell
-                     (legato 0.9)))
+  (-> (s :saw)
+      (note [:c2 :e2 :g2 :b2])
+      (bpf 400)               ; Base center frequency at 400 Hz
+      (bpf-env 2400)          ; Envelope sweeps center freq up to +2400 Hz
+      (bpf-perc 0.05)         ; Percussive envelope attack/decay
+      (resonance 0.8)))        ; Sharp resonant peak for a vocal "wah" effect
 
 
-;; Telephone / Radio Vocoder Sweep
-(play-only!
- (-> (s :saw)
-     (note [:c2 :e2 :g2 :b2])
-     (bpf 400)               ; Base center frequency at 400 Hz
-     (bpf-env 2400)          ; Envelope sweeps center freq up to +2400 Hz
-     (bpf-perc 0.05)         ; Percussive envelope attack/decay
-     (resonance 0.8)))        ; Sharp resonant peak for a vocal "wah" effect
+  (play-only! :pad (-> (note [#{:c3 :eb3} #{:c4 :g3}])
+                      (mono)
+                      (glide 0.5)
+                      (s :saw)))
 
+  (stop!)
 
-(play-only! :pad (-> (note [#{:c3 :eb3} #{:c4 :g3}])
-                     (mono)
-                     (glide 0.5)
-                     (s :saw)))
-
-(stop!)
-
-(ov/stop)
+  )

@@ -13,7 +13,14 @@
      (ov/line:kr 0 0 60 ov/FREE)
      ~@body))
 
-(defonce duck-bus (ov/control-bus))
+(defonce duck-bus-atom (atom nil))
+
+(defn get-duck-bus []
+  (if (and @duck-bus-atom (ov/server-connected?))
+    @duck-bus-atom
+    (let [b (ov/control-bus 1)]
+      (reset! duck-bus-atom b)
+      b)))
 
 (defmacro with-glide [freq & body]
   `(let [~'start-f (ov/select:kr (< ~'slide-from 0) [~'slide-from ~freq])
@@ -33,7 +40,7 @@
                       pan-hz 0 pan-depth 0
                       phaser-hz 0 phaser-depth 0
                       hpf 0 bpf -1 room 0 delay 0 repeats 4
-                      duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2
+                      duck 0 duck-trigger 0 duck-attack 0.001 duck-release 0.2 duck-bus-id -1
                       room-size 0.5 damp 0.5
                       slide 0 slide-from -1
                       legato 1
@@ -108,11 +115,12 @@
                ~'distort-env ~(varlag-param 'distort-env)
                ~'amp ~(varlag-param 'amp)
                ~'vibrato ~(varlag-param 'vibrato)
+               ~'duck ~(varlag-param 'duck)
 
                auto-gate# (ov/line:kr 1 0 ~'sustain)
                ~'effective-gate (ov/select:kr ~'monophonic [auto-gate# ~'gate])
-               adsr-env# (ov/env-gen (ov/adsr ~'attack ~'decay ~'s-level ~'release) :gate ~'effective-gate)
-               perc-env# (ov/env-gen (ov/perc ~'attack ~'sustain) :gate ~'effective-gate)
+               adsr-env# (ov/env-gen (ov/adsr ~'attack ~'decay ~'s-level ~'release) :gate ~'effective-gate :action ov/FREE)
+               perc-env# (ov/env-gen (ov/perc ~'attack ~'sustain) :gate ~'effective-gate :action ov/FREE)
                ~'env (ov/select:kr ~'env-type [adsr-env# perc-env#])
 
                lpf-adsr# (ov/env-gen (ov/adsr ~'lpf-attack ~'lpf-decay ~'lpf-s-level ~'lpf-release) :gate ~'effective-gate)
@@ -170,16 +178,19 @@
                distort-env-sig# (ov/select:kr ~'distort-env-type [distort-adsr# distort-perc#])
                ~'effective-distort (ov/clip (+ ~'distort (* ~'distort-env distort-env-sig#)) 0 1)
 
-               ;; Trigger Sidechain
+               ;; Trigger Sidechain (only write to duck-bus when duck-trigger is active)
                _# (let [trig-env# (ov/env-gen
                                    (ov/perc
                                     ~'duck-attack
                                     ~'duck-release)
+                                   :gate ~'effective-gate
                                    :level-scale
                                    ~'duck-trigger)]
-                    (ov/out:kr duck-bus trig-env#))
+                    (ov/select:kr (> ~'duck-trigger 0)
+                                  [0
+                                   (ov/out:kr ~'duck-bus-id trig-env#)]))
                ;; Read Sidechain
-               ~'duck-env (ov/in:kr duck-bus)
+               ~'duck-env (ov/in:kr ~'duck-bus-id 1)
                ~'amp-duck (ov/clip
                            (- 1 (* ~'duck ~'duck-env))
                            0 1)
@@ -270,7 +281,7 @@
                          (> ~'effective-crush 0)
                          0 1 -1 1)))
 
-                 ~'gated (* ~'crs ~'env)
+                 ~'gated (* ~'crs ~'env ~'amp-duck)
                  ~'dly (let [~'dry ~'gated
                              ~'wet (+ ~'dry
                                       (ov/comb-n
@@ -292,8 +303,7 @@
                              ~'room-size
                              ~'damp)
                  _# (ov/detect-silence
-                      (ov/select:ar ~'monophonic
-                                    [~'reverbed 1.0])
+                      ~'reverbed
                       :amp 0.0001
                       :time 0.2
                       :action ov/FREE)
@@ -309,8 +319,7 @@
                      (ov/pan2
                       (*
                        (ov/mix [~'reverbed])
-                       ~'amp
-                       ~'amp-duck)
+                       ~'amp)
                       ~'actual-pan))))
        (alter-meta! (var ~synth-symbol) assoc :doc ~doc-str)
        (let [synth-var# (var ~synth-symbol)]

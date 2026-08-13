@@ -149,7 +149,6 @@
   "Updates controls of an existing monophonic synth node instance."
   [inst args]
   (let [update-args (->> (partition 2 args)
-                         (remove (fn [[k _]] (= k :gate)))
                          (apply concat)
                          vec)]
     (apply ov/ctl inst update-args)))
@@ -160,8 +159,15 @@
   (tel/log! :info {:action :start-mono
                    :key [key voice-idx]
                    :had-inst (some? old-inst)})
-  (gate-off old-inst)
-  (let [new-inst (apply synth-var args)]
+  (when old-inst
+    (gate-off old-inst))
+  (swap! player-state update :active-synths dissoc [key voice-idx])
+  (let [args-with-gate (->> (partition 2 args)
+                            (remove (fn [[k _]] (= k :gate)))
+                            (apply concat)
+                            (concat [:gate 1])
+                            vec)
+        new-inst (apply synth-var args-with-gate)]
     (swap! player-state assoc-in [:active-synths [key voice-idx]]
            {:inst new-inst :synth synth-var})))
 
@@ -243,11 +249,20 @@
             fshift-env-type (get-env-flag :fshift-env-type)
             pan-env-type (get-env-flag :pan-env-type)
             distort-env-type (get-env-flag :distort-env-type)
+            duck-val (try-parse-number (or (get params :duck) 0))
+            duck-trig-val (try-parse-number (or (get params :duck-trigger) 0))
+            duck-atk-val (try-parse-number (or (get params :duck-attack) 0.001))
+            duck-rel-val (try-parse-number (or (get params :duck-release) 0.2))
             reserved #{:sound :note :degree :active :start :duration :env :lpf-env-type :hpf-env-type :bpf-env-type :res-env-type :phaser-env-type :crush-env-type :detune-env-type :pshift-env-type :fshift-env-type :pan-env-type :distort-env-type :add :swing :slide :legato :monophonic :gate}
-            handled #{:amp :lpf :sustain :freq :slide-from :gate :monophonic :env-type :lpf-env-type :hpf-env-type :bpf-env-type :res-env-type :phaser-env-type :crush-env-type :detune-env-type :pshift-env-type :fshift-env-type :pan-env-type :distort-env-type}
+            handled #{:amp :lpf :sustain :freq :slide-from :gate :monophonic :env-type :lpf-env-type :hpf-env-type :bpf-env-type :res-env-type :phaser-env-type :crush-env-type :detune-env-type :pshift-env-type :fshift-env-type :pan-env-type :distort-env-type :duck :duck-trigger :duck-attack :duck-release :duck-bus-id}
             args (cond-> (reduce-kv (fn [acc k v] (if (or (reserved k) (handled k)) acc (conj acc k v))) [] params)
                    true (conj :amp amp)
                    true (conj :freq effective-freq)
+                   true (conj :duck duck-val)
+                   true (conj :duck-trigger duck-trig-val)
+                   true (conj :duck-attack duck-atk-val)
+                   true (conj :duck-release duck-rel-val)
+                   true (conj :duck-bus-id (if-let [b (synths/get-duck-bus)] (:id b) -1))
                    lpf (conj :lpf lpf)
                    sustain-sec (conj :sustain sustain-sec)
                    true (conj :slide effective-slide-time)
@@ -265,7 +280,8 @@
                    true (conj :pshift-env-type pshift-env-type)
                    true (conj :fshift-env-type fshift-env-type)
                    true (conj :pan-env-type pan-env-type)
-                   true (conj :distort-env-type distort-env-type))
+                   true (conj :distort-env-type distort-env-type)
+                   true (conj :duck-bus-id (if-let [b (synths/get-duck-bus)] (:id b) -1)))
             args (if sample-buf (conj args :buf (:id sample-buf)) args)
             args (if (and sample-buf (get params :begin)) (conj args :start-pos (get params :begin)) args)
             args (if (and sample-buf (get params :rate)) (conj args :rate-s (get params :rate)) args)
@@ -519,14 +535,6 @@
     (let [quant 4]
       (doseq [[key pattern] pairs]
         (let [start-loop? (not (contains? (:loops @player-state) key))]
-          ;; When updating an existing pattern, gate off existing active synths
-          ;; so changing pattern parameters (or synth type) doesn't leave orphaned synths running.
-          (when-not start-loop?
-            (doseq [[k active] (:active-synths @player-state)]
-              (let [k-base (if (vector? k) (first k) k)]
-                (when (= k-base key)
-                  (gate-off (:inst active))
-                  (swap! player-state update :active-synths dissoc k)))))
           (swap! player-state (fn [s]
                                 (-> s
                                     (assoc :playing? true)
@@ -562,6 +570,12 @@
 (defn stop!
   "Stops all playing patterns or a specific pattern by key."
   ([]
-   (swap! player-state assoc :playing? false :patterns {} :loops #{}))
+   (let [active-synths (:active-synths @player-state)]
+     (doseq [[_ active] active-synths]
+       (gate-off (:inst active)))
+     (when (ov/server-connected?)
+       (when-let [b (synths/get-duck-bus)]
+         (try (ov/control-bus-set! b 0) (catch Exception _ nil))))
+     (swap! player-state assoc :playing? false :patterns {} :loops #{} :active-synths {})))
   ([key]
    (stop-pattern! key)))

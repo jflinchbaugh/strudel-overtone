@@ -47,5 +47,8 @@
 
         (is (false? (:playing? @player-state)))
         (is (empty? (:loops @player-state)))
-        (is (empty? (:patterns @player-state))))))))
+        (is (empty? (:patterns @player-state)))
+        (is (= 1 (count @gate-off-calls)))
+        (is (= 101 (:id (first @gate-off-calls))))
+        (is (empty? (:active-synths @player-state))))))))
 
