@@ -97,7 +97,7 @@
                             (s :sine)
                             (gain 0.4)
                             (ribbon 0 4) ;; Capture 4 random chords into a loop
-                            (lpf (sig-range sine 500 5000)))))
+                            #_(lpf (sig-range sine 500 5000)))))
 
   (playing)
 
@@ -108,14 +108,11 @@
   ;; Example: Acid bassline with glide (portamento)
   (play! :acid (-> (note (choose-n 3 [:c2 :c3 :g2 :a2]))
                    (s :tb303)
-                   (attack 1)
-                   (decay 1)
-                   (s-level 1)
-                   (sustain 1)
-                   (mono)
+                   (adsr 1 1 1 1)
+                   #_(mono)
                    (glide 1/3) ;; Slide between notes over 0.3 cycles
                    #_(legato 1.1) ;; Overlap notes slightly for better glide
-                   (lpf (sig-range sine 200 2000))
+                   #_(lpf (sig-range sine 200 2000))
                    (resonance 0.8)
                    (gain 0.3)))
 
@@ -141,9 +138,7 @@
                         (mono)
                         (glide 0.1)
                         (legato 1.0)
-                        (s-level 1.0)
-                        (attack 0.05)
-                        (decay 0)
+                        (adsr 0.05 0 1.0 0.1)
                         (gain 0.2)))
 
   ;; Example: Monophonic chords (paraphonic)
@@ -154,9 +149,8 @@
   (play-only! :mono-chords (-> (note (choose-n 3 [:c2 :e2 :g2 :a2 :c3 :e3 :g3]))
                           (s :tri)
                           (mono)
-                          (glide g)
-                          (s-level 1.0)
-                          (attack 0.05)
+                          (glide @g)
+                          (adsr 0.05 0.1 1.0 0.05)
                           (gain 0.15)
                           (lpf 1000)))
 

@@ -110,65 +110,65 @@
                ~'vibrato ~(varlag-param 'vibrato)
 
                auto-gate# (ov/line:kr 1 0 ~'sustain)
-               effective-gate# (ov/select:kr ~'monophonic [auto-gate# ~'gate])
-               adsr-env# (ov/env-gen (ov/adsr ~'attack ~'decay ~'s-level ~'release) :gate effective-gate#)
-               perc-env# (ov/env-gen (ov/perc ~'attack ~'sustain) :gate effective-gate#)
+               ~'effective-gate (ov/select:kr ~'monophonic [auto-gate# ~'gate])
+               adsr-env# (ov/env-gen (ov/adsr ~'attack ~'decay ~'s-level ~'release) :gate ~'effective-gate)
+               perc-env# (ov/env-gen (ov/perc ~'attack ~'sustain) :gate ~'effective-gate)
                ~'env (ov/select:kr ~'env-type [adsr-env# perc-env#])
 
-               lpf-adsr# (ov/env-gen (ov/adsr ~'lpf-attack ~'lpf-decay ~'lpf-s-level ~'lpf-release) :gate effective-gate#)
-               lpf-perc# (ov/env-gen (ov/perc ~'lpf-attack ~'sustain) :gate effective-gate#)
+               lpf-adsr# (ov/env-gen (ov/adsr ~'lpf-attack ~'lpf-decay ~'lpf-s-level ~'lpf-release) :gate ~'effective-gate)
+               lpf-perc# (ov/env-gen (ov/perc ~'lpf-attack ~'sustain) :gate ~'effective-gate)
                lpf-env-sig# (ov/select:kr ~'lpf-env-type [lpf-adsr# lpf-perc#])
-               effective-lpf# (s-max 20 (+ ~'lpf (* ~'lpf-env lpf-env-sig#)))
+               ~'effective-lpf (s-max 20 (+ ~'lpf (* ~'lpf-env lpf-env-sig#)))
 
-               hpf-adsr# (ov/env-gen (ov/adsr ~'hpf-attack ~'hpf-decay ~'hpf-s-level ~'hpf-release) :gate effective-gate#)
-               hpf-perc# (ov/env-gen (ov/perc ~'hpf-attack ~'sustain) :gate effective-gate#)
+               hpf-adsr# (ov/env-gen (ov/adsr ~'hpf-attack ~'hpf-decay ~'hpf-s-level ~'hpf-release) :gate ~'effective-gate)
+               hpf-perc# (ov/env-gen (ov/perc ~'hpf-attack ~'sustain) :gate ~'effective-gate)
                hpf-env-sig# (ov/select:kr ~'hpf-env-type [hpf-adsr# hpf-perc#])
-               effective-hpf# (s-max 20 (+ ~'hpf (* ~'hpf-env hpf-env-sig#)))
+               ~'effective-hpf (s-max 20 (+ ~'hpf (* ~'hpf-env hpf-env-sig#)))
 
-               bpf-adsr# (ov/env-gen (ov/adsr ~'bpf-attack ~'bpf-decay ~'bpf-s-level ~'bpf-release) :gate effective-gate#)
-               bpf-perc# (ov/env-gen (ov/perc ~'bpf-attack ~'sustain) :gate effective-gate#)
+               bpf-adsr# (ov/env-gen (ov/adsr ~'bpf-attack ~'bpf-decay ~'bpf-s-level ~'bpf-release) :gate ~'effective-gate)
+               bpf-perc# (ov/env-gen (ov/perc ~'bpf-attack ~'sustain) :gate ~'effective-gate)
                bpf-env-sig# (ov/select:kr ~'bpf-env-type [bpf-adsr# bpf-perc#])
-               effective-bpf# (s-max 20 (+ ~'bpf (* ~'bpf-env bpf-env-sig#)))
+               ~'effective-bpf (s-max 20 (+ ~'bpf (* ~'bpf-env bpf-env-sig#)))
 
-               res-adsr# (ov/env-gen (ov/adsr ~'res-attack ~'res-decay ~'res-s-level ~'res-release) :gate effective-gate#)
-               res-perc# (ov/env-gen (ov/perc ~'res-attack ~'sustain) :gate effective-gate#)
+               res-adsr# (ov/env-gen (ov/adsr ~'res-attack ~'res-decay ~'res-s-level ~'res-release) :gate ~'effective-gate)
+               res-perc# (ov/env-gen (ov/perc ~'res-attack ~'sustain) :gate ~'effective-gate)
                res-env-sig# (ov/select:kr ~'res-env-type [res-adsr# res-perc#])
-               effective-res# (ov/clip (+ ~'resonance (* ~'res-env res-env-sig#)) 0.001 1.0)
+               ~'effective-res (ov/clip (+ ~'resonance (* ~'res-env res-env-sig#)) 0.001 1.0)
 
-               phaser-adsr# (ov/env-gen (ov/adsr ~'phaser-attack ~'phaser-decay ~'phaser-s-level ~'phaser-release) :gate effective-gate#)
-               phaser-perc# (ov/env-gen (ov/perc ~'phaser-attack ~'sustain) :gate effective-gate#)
+               phaser-adsr# (ov/env-gen (ov/adsr ~'phaser-attack ~'phaser-decay ~'phaser-s-level ~'phaser-release) :gate ~'effective-gate)
+               phaser-perc# (ov/env-gen (ov/perc ~'phaser-attack ~'sustain) :gate ~'effective-gate)
                phaser-env-sig# (ov/select:kr ~'phaser-env-type [phaser-adsr# phaser-perc#])
-               effective-phaser-depth# (ov/clip (+ ~'phaser-depth (* ~'phaser-env phaser-env-sig#)) 0 1)
+               ~'effective-phaser-depth (ov/clip (+ ~'phaser-depth (* ~'phaser-env phaser-env-sig#)) 0 1)
 
-               crush-adsr# (ov/env-gen (ov/adsr ~'crush-attack ~'crush-decay ~'crush-s-level ~'crush-release) :gate effective-gate#)
-               crush-perc# (ov/env-gen (ov/perc ~'crush-attack ~'sustain) :gate effective-gate#)
+               crush-adsr# (ov/env-gen (ov/adsr ~'crush-attack ~'crush-decay ~'crush-s-level ~'crush-release) :gate ~'effective-gate)
+               crush-perc# (ov/env-gen (ov/perc ~'crush-attack ~'sustain) :gate ~'effective-gate)
                crush-env-sig# (ov/select:kr ~'crush-env-type [crush-adsr# crush-perc#])
-               effective-crush# (ov/clip (+ ~'crush (* ~'crush-env crush-env-sig#)) 0 1)
+               ~'effective-crush (ov/clip (+ ~'crush (* ~'crush-env crush-env-sig#)) 0 1)
 
-               detune-adsr# (ov/env-gen (ov/adsr ~'detune-attack ~'detune-decay ~'detune-s-level ~'detune-release) :gate effective-gate#)
-               detune-perc# (ov/env-gen (ov/perc ~'detune-attack ~'sustain) :gate effective-gate#)
+               detune-adsr# (ov/env-gen (ov/adsr ~'detune-attack ~'detune-decay ~'detune-s-level ~'detune-release) :gate ~'effective-gate)
+               detune-perc# (ov/env-gen (ov/perc ~'detune-attack ~'sustain) :gate ~'effective-gate)
                detune-env-sig# (ov/select:kr ~'detune-env-type [detune-adsr# detune-perc#])
                ~'effective-detune (+ ~'detune (* ~'detune-env detune-env-sig#))
 
-               pshift-adsr# (ov/env-gen (ov/adsr ~'pshift-attack ~'pshift-decay ~'pshift-s-level ~'pshift-release) :gate effective-gate#)
-               pshift-perc# (ov/env-gen (ov/perc ~'pshift-attack ~'sustain) :gate effective-gate#)
+               pshift-adsr# (ov/env-gen (ov/adsr ~'pshift-attack ~'pshift-decay ~'pshift-s-level ~'pshift-release) :gate ~'effective-gate)
+               pshift-perc# (ov/env-gen (ov/perc ~'pshift-attack ~'sustain) :gate ~'effective-gate)
                pshift-env-sig# (ov/select:kr ~'pshift-env-type [pshift-adsr# pshift-perc#])
-               effective-pshift# (+ ~'pshift (* ~'pshift-env pshift-env-sig#))
+               ~'effective-pshift (+ ~'pshift (* ~'pshift-env pshift-env-sig#))
 
-               fshift-adsr# (ov/env-gen (ov/adsr ~'fshift-attack ~'fshift-decay ~'fshift-s-level ~'fshift-release) :gate effective-gate#)
-               fshift-perc# (ov/env-gen (ov/perc ~'fshift-attack ~'sustain) :gate effective-gate#)
+               fshift-adsr# (ov/env-gen (ov/adsr ~'fshift-attack ~'fshift-decay ~'fshift-s-level ~'fshift-release) :gate ~'effective-gate)
+               fshift-perc# (ov/env-gen (ov/perc ~'fshift-attack ~'sustain) :gate ~'effective-gate)
                fshift-env-sig# (ov/select:kr ~'fshift-env-type [fshift-adsr# fshift-perc#])
-               effective-fshift# (+ ~'fshift (* ~'fshift-env fshift-env-sig#))
+               ~'effective-fshift (+ ~'fshift (* ~'fshift-env fshift-env-sig#))
 
-               pan-adsr# (ov/env-gen (ov/adsr ~'pan-attack ~'pan-decay ~'pan-s-level ~'pan-release) :gate effective-gate#)
-               pan-perc# (ov/env-gen (ov/perc ~'pan-attack ~'sustain) :gate effective-gate#)
+               pan-adsr# (ov/env-gen (ov/adsr ~'pan-attack ~'pan-decay ~'pan-s-level ~'pan-release) :gate ~'effective-gate)
+               pan-perc# (ov/env-gen (ov/perc ~'pan-attack ~'sustain) :gate ~'effective-gate)
                pan-env-sig# (ov/select:kr ~'pan-env-type [pan-adsr# pan-perc#])
-               effective-pan# (ov/clip (+ ~'pan (* ~'pan-env pan-env-sig#)) -1 1)
+               ~'effective-pan (ov/clip (+ ~'pan (* ~'pan-env pan-env-sig#)) -1 1)
 
-               distort-adsr# (ov/env-gen (ov/adsr ~'distort-attack ~'distort-decay ~'distort-s-level ~'distort-release) :gate effective-gate#)
-               distort-perc# (ov/env-gen (ov/perc ~'distort-attack ~'sustain) :gate effective-gate#)
+               distort-adsr# (ov/env-gen (ov/adsr ~'distort-attack ~'distort-decay ~'distort-s-level ~'distort-release) :gate ~'effective-gate)
+               distort-perc# (ov/env-gen (ov/perc ~'distort-attack ~'sustain) :gate ~'effective-gate)
                distort-env-sig# (ov/select:kr ~'distort-env-type [distort-adsr# distort-perc#])
-               effective-distort# (ov/clip (+ ~'distort (* ~'distort-env distort-env-sig#)) 0 1)
+               ~'effective-distort (ov/clip (+ ~'distort (* ~'distort-env distort-env-sig#)) 0 1)
 
                ;; Trigger Sidechain
                _# (let [trig-env# (ov/env-gen
@@ -186,12 +186,12 @@
                ~'snd (do ~@body)
                ;; Effect Chain
                  ;; Pitch Shift bypass
-                 ~'ps (let [~'use-ps (> (ov/absdif effective-pshift# 0)
+                 ~'ps (let [~'use-ps (> (ov/absdif ~'effective-pshift 0)
                                         0.01)
                             ~'ps-sig (ov/pitch-shift
                                       ~'snd 0.2
                                       (ov/pow 2
-                                              (/ effective-pshift# 12)))]
+                                              (/ ~'effective-pshift 12)))]
                         (ov/x-fade2
                          ~'snd
                          ~'ps-sig
@@ -199,9 +199,9 @@
 
                  ;; Freq Shift bypass
                  ~'fs (let [~'use-fs (>
-                                      (ov/absdif effective-fshift# 0)
+                                      (ov/absdif ~'effective-fshift 0)
                                       0.01)
-                            ~'fs-sig (ov/freq-shift ~'ps effective-fshift#)]
+                            ~'fs-sig (ov/freq-shift ~'ps ~'effective-fshift)]
                         (ov/x-fade2
                          ~'ps
                          ~'fs-sig
@@ -232,13 +232,13 @@
                          (ov/x-fade2
                           ~'dry
                           ~'wet
-                          (ov/lin-lin effective-phaser-depth# 0 1 -1 1)))
+                          (ov/lin-lin ~'effective-phaser-depth 0 1 -1 1)))
 
-                 ~'filt (ov/hpf ~'phs effective-hpf#)
-                 ~'filt (let [~'bpf-rq (ov/lin-lin effective-res# 0 1 1.0 0.05)
+                 ~'filt (ov/hpf ~'phs ~'effective-hpf)
+                 ~'filt (let [~'bpf-rq (ov/lin-lin ~'effective-res 0 1 1.0 0.05)
                               ~'bpf-sig (ov/bpf
                                          ~'filt
-                                         effective-bpf#
+                                         ~'effective-bpf
                                          ~'bpf-rq)]
                           (ov/x-fade2
                            ~'filt
@@ -248,26 +248,26 @@
                             0 1 -1 1)))
                  ~'filt (ov/rlpf
                          ~'filt
-                         effective-lpf#
-                         effective-res#)
+                         ~'effective-lpf
+                         ~'effective-res)
 
                  ~'dst (ov/distort
                         (* ~'filt
-                           (ov/dbamp (* effective-distort# 24))))
+                           (ov/dbamp (* ~'effective-distort 24))))
 
                  ;; Decimator bypass - critical for ringing
                  ~'crs (let [~'dry ~'dst
                              ~'wet (ov/decimator
                                     ~'dry
                                     (ov/lin-lin
-                                     effective-crush# 0 1 44100 2000)
+                                     ~'effective-crush 0 1 44100 2000)
                                     (ov/lin-lin
-                                     effective-crush# 0 1 24 4))]
+                                     ~'effective-crush 0 1 24 4))]
                        (ov/x-fade2
                         ~'dry
                         ~'wet
                         (ov/lin-lin
-                         (> effective-crush# 0)
+                         (> ~'effective-crush 0)
                          0 1 -1 1)))
 
                  ~'gated (* ~'crs ~'env)
