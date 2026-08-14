@@ -29,6 +29,8 @@ Modify the timing and structure of your loops.
 *   `slow n`: Slows down the pattern by factor n.
 *   `rev`: Reverses the events within a cycle.
 *   `alt v1 v2 ...`: Alternates between values cycle-by-cycle.
+*   `every-cycle n f`: Applies function f to pattern every n cycles.
+*   `euclid k n [hit] [rest] [rot]`: Generates a Euclidean rhythm vector.
 *   `slowcat p1 p2 ...`: Concatenates patterns in time (sequential).
 *   `stack p1 p2 ...`: Layers patterns (simultaneous).
 *   `fastcat p1 p2 ...`: Squeezes patterns into a single cycle.

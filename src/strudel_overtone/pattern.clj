@@ -861,3 +861,105 @@
   "Automatically stops the pattern after n cycles."
   [pattern cycles]
   (assoc pattern :stop-cycles cycles))
+
+(defn euclid
+  "Generates a Euclidean rhythm vector distributing k hits across n steps.
+   Returns a vector of length n.
+   Optional arguments:
+     hit: value for active steps (defaults to :x)
+     rest: value for inactive steps (defaults to :-)
+     rotate: integer offset to rotate the rhythm (defaults to 0)"
+  ([k n]
+   (euclid k n :x :- 0))
+  ([k n hit]
+   (euclid k n hit :- 0))
+  ([k n hit rest]
+   (euclid k n hit rest 0))
+  ([k n hit rest rotate]
+   (if (<= n 0)
+     []
+     (let [k (long (max 0 k))
+           n (long n)
+           base (mapv (fn [i]
+                        (if (< (mod (* i k) n) k)
+                          hit
+                          rest))
+                      (range n))]
+       (if (zero? rotate)
+         base
+         (let [rot (mod (long rotate) n)]
+           (vec (concat (subvec base (- n rot))
+                        (subvec base 0 (- n rot))))))))))
+
+(defn- gate-active-by-cycle [orig-act condition-fn]
+  (let [act-fn (if (fn? orig-act)
+                 orig-act
+                 (constantly (if (some? orig-act) orig-act 1)))]
+    (fn [beat-t k]
+      (if (condition-fn *current-cycle*)
+        (let [res (act-fn beat-t k)]
+          (if (number? res) res 1))
+        0))))
+
+(defn- apply-every-cycle-to-pattern [pattern n offset f]
+  (let [offset (or offset 0)
+        orig-events (map (fn [e]
+                           (update-in e [:params :active]
+                                      gate-active-by-cycle
+                                      (fn [c]
+                                        (not= 0 (mod (+ (long c)
+                                                        offset)
+                                                     n)))))
+                         (:events pattern))
+        trans-pat (f pattern)
+        trans-events (map (fn [e]
+                            (update-in e [:params :active]
+                                       gate-active-by-cycle
+                                       (fn [c]
+                                         (= 0 (mod (+ (long c)
+                                                      offset)
+                                                   n)))))
+                          (:events trans-pat))]
+    (assoc pattern
+           :events (concat orig-events trans-events)
+           :length (or (:length trans-pat) (:length pattern) 1.0))))
+
+(defn every-cycle
+  "Applies function f to the pattern every n cycles.
+   When used as a parameter value, alternates between on-val and off-val.
+   Supports threading: (-> pat (every-cycle 4 rev))"
+  ([n f]
+   (if (fn? f)
+     (fn [pattern] (every-cycle pattern n 0 f))
+     (every-cycle n 0 f nil)))
+  ([arg1 arg2 arg3]
+   (cond
+     (instance? Pattern arg1)
+     (apply-every-cycle-to-pattern arg1 arg2 0 arg3)
+
+     (and (number? arg1) (number? arg2) (fn? arg3))
+     (fn [pattern] (apply-every-cycle-to-pattern pattern arg1 arg2 arg3))
+
+     (and (number? arg1) (fn? arg2) (instance? Pattern arg3))
+     (apply-every-cycle-to-pattern arg3 arg1 0 arg2)
+
+     :else
+     (fn [_ _]
+       (if (zero? (mod (long *current-cycle*) (long arg1)))
+         arg2
+         arg3))))
+  ([arg1 arg2 arg3 arg4]
+   (cond
+     (instance? Pattern arg1)
+     (apply-every-cycle-to-pattern arg1 arg2 arg3 arg4)
+
+     (and (number? arg1) (number? arg2) (fn? arg3) (instance? Pattern arg4))
+     (apply-every-cycle-to-pattern arg4 arg1 arg2 arg3)
+
+     :else
+     (fn [_ _]
+       (if (zero? (mod (+ (long *current-cycle*) (long arg2))
+                       (long arg1)))
+         arg3
+         arg4)))))
+
