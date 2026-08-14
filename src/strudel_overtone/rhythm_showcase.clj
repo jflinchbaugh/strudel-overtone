@@ -36,8 +36,8 @@
 
   ;; --- 3. Melodic Euclidean Sequences ---
   ;; Using euclid directly with keyword pitch values and rotation
-  (play! :lead
-         (-> (note (euclid 5 8 :c3 :- 2))
+  (play-only!
+   :lead (-> (note (euclid 5 8 :c3 :- 2))
              (s :saw)
              (lpf 900)
              (lpf-env 2500)
@@ -61,7 +61,7 @@
   (stop!)
 
   ;; --- 5. Full Euclidean Groove with Every-Cycle Fills ---
-  (cpm 120)
+  (cpm 30)
 
   (play-only!
    ;; Kick with 3/8 Tresillo, doubled every 4th cycle
@@ -91,6 +91,12 @@
              (resonance 0.15)
              (duck 0.7)
              (every-cycle 8 4 (fn [p] (add p 12)))))
+
+  (play-only!
+   :lead (-> (s :sine)
+             (note [:c4])
+             (degrees :major [1 2 3 4])
+             (every-cycle 2 (fn [p] (add p 12)))))
 
   (stop!)
 )
