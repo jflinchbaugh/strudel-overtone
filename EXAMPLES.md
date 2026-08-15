@@ -137,7 +137,40 @@ Use `alt` to swap values every cycle, or `slowcat` to chain entire patterns.
                       (-> (note [:c3 :e3 :g3 :b3]) (s :saw))))
 ```
 
-## 6. Playback Control
+## 6. MIDI Input (Live Parameters)
+
+Connect hardware knobs, faders, and controllers to live pattern parameters.
+
+```clojure
+;; 1. List available MIDI devices & connect
+(midi-in-devices)
+(midi-in-connect!) ; connects to first device, or (midi-in-connect! "Device Name")
+
+;; 2. MIDI Debug Logging (Discover CC & Note numbers from your hardware)
+(midi-debug! true)  ; logs incoming CC and Note events
+(midi-debug! false) ; turn off when mapped
+
+;; 3. Define a named CC mapping with exponential/linear scaling
+(def-midi-cc! :cutoff 74 :min 200 :max 10000 :curve :exp :default 800)
+(def-midi-cc! :res 71 :min 0.0 :max 1.0 :default 0.2)
+
+;; 4. Bind Hardware Drum Pads
+(def-midi-pad-toggle! 36
+  (fn [_] (play! :kick (s :kick)))
+  (fn [_] (stop! :kick)))
+
+;; 5. Use in live patterns
+(play! :acid
+       (-> (note (euclid 5 8 :c2 :- 1))
+           (s :tb303)
+           (lpf (midi-cc :cutoff))      ; Real-time hardware knob control
+           (resonance (midi-cc :res)))) ; Real-time resonance control
+
+;; 4. Inline CC without pre-registering
+(play! :pad (-> (note [:c3 :e3 :g3]) (s :saw) (gain (midi-cc 1 :min 0.0 :max 1.0))))
+```
+
+## 7. Playback Control
 
 *   `(play! :name pattern)`: Starts/updates a loop.
 *   `(play-only! :name pattern)`: Stops everything else and plays this.

@@ -96,7 +96,8 @@
    :lead (-> (s :sine)
              (note [:c4])
              (degrees :major [1 2 3 4])
-             (every-cycle 2 (fn [p] (add p 12)))))
+             (every-cycle 2 (fn [p] (crush p 0.5)))
+             (every-cycle 2 1 (fn [p] (distort p 0.5)))))
 
   (stop!)
 )

@@ -250,3 +250,19 @@
   (testing "def-additive! with custom step"
     (sut/def-additive! :test-step [1.0 0.5] :step 2)
     (is (some? (ns-resolve 'strudel-overtone.synths 'test-step)))))
+
+(deftest reload!-test
+  (testing "reload! reloads namespaces in order and returns :reloaded"
+    (let [reloaded (atom [])]
+      (with-redefs [clojure.core/require (fn [n flag]
+                                           (swap! reloaded conj [n flag]))]
+        (is (= :reloaded (sut/reload! nil)))
+        (is (= '[strudel-overtone.util
+                 strudel-overtone.pattern
+                 strudel-overtone.synths
+                 strudel-overtone.samples
+                 strudel-overtone.player
+                 strudel-overtone.midi
+                 strudel-overtone.core]
+               (mapv first @reloaded)))
+        (is (every? #(= :reload (second %)) @reloaded))))))

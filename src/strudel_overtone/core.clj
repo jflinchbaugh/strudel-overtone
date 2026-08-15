@@ -5,7 +5,8 @@
             [strudel-overtone.pattern :as p]
             [strudel-overtone.synths :as synths]
             [strudel-overtone.samples :as samples]
-            [strudel-overtone.player :as player])
+            [strudel-overtone.player :as player]
+            [strudel-overtone.midi :as midi])
   (:import [strudel_overtone.pattern Event Pattern Overlay]))
 
 ;; --- Pattern Engine Re-exports ---
@@ -78,6 +79,46 @@
 (import-vars samples
              samples sample-slices load-sample! load-freesound!
              slice-sample! slice-sample-ms! sample-info)
+
+;; --- MIDI Re-exports ---
+
+(import-vars midi
+             midi-state reset-midi-state! scale-cc-val
+             def-midi-cc! set-midi-cc! get-midi-cc-val midi-cc
+             def-midi-pad! def-midi-pad-toggle!
+             midi-debug! midi-debug?
+             handle-midi-msg midi-in-devices midi-in-connect!
+             midi-in-disconnect!
+             midi-out-devices midi-out-connect!
+             midi-out-disconnect!
+             midi-send-cc! midi-set-pad-light!
+             colors coord->note note->coord rgb
+             light-on! light-grid! random-lights
+             test-midi-out!)
+
+;; --- Live Reloading ---
+
+(defn reload!
+  "Reloads all strudel-overtone namespaces in dependency order,
+   re-compiles core re-exports, and refers them into target-ns (default *ns*)."
+  ([]
+   (reload! *ns*))
+  ([target-ns]
+   (let [namespaces '[strudel-overtone.util
+                      strudel-overtone.pattern
+                      strudel-overtone.synths
+                      strudel-overtone.samples
+                      strudel-overtone.player
+                      strudel-overtone.midi
+                      strudel-overtone.core]]
+     (doseq [n namespaces]
+       (require n :reload))
+     (when target-ns
+       (binding [*ns* (if (instance? clojure.lang.Namespace target-ns)
+                        target-ns
+                        (the-ns target-ns))]
+         (refer 'strudel-overtone.core)))
+     :reloaded)))
 
 ;; --- Main / Entry ---
 
