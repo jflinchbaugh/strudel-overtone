@@ -19,7 +19,8 @@
         ;; Trigger an INACTIVE event for the same key/voice
         (let [ev (p/->Event 0 1 {:sound :saw :monophonic 1 :active (constantly 0)})]
           (player/trigger-event :p1 ev 0 1 0)
-          
+
           (is (= 1 (count @gate-calls)) "Should have gated off the synth")
           (is (= 999 (:id (first @gate-calls))))
-          (is (empty? (:active-synths @player-state)) "Should have removed from active-synths"))))))
+          (is (some? (get-in @player-state [:active-synths [:p1 0]]))
+              "Should retain tracking in active-synths for reuse/stop"))))))

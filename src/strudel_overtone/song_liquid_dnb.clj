@@ -38,16 +38,16 @@
    ;; Shuffling 16th hats with stereo panning and periodic roll
    :hats (-> (s [:hh :hh [:hh :hh] :hh :hh [:hh :hh] :hh :hh])
              (gain (overlay [0.3 0.15 0.25 0.15 0.35 0.15 0.25 0.2]))
-             (pan (saw 0.5 -0.5 0.5))
+             (pan (saw-sig 0.5 -0.5 0.5))
              (duck 0.5)
              (every-cycle 4 (fn [p] (fast p 2))))
 
    ;; Deep rolling Reese sub-bass with portamento glide & filter movement
-   :reese (-> (note [:f1 :_ [:f1 :ab1] :_ :eb1 :_ [:eb1 :bb1] :_])
+   :reese (-> (note [:f1 :- [:f1 :ab1] :- :eb1 :- [:eb1 :bb1] :-])
               (s :tb303)
               (mono)
               (glide 0.08)
-              (lpf (sine 0.5 280 1100))
+              (lpf (sine-sig 0.5 280 1100))
               (resonance 0.35)
               (distort 0.2)
               (gain 0.85)
@@ -75,19 +75,26 @@
                 (gain 0.35)
                 (echo 0.17 4)
                 (room 0.65)
-                (pan (sine 0.25 -0.7 0.7))))
+                (pan (sine-sig 0.25 -0.7 0.7))))
+
+(stop!)
+
+(ov/stop)
+
+(reload!)
+
 
   ;; ---------------------------------------------------------------------------
   ;; SECTION B: ATMOSPHERIC CHILL BREAKDOWN (Deep Pad & Sparse Beats)
   ;; ---------------------------------------------------------------------------
   (play-only!
    ;; Light ticking hats
-   :hats (-> (s [:hh :_ :hh :_ :hh :_ [:hh :hh] :_])
+   :hats (-> (s [:hh :- :hh :- :hh :- [:hh :hh] :-])
              (gain 0.25)
-             (pan (sine 1 -0.6 0.6)))
+             (pan (sine-sig 1 -0.6 0.6)))
 
    ;; Deep sub pulse
-   :sub (-> (note [:f1 :_ :db1 :_ :eb1 :_ :c1 :_])
+   :sub (-> (note [:f1 :- :db1 :- :eb1 :- :c1 :-])
             (s :sine)
             (mono)
             (glide 0.1)
@@ -101,7 +108,7 @@
                       #{:c3 :eb3 :g3 :bb3}])
                (s :liquid-rhodes)
                (slow 2)
-               (lpf (sine 0.2 400 2800))
+               (lpf (sine-sig 0.2 400 2800))
                (room 0.6)
                (gain 0.45))
 
@@ -126,7 +133,7 @@
 
    :hats (-> (s [:hh :hh :hh [:hh :hh] :hh :hh [:hh :hh :hh] :hh])
              (gain 0.3)
-             (pan (saw 1 -0.6 0.6)))
+             (pan (saw-sig 1 -0.6 0.6)))
 
    ;; Aggressive distorted Reese bass
    :reese (-> (note [:f1 [:f1 :f2] :ab1 [:g1 :eb1] :db1 [:db1 :db2] :c1 [:eb1 :ab1]])

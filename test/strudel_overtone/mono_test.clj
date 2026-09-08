@@ -40,15 +40,26 @@
               (let [args-map (apply hash-map (:args (second @mono-calls)))]
                 (is (== (double (ov/midi->hz (ov/note :g3))) (double (:freq args-map)))))))
 
-          (testing "rest triggers gate-off"
-            (let [gate-offs (atom 0)]
-              (with-redefs [player/gate-off (fn [inst] (swap! gate-offs inc))]
-                (let [pat (-> (sut/note [:c3 :-]) (sut/mono))
-                      rest-ev (second (:events pat))]
-                  (is (= 0 (active-val rest-ev)))
-                  (sut/trigger-event :p1 rest-ev 2 1)
-                  (is (= 1 @gate-offs))
-                  (is (nil? (get-in @player-state [:active-synths [:p1 0]])))))))
+          (testing "rest gates off gate control and next note re-gates with gate 1"
+            (let [ctl-calls (atom [])]
+              (with-redefs [ov/ctl (fn [inst & kvs]
+                                     (swap! ctl-calls conj (apply hash-map kvs)))
+                            ov/node-active? (constantly true)]
+                (let [pat (-> (sut/note [:c3 :- :g3]) (sut/s :saw) (sut/mono))
+                      evs (:events pat)]
+                  ;; 1. Play first note
+                  (sut/trigger-event :p1 (first evs) 0 1 0)
+                  ;; 2. Play rest
+                  (sut/trigger-event :p1 (second evs) 1 1 0)
+                  (is (= 0 (:gate (first @ctl-calls))) "Rest should set :gate to 0")
+                  (is (some? (get-in @player-state [:active-synths [:p1 0]]))
+                      "Synth node should still be tracked in active-synths")
+                  ;; 3. Play next note
+                  (sut/trigger-event :p1 (nth evs 2) 2 1 0)
+                  (is (= 4 (count @mono-calls)))
+                  (let [fourth-args (apply hash-map (:args (nth @mono-calls 3)))]
+                    (is (= 1 (:gate fourth-args)) "Next note after rest should have gate 1")
+                    (is (== (double (ov/midi->hz (ov/note :g3))) (double (:freq fourth-args)))))))))
 
           (testing "chord followed by single note gates off extra voices"
             (let [gate-offs (atom 0)]

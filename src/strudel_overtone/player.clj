@@ -414,17 +414,21 @@
                                            :active-synths dissoc k))))))
                (trigger-single-event
                 key ev params beat dur-beats voice-idx))))
-         ;; Deactivated event: If it was monophonic, we should gate off any existing instances
-         (let [active-synths (:active-synths @player-state)]
-           (doseq [[k active] active-synths]
-             (when (and (vector? k) (= (first k) key) (or (zero? voice-idx) (>= (second k) voice-idx)))
-               (ov/apply-at (metro beat)
-                            (fn [& _]
-                              (tel/log! :info
-                                        {:action :gate-deactivated
-                                         :k k :beat beat})
-                              (gate-off (:inst active))
-                              (swap! player-state update :active-synths dissoc k))))))))
+         ;; Deactivated event: If it was monophonic, gate off existing instances but preserve tracking
+         (let [raw-mono (get params :monophonic 0)
+               mono-val (if (fn? raw-mono) (raw-mono beat :monophonic) raw-mono)
+               monophonic (is-active? mono-val)]
+           (when monophonic
+             (ov/apply-at (metro beat)
+                          (fn [& _]
+                            (doseq [[k active] (:active-synths @player-state)]
+                              (when (and (vector? k)
+                                         (= (first k) key)
+                                         (or (zero? voice-idx) (>= (second k) voice-idx)))
+                                (tel/log! :info
+                                          {:action :gate-deactivated
+                                           :k k :beat beat})
+                                (gate-off (:inst active))))))))))
      (catch Exception e
        (tel/log! :error {:msg "Error triggering event"
                          :error (ex-message e)

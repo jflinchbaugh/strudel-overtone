@@ -143,7 +143,7 @@
   (update pattern :events
           (fn [evs]
             (map (fn [e]
-                   (if (is-rest-params? (:params e))
+                   (if (and (is-rest-params? (:params e)) (not= key :monophonic))
                      e
                      (let [v (wrap-number-fn param-value)
                            old-v (get-in e [:params key])]
