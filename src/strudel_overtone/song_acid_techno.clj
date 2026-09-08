@@ -33,7 +33,7 @@
    ;; Driving offbeat open/closed hats using Euclidean distribution
    :hats (-> (s (euclid 7 16 :hat))
              (gain 0.45)
-             (pan (sine 1 -0.5 0.5))
+             (pan (sine-sig 1 -0.5 0.5))
              (duck 0.55))
 
    ;; 16th-note sub rumble bassline
@@ -79,7 +79,7 @@
    ;; Slicing Euclidean hats
    :hats (-> (s (euclid 11 16 :hat))
              (gain 0.4)
-             (pan (saw 2 -0.6 0.6))
+             (pan (saw-sig 2 -0.6 0.6))
              (duck 0.6))
 
    ;; Inharmonic metallic industrial percussion accents
@@ -133,7 +133,7 @@
              (s :tb303)
              (mono)
              (glide 0.08)
-             (lpf (sine 0.15 400 4500))
+             (lpf (sine-sig 0.15 400 4500))
              (resonance 0.85)
              (distort 0.35)
              (echo 0.25 5)
@@ -144,12 +144,13 @@
    :drone (-> (note [#{:c2 :g2}])
               (s :mooger)
               (slow 4)
-              (lpf (sine 0.1 300 1500))
+              (lpf (sine-sig 0.1 300 1500))
               (distort 0.2)
               (room 0.7)
               (gain 0.35)))
 
   ;; Stop playback
   (stop!)
+
   (ov/stop)
   )

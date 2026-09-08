@@ -46,7 +46,7 @@
    ;; Swung, humanized hi-hats with velocity overlay
    :hats (-> (s [:hh :hh :hh :hh :hh :hh :hh :hh])
              (gain (overlay [0.35 0.18 0.28 0.15 0.32 0.18 0.25 0.2]))
-             (pan (sine 0.5 -0.3 0.3))
+             (pan (sine-sig 0.5 -0.3 0.3))
              (lpf 6000)
              (swing 1/16)
              (duck 0.45))
@@ -113,7 +113,7 @@
                       #{:bb3 :d4 :f4 :ab4}])
                (s :lofi-epiano)
                (slow 2)
-               (lpf (sine 0.15 800 2400))
+               (lpf (sine-sig 0.15 800 2400))
                (room 0.6)
                (gain 0.45))
 
@@ -128,7 +128,15 @@
              (room 0.6)
              (gain 0.38)))
 
+
+  (play-only!
+   :crackle (-> (s :crackle)
+                (gain 0.14)
+                #_(lpf 2800)))
+
   ;; Stop all tracks
   (stop!)
+
+
   (ov/stop)
   )

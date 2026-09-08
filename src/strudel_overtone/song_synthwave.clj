@@ -28,7 +28,7 @@
             (gain 0.45)
             (room 0.6)
             (echo 0.25 4)
-            (pan (sine 0.5 -0.6 0.6)))
+            (pan (sine-sig 0.5 -0.6 0.6)))
 
    ;; Warm vintage chords
    :pad (-> (note [#{:d3 :f3 :a3 :c4}
@@ -64,13 +64,13 @@
    :hats (-> (s [:hh :hh :hh :hh :hh :hh :hh :hh])
              (fast 2)
              (gain (overlay [0.25 0.15 0.2 0.15]))
-             (pan (sine 1 -0.4 0.4))
+             (pan (sine-sig 1 -0.4 0.4))
              (duck 0.6))
 
    ;; 16th rolling synthwave bassline with filter sweeps and sidechain pumping
    :bass (-> (note [:d2 :d2 :d2 :d2 :bb1 :bb1 :bb1 :bb1 :c2 :c2 :c2 :c2 :a1 :a1 :a1 :a1])
              (s :saw)
-             (fast 2)
+             (slow 4)
              (lpf 500)
              (lpf-env 2400)
              (lpf-adsr 0.01 0.16 0.1 0.08)
@@ -114,7 +114,7 @@
              (s :tb303)
              (mono)
              (glide 0.12)
-             (lpf (sine 0.25 300 1200))
+             (lpf (sine-sig 0.25 300 1200))
              (resonance 0.6)
              (gain 0.6))
 
@@ -125,7 +125,7 @@
                    #{:a2 :c3 :e3 :g3}])
             (s :supersaw)
             (slow 2)
-            (lpf (sine 0.1 600 3500))
+            (lpf (sine-sig 0.1 600 3500))
             (room 0.7)
             (gain 0.4))
 
@@ -158,7 +158,7 @@
 
    :bass (-> (note [:d2 :d2 :d2 :d2 :bb1 :bb1 :bb1 :bb1 :c2 :c2 :c2 :c2 :a1 :a1 :a1 :a1])
              (s :saw)
-             (fast 2)
+             (slow 2)
              (lpf 750)
              (lpf-env 3500)
              (lpf-adsr 0.01 0.14 0.1 0.06)
@@ -177,5 +177,6 @@
 
   ;; Stop all tracks
   (stop!)
+
   (ov/stop)
   )
