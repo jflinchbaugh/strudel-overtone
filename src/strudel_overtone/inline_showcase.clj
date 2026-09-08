@@ -9,6 +9,9 @@
 (comment
   (stop!)
 
+  (midi-out-connect!)
+
+
   ;; --- 1. Expressive Melody with Per-Note Dynamics and Glides ---
   ;; Notes can individually carry dynamics (gain), pitch slides (glide),
   ;; or custom filters without affecting the surrounding sequence.
@@ -21,6 +24,15 @@
              (mono)
              (room 0.3)
              (space 0.4 0.25 4)))
+
+  (play! :lights
+         (-> (s [:bd])
+             (gain 0)
+             (fast 4)
+             (swing 1/3)
+             (light-grid
+              (fn [time]
+                random-lights))))
 
   (stop!)
 
@@ -94,7 +106,12 @@
             (s :mooger)
             (slow 2)
             (adsr 0.2 0.5 0.7 0.8)
-            (space 0.6 0.3 5)))
+            (space 0.6 0.3 5))
+   :lights (-> (s [:bd])
+       (gain 0)
+       (light-grid
+        (fn [time]
+          random-lights))))
 
   (stop!)
 
