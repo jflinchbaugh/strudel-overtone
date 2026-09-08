@@ -264,3 +264,51 @@
           ((get-in (first evs) [:params :pad-light]) 0.0 :pad-light)
           ((get-in (second evs) [:params :pad-light]) 0.5 :pad-light)
           (is (= [[0 :yellow] [1 :yellow]] @pad-events)))))))
+
+(deftest inline-params-test
+  (testing "inline parameter modification on single note"
+    (let [pat (sut/note [:c3 (-> :e3 (sut/gain 0.5) (sut/glide 0.2)) :g3])
+          evs (:events pat)]
+      (is (= 3 (count evs)))
+      (let [e1 (nth evs 0)
+            e2 (nth evs 1)
+            e3 (nth evs 2)]
+        (is (= :c3 (get-in e1 [:params :note])))
+        (is (nil? (get-in e1 [:params :amp])))
+        (is (= :e3 (get-in e2 [:params :note])))
+        (is (= 0.5 ((get-in e2 [:params :amp]) 0 :amp)))
+        (is (= 0.2 ((get-in e2 [:params :slide]) 0 :slide)))
+        (is (= :g3 (get-in e3 [:params :note])))
+        (is (nil? (get-in e3 [:params :amp]))))))
+
+  (testing "inline parameter modification across a vector"
+    (let [pat (sut/note [:c3 (-> [:e3 :g3] (sut/gain 0.6) (sut/lpf 800)) :b3])
+          evs (:events pat)]
+      (is (= 4 (count evs)))
+      (let [e2 (nth evs 1)
+            e3 (nth evs 2)]
+        (is (= :e3 (get-in e2 [:params :note])))
+        (is (= 0.6 ((get-in e2 [:params :amp]) 0 :amp)))
+        (is (= 800 ((get-in e2 [:params :lpf]) 0 :lpf)))
+        (is (= :g3 (get-in e3 [:params :note])))
+        (is (= 0.6 ((get-in e3 [:params :amp]) 0 :amp)))
+        (is (= 800 ((get-in e3 [:params :lpf]) 0 :lpf))))))
+
+  (testing "inline parameter modification across a set (simul / chord)"
+    (let [pat (sut/note [:c3 (-> #{:e3 :g3} (sut/gain 0.7)) :c4])
+          evs (:events pat)]
+      (is (= 4 (count evs)))
+      (let [chord-evs (filter #(#{:e3 :g3} (get-in % [:params :note])) evs)]
+        (is (= 2 (count chord-evs)))
+        (doseq [ev chord-evs]
+          (is (= 0.7 ((get-in ev [:params :amp]) 0 :amp)))))))
+
+  (testing "inline modification with with helper"
+    (let [pat (sut/note [:c3 (sut/with :e3 {:amp 0.5 :lpf 1200}) :g3])
+          evs (:events pat)]
+      (is (= 3 (count evs)))
+      (let [e2 (nth evs 1)]
+        (is (= :e3 (get-in e2 [:params :note])))
+        (is (= 0.5 ((get-in e2 [:params :amp]) 0 :amp)))
+        (is (= 1200 ((get-in e2 [:params :lpf]) 0 :lpf)))))))
+

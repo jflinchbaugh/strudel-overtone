@@ -10,6 +10,13 @@
 (defrecord Event [time duration params])
 (defrecord Pattern [events cycles delay-cycles stop-cycles length])
 (defrecord Overlay [val])
+(defrecord DecoratedToken [val params])
+
+(defn decorated?
+  "Returns true if x is an instance of DecoratedToken."
+  [x]
+  (instance? DecoratedToken x))
+
 
 (def ^:dynamic *current-cycle* 0)
 (def ^:dynamic *current-event* nil)
@@ -19,6 +26,7 @@
    be applied as an overlay, without splitting existing events."
   [val]
   (->Overlay val))
+
 
 (defn make-pattern
   "Constructs a Pattern record from a sequence of events."
@@ -40,26 +48,77 @@
 
 
 
+;; --- Parameter Merging ---
+
+(def additive-keys
+  "Set of parameter keys whose values combine additively when set multiple times."
+  #{:amp :add :detune :pshift :fshift :vibrato
+    :lpf-env :hpf-env :bpf-env :res-env :phaser-env :crush-env
+    :detune-env :pshift-env :fshift-env :pan-env :distort-env})
+
+(defn- combine-param-values [key old-v new-v]
+  (cond
+    (and (= key :note) (some? old-v))
+    (fn [beat k]
+      (let [root (if (fn? old-v) (old-v beat k) old-v)]
+        (if (fn? new-v) (new-v beat k) new-v)))
+
+    (and (contains? additive-keys key) (some? old-v))
+    (fn [beat k]
+      (+ (double (if (fn? old-v) (old-v beat k) old-v))
+         (double (if (fn? new-v) (new-v beat k) new-v))))
+
+    :else
+    new-v))
+
+(defn- merge-event-params [params1 params2]
+  (reduce-kv (fn [m k v]
+               (let [old-v (get m k)]
+                 (assoc m k (combine-param-values k old-v v))))
+             params1
+             params2))
+
 ;; --- Mini-notation Parser ---
 
 (defn parse-mini
   "Naively parses a collection or single value into a sequence of events.
-   Returns a list of maps {:value v :start s :duration d}.
+   Returns a list of maps {:value v :start s :duration d :params p}.
    Handles nested collections by subdividing the duration.
-   Handles sets by creating simultaneous events with the same duration."
+   Handles sets by creating simultaneous events with the same duration.
+   Handles DecoratedToken by carrying attached parameters."
   ([tokens] (parse-mini tokens 0.0 1.0))
   ([tokens start duration]
-   (if (sequential? tokens)
+   (cond
+     (instance? DecoratedToken tokens)
+     (let [sub-events (parse-mini (:val tokens) start duration)
+           p (:params tokens)]
+       (map (fn [ev]
+              (update ev :params #(merge-event-params (or % {}) p)))
+            sub-events))
+
+     (sequential? tokens)
      (let [n (count tokens)
            dur (if (pos? n) (/ duration (double n)) 0)]
        (mapcat (fn [[i v]]
                  (let [s-time (+ start (* i dur))]
                    (cond
+                     (instance? DecoratedToken v)
+                     (let [sub (parse-mini (:val v) s-time dur)
+                           p (:params v)]
+                       (map (fn [ev]
+                              (update ev :params #(merge-event-params (or % {}) p)))
+                            sub))
+
                      (set? v)
                      (map (fn [val]
-                            {:value val
-                             :start s-time
-                             :duration dur})
+                            (if (instance? DecoratedToken val)
+                              {:value (:val val)
+                               :start s-time
+                               :duration dur
+                               :params (:params val)}
+                              {:value val
+                               :start s-time
+                               :duration dur}))
                           ;; Sort for deterministic voice-idx
                           ;; assignment across cycles.
                           (sort-by str v))
@@ -72,9 +131,12 @@
                        :start s-time
                        :duration dur}])))
                (map-indexed vector tokens)))
+
+     :else
      [{:value tokens
        :start start
        :duration duration}])))
+
 
 ;; --- Core Pattern Builders ---
 
@@ -108,33 +170,6 @@
       (number? v) (zero? v)
       :else false)))
 
-(def additive-keys
-  "Set of parameter keys whose values combine additively when set multiple times."
-  #{:amp :add :detune :pshift :fshift :vibrato
-    :lpf-env :hpf-env :bpf-env :res-env :phaser-env :crush-env
-    :detune-env :pshift-env :fshift-env :pan-env :distort-env})
-
-(defn- combine-param-values [key old-v new-v]
-  (cond
-    (and (= key :note) (some? old-v))
-    (fn [beat k]
-      (let [root (if (fn? old-v) (old-v beat k) old-v)]
-        (if (fn? new-v) (new-v beat k) new-v)))
-
-    (and (contains? additive-keys key) (some? old-v))
-    (fn [beat k]
-      (+ (double (if (fn? old-v) (old-v beat k) old-v))
-         (double (if (fn? new-v) (new-v beat k) new-v))))
-
-    :else
-    new-v))
-
-(defn- merge-event-params [params1 params2]
-  (reduce-kv (fn [m k v]
-               (let [old-v (get m k)]
-                 (assoc m k (combine-param-values k old-v v))))
-             params1
-             params2))
 
 (defn with-param
   "Updates pattern events with a specific parameter.
@@ -153,15 +188,16 @@
 (defn- make-event-list [pat key transform-fn]
   (let [parsed (parse-mini pat)]
     (map (fn [p]
-           (let [v (:value p)]
+           (let [v (:value p)
+                 base-params (or (:params p) {})]
              (if (is-rest? v)
                (->Event (:start p)
                         (:duration p)
-                        {:active (constantly 0)})
+                        (merge-event-params base-params {:active (constantly 0)}))
                (let [res (wrap-number-fn (transform-fn v))]
                  (->Event (:start p)
                           (:duration p)
-                          {key res})))))
+                          (merge-event-params base-params {key res}))))))
          parsed)))
 
 (defn- combine-patterns
@@ -228,24 +264,58 @@
                       base-events))))))
 
 (defn set-param
-  "Sets a single parameter on pattern events to value v."
-  ([pattern key param-value] (set-param pattern key param-value try-parse-number))
-  ([pattern key param-value transform-fn]
-   (let [overlay? (instance? Overlay param-value)
-         v (if overlay? (:val param-value) param-value)]
-     (if (sequential? v)
-       (combine-patterns
-        pattern
-        (make-pattern (make-event-list v key (comp wrap-number-fn transform-fn)))
-        key
-        overlay?)
-       (with-param pattern key (wrap-number-fn (transform-fn v)))))))
+  "Sets a single parameter on pattern events or decorates a value/collection.
+   If target is a Pattern, updates or overlays parameter on pattern events.
+   If target is a value, vector, or set, attaches the parameter inline."
+  ([target key param-value] (set-param target key param-value try-parse-number))
+  ([target key param-value transform-fn]
+   (cond
+     (instance? Pattern target)
+     (let [overlay? (instance? Overlay param-value)
+           v (if overlay? (:val param-value) param-value)]
+       (if (sequential? v)
+         (combine-patterns
+          target
+          (make-pattern (make-event-list v key (comp wrap-number-fn transform-fn)))
+          key
+          overlay?)
+         (with-param target key (wrap-number-fn (transform-fn v)))))
+
+     (instance? DecoratedToken target)
+     (let [val-fn (wrap-number-fn (transform-fn param-value))]
+       (update target :params #(merge-event-params (or % {}) {key val-fn})))
+
+     (sequential? target)
+     (let [val-fn (wrap-number-fn (transform-fn param-value))]
+       (mapv (fn [item] (set-param item key val-fn identity)) target))
+
+     (set? target)
+     (let [val-fn (wrap-number-fn (transform-fn param-value))]
+       (into #{} (map (fn [item] (set-param item key val-fn identity))) target))
+
+     :else
+     (let [val-fn (wrap-number-fn (transform-fn param-value))]
+       (->DecoratedToken target {key val-fn})))))
 
 (defn params
   "Sets multiple parameters at once from a map.
    Example: (params pat {:attack 0.1 :release 0.5})"
-  [pattern param-map]
-  (reduce-kv (fn [p k v] (set-param p k v)) pattern param-map))
+  [target param-map]
+  (reduce-kv (fn [p k v] (set-param p k v)) target param-map))
+
+(defn with
+  "Decorates a target (note, vector, set, or token) with inline parameters.
+   Accepts either a map of params, or key-value pairs.
+   Examples:
+     (with :e3 {:gain 0.5 :lpf 800})
+     (with :e3 :gain 0.5 :lpf 800)
+     (with [:c3 :e3] :gain 0.6)"
+  [target & kvs-or-map]
+  (let [param-map (if (and (= 1 (count kvs-or-map)) (map? (first kvs-or-map)))
+                    (first kvs-or-map)
+                    (apply hash-map kvs-or-map))]
+    (params target param-map)))
+
 
 (defn alt
   "Returns a function that alternates between values every cycle.

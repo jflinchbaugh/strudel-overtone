@@ -7,7 +7,7 @@
             [strudel-overtone.samples :as samples]
             [strudel-overtone.player :as player]
             [strudel-overtone.midi :as midi])
-  (:import [strudel_overtone.pattern Event Pattern Overlay]))
+  (:import [strudel_overtone.pattern Event Pattern Overlay DecoratedToken]))
 
 ;; --- Pattern Engine Re-exports ---
 
@@ -21,8 +21,9 @@
 
 ;; Pattern records & builders
 (import-vars p
-             ->Event ->Pattern ->Overlay make-pattern parse-mini
-             with-param set-param params overlay)
+             ->Event ->Pattern ->Overlay ->DecoratedToken decorated?
+             make-pattern parse-mini
+             with-param set-param params with overlay)
 
 ;; DSL Modifiers
 (import-vars p
