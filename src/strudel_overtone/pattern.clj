@@ -1,6 +1,7 @@
 (ns strudel-overtone.pattern
   (:require [overtone.core :as ov]
             [strudel-overtone.util :refer [import-vars]]
+            [strudel-overtone.midi :as midi]
             [strudel-overtone.pattern.random :as rand]
             [strudel-overtone.pattern.signals :as sig]))
 
@@ -962,4 +963,154 @@
                        (long arg1)))
          arg3
          arg4)))))
+
+(defn- resolve-grid-color-fn
+  [color-fn-or-factory cycle-t cycle]
+  (if (fn? color-fn-or-factory)
+    (let [res (try
+                (try (color-fn-or-factory cycle cycle-t)
+                     (catch clojure.lang.ArityException _
+                       (color-fn-or-factory cycle-t)))
+                (catch clojure.lang.ArityException _
+                  color-fn-or-factory))]
+      (if (fn? res) res color-fn-or-factory))
+    color-fn-or-factory))
+
+(defn light-grid
+  "Sets a grid lighting function on pattern events, or creates a lighting pattern.
+   The color-fn-or-factory can be:
+     - A color keyword (e.g. :red, :blue, :black)
+     - A 2-arg color function (fn [row col] color)
+     - A factory function (fn [time] (fn [row col] ...)) or (fn [cycle time] ...)
+     - A 3-arg function (fn [row col time] ...) or 4-arg (fn [row col cycle time] ...)"
+  ([color-fn-or-factory]
+   (if (or (instance? Pattern color-fn-or-factory)
+           (instance? Event color-fn-or-factory))
+     color-fn-or-factory
+     (fn [pat] (light-grid pat color-fn-or-factory))))
+  ([pattern color-fn-or-factory]
+   (let [hook-fn (fn [cycle-t _]
+                   (let [cycle (or *current-cycle*
+                                   (long (Math/floor (double cycle-t))))
+                         target-fn (resolve-grid-color-fn
+                                    color-fn-or-factory cycle-t cycle)]
+                     (midi/light-grid!
+                      (fn [r c]
+                        (if (fn? target-fn)
+                          (try (target-fn r c)
+                               (catch clojure.lang.ArityException _
+                                 (try (target-fn r c cycle-t)
+                                      (catch clojure.lang.ArityException _
+                                        (target-fn r c cycle cycle-t)))))
+                          target-fn)))
+                     1.0))]
+     (with-param pattern :light-grid hook-fn))))
+
+(defn- normalize-pad-val [v]
+  (cond
+    (and (vector? v) (= 2 (count v)) (every? number? v))
+    (midi/coord->note (first v) (second v))
+
+    (sequential? v)
+    (mapv normalize-pad-val v)
+
+    :else v))
+
+(defn pad-light
+  "Creates a pattern of pad lights, or attaches pad lighting to a pattern.
+   The pad can be a [row col] coordinate, note number, or note keyword.
+   Usage:
+     (pad-light [[0 0] [0 1] [0 2]])
+     (pad-light [[0 0] [0 1]] :green)
+     (pad-light [[0 0] [0 1]] [:red :blue])
+     (-> (note [:c3 :e3 :g3]) (pad-light :cyan))
+     (-> (s [:bd :sd]) (pad-light [[0 0] [0 1]] :yellow))"
+  ([arg]
+   (cond
+     (or (instance? Pattern arg) (instance? Event arg))
+     arg
+
+     (and (keyword? arg) (contains? midi/colors arg))
+     (fn [pat] (pad-light pat arg))
+
+     (or (vector? arg) (sequential? arg))
+     (pad-light arg :white)
+
+     :else
+     (fn [pat] (pad-light pat arg))))
+  ([arg1 arg2]
+   (cond
+     (instance? Pattern arg1)
+     (let [pat (if (sequential? arg2)
+                 (set-param arg1 :pad-color arg2 identity)
+                 arg1)
+           new-events (mapv (fn [ev]
+                              (let [pad-val (get (:params ev) :pad
+                                                 (:note (:params ev)))
+                                    col-val (if (sequential? arg2)
+                                              (get (:params ev)
+                                                   :pad-color :white)
+                                              arg2)
+                                    hook (fn [cycle-t _]
+                                           (let [p (if (fn? pad-val)
+                                                     (pad-val cycle-t :pad)
+                                                     pad-val)
+                                                 c (if (fn? col-val)
+                                                     (col-val cycle-t
+                                                              :pad-color)
+                                                     col-val)]
+                                             (when (and p (not (is-rest? p)))
+                                               (midi/light-on! p c))
+                                             1.0))]
+                                (assoc-in ev [:params :pad-light] hook)))
+                            (:events pat))]
+       (assoc pat :events new-events))
+
+     (instance? Event arg1)
+     (let [pad-val (get (:params arg1) :pad (:note (:params arg1)))
+           hook (fn [cycle-t _]
+                  (let [p (if (fn? pad-val) (pad-val cycle-t :pad) pad-val)
+                        c (if (fn? arg2) (arg2 cycle-t :pad-color) arg2)]
+                    (when (and p (not (is-rest? p)))
+                      (midi/light-on! p c))
+                    1.0))]
+       (assoc-in arg1 [:params :pad-light] hook))
+
+     :else
+     (let [norm-pads (normalize-pad-val arg1)
+           base-pat (make-pattern (make-event-list norm-pads :pad identity))
+           with-colors (if (sequential? arg2)
+                         (set-param base-pat :pad-color arg2 identity)
+                         base-pat)
+           new-events (mapv (fn [ev]
+                              (let [pad-val (:pad (:params ev))
+                                    col-val (if (sequential? arg2)
+                                              (get (:params ev)
+                                                   :pad-color :white)
+                                              arg2)
+                                    hook (fn [cycle-t _]
+                                           (let [p (if (fn? pad-val)
+                                                     (pad-val cycle-t :pad)
+                                                     pad-val)
+                                                 c (if (fn? col-val)
+                                                     (col-val cycle-t
+                                                              :pad-color)
+                                                     col-val)]
+                                             (when (and p (not (is-rest? p)))
+                                               (midi/light-on! p c))
+                                             1.0))]
+                                (assoc-in ev [:params :pad-light] hook)))
+                            (:events with-colors))]
+       (assoc with-colors :events new-events))))
+  ([pat pads color]
+   (let [norm (normalize-pad-val pads)
+         base (if (sequential? norm)
+                (set-param pat :pad norm identity)
+                (with-param pat :pad norm))]
+     (pad-light base color))))
+
+(defn pad-color
+  "Sets the pad color for a pattern."
+  [pat color]
+  (pad-light pat color))
 

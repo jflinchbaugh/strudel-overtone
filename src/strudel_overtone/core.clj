@@ -43,7 +43,8 @@
              pshift-env pshift-adsr pshift-perc fshift-env fshift-adsr
              fshift-perc pan-env pan-adsr pan-perc distort-env
              distort-adsr distort-perc fm echo step degrees
-             alt slowcat stack fastcat euclid every-cycle)
+             alt slowcat stack fastcat euclid every-cycle
+             light-grid pad-light pad-color)
 
 ;; --- Player Re-exports ---
 

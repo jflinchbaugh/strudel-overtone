@@ -191,3 +191,76 @@
       (is (= 150.0 ((:fshift params) 0 :fshift)))
       (is (= 0.7 ((:vibrato params) 0 :vibrato)))
       (is (= 5000.0 ((:lpf-env params) 0 :lpf-env))))))
+
+(deftest light-grid-param-test
+  (testing "light-grid pattern modifier with static, direct, and factory fns"
+    (let [grid-calls (atom [])]
+      (with-redefs [strudel-overtone.midi/light-grid! (fn [f]
+                                                        (swap! grid-calls conj (f 0 1)))]
+        ;; 1. Direct 2-arg (r, c) color fn
+        (let [pat (-> (sut/s [:kick])
+                      (sut/light-grid (fn [r c] :red)))
+              ev (first (:events pat))
+              hook (get-in ev [:params :light-grid])]
+          (is (fn? hook))
+          (hook 0 :light-grid)
+          (is (= [:red] @grid-calls)))
+
+        ;; 2. Factory fn (time) -> (r, c)
+        (reset! grid-calls [])
+        (let [pat (-> (sut/s [:kick])
+                      (sut/light-grid (fn [t]
+                                        (fn [r c] (if (zero? t) :blue :yellow)))))
+              ev (first (:events pat))
+              hook (get-in ev [:params :light-grid])]
+          (hook 0.0 :light-grid)
+          (is (= [:blue] @grid-calls))
+          (hook 1.5 :light-grid)
+          (is (= [:blue :yellow] @grid-calls)))
+
+        ;; 3. Factory fn (cycle, time) -> (r, c)
+        (reset! grid-calls [])
+        (let [pat (-> (sut/s [:kick])
+                      (sut/light-grid (fn [cycle t]
+                                        (fn [r c] [cycle t r c]))))
+              ev (first (:events pat))
+              hook (get-in ev [:params :light-grid])]
+          (binding [strudel-overtone.pattern/*current-cycle* 3]
+            (hook 3.25 :light-grid)
+            (is (= [[3 3.25 0 1]] @grid-calls))))))))
+
+(deftest pad-light-test
+  (testing "pad-light as constructor and pattern modifier"
+    (let [pad-events (atom [])]
+      (with-redefs [strudel-overtone.midi/light-on! (fn [pad color]
+                                                      (swap! pad-events conj [pad color]))]
+        ;; 1. Direct constructor: (pad-light [[0 0] [0 1]] :green)
+        (let [pat (sut/pad-light [[0 0] [0 1]] :green)
+              evs (:events pat)]
+          (is (= 2 (count evs)))
+          (let [hook1 (get-in (first evs) [:params :pad-light])]
+            (is (fn? hook1))
+            (hook1 0.0 :pad-light)
+            (is (= [[0 :green]] @pad-events)))
+          (let [hook2 (get-in (second evs) [:params :pad-light])]
+            (hook2 0.5 :pad-light)
+            (is (= [[0 :green] [1 :green]] @pad-events))))
+
+        ;; 2. Modifying an existing note pattern with a color: (-> (note [:c3]) (pad-light :cyan))
+        (reset! pad-events [])
+        (let [pat (-> (sut/note [:c3])
+                      (sut/pad-light :cyan))
+              ev (first (:events pat))
+              hook (get-in ev [:params :pad-light])]
+          (hook 0.0 :pad-light)
+          (is (= [[:c3 :cyan]] @pad-events)))
+
+        ;; 3. Modifying an existing sound pattern with pad coordinates and color
+        (reset! pad-events [])
+        (let [pat (-> (sut/s [:bd :sd])
+                      (sut/pad-light [[0 0] [0 1]] :yellow))
+              evs (:events pat)]
+          (is (= 2 (count evs)))
+          ((get-in (first evs) [:params :pad-light]) 0.0 :pad-light)
+          ((get-in (second evs) [:params :pad-light]) 0.5 :pad-light)
+          (is (= [[0 :yellow] [1 :yellow]] @pad-events)))))))
