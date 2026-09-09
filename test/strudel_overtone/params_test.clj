@@ -265,6 +265,60 @@
           ((get-in (second evs) [:params :pad-light]) 0.5 :pad-light)
           (is (= [[0 :yellow] [1 :yellow]] @pad-events)))))))
 
+(deftest light-on-rests-and-standalone-test
+  (testing "light-grid attaches to rests and fires"
+    (let [grid-calls (atom [])]
+      (with-redefs [strudel-overtone.midi/light-grid! (fn [f]
+                                                        (swap! grid-calls conj (f 0 0)))]
+        (let [pat (-> (sut/note [:-])
+                      (sut/light-grid (fn [r c] :cyan)))
+              evs (:events pat)]
+          (is (= 1 (count evs)))
+          (let [hook (get-in (first evs) [:params :light-grid])]
+            (is (fn? hook))
+            (hook 0.0 :light-grid)
+            (is (= [:cyan] @grid-calls)))))))
+
+  (testing "light-grid as standalone pattern constructor"
+    (let [grid-calls (atom [])]
+      (with-redefs [strudel-overtone.midi/light-grid! (fn [f]
+                                                        (swap! grid-calls conj (f 0 0)))]
+        (let [pat (sut/light-grid (fn [r c] :magenta))
+              evs (:events pat)]
+          (is (= 1 (count evs)))
+          (let [hook (get-in (first evs) [:params :light-grid])]
+            (is (fn? hook))
+            (hook 0.0 :light-grid)
+            (is (= [:magenta] @grid-calls)))))))
+
+  (testing "inline light-grid on a single note"
+    (let [grid-calls (atom [])]
+      (with-redefs [strudel-overtone.midi/light-grid! (fn [f]
+                                                        (swap! grid-calls conj (f 0 0)))]
+        (let [pat (sut/note [:c3 (-> :e3 (sut/light-grid (fn [r c] :yellow))) :g3])
+              evs (:events pat)]
+          (is (= 3 (count evs)))
+          (is (nil? (get-in (nth evs 0) [:params :light-grid])))
+          (let [hook (get-in (nth evs 1) [:params :light-grid])]
+            (is (fn? hook))
+            (hook 0.0 :light-grid)
+            (is (= [:yellow] @grid-calls)))
+          (is (nil? (get-in (nth evs 2) [:params :light-grid])))))))
+
+  (testing "light-grid with a vector of colors (mini-notation)"
+    (let [grid-calls (atom [])]
+      (with-redefs [strudel-overtone.midi/light-grid! (fn [f]
+                                                        (swap! grid-calls conj (f 0 0)))]
+        (let [pat (sut/light-grid [:red :blue :green :yellow])
+              evs (:events pat)]
+          (is (= 4 (count evs)))
+          (doseq [[idx ev] (map-indexed vector evs)]
+            (let [hook (get-in ev [:params :light-grid])]
+              (is (fn? hook))
+              (hook (* idx 0.25) :light-grid)))
+          (is (= [:red :blue :green :yellow] @grid-calls)))))))
+
+
 (deftest inline-params-test
   (testing "inline parameter modification on single note"
     (let [pat (sut/note [:c3 (-> :e3 (sut/gain 0.5) (sut/glide 0.2)) :g3])

@@ -66,13 +66,18 @@
     (ov/midi->hz n)
     (ov/midi->hz (ov/note n))))
 
+(def ^:private visual-hook-keys
+  #{:light-grid :pad-light})
+
 (defn resolve-params
   "Resolves dynamic parameters for an event at the given beat and cycle."
   [params beat cycle]
   (binding [p/*current-cycle* (or cycle 0)]
     (let [cycle-t (/ (double beat) 4.0)]
       (reduce-kv (fn [m k v]
-                   (assoc m k (if (fn? v) (v cycle-t k) v)))
+                   (assoc m k (if (and (fn? v) (not (visual-hook-keys k)))
+                                (v cycle-t k)
+                                v)))
                  {}
                  params))))
 
@@ -210,7 +215,8 @@
         sound-name (or sound-param (if (or n (coll? n-raw)) :saw nil))
         slice (when sound-name (get @samples/sample-slices sound-name))
         effective-sound (if slice (:source slice) sound-name)
-        sample-buf (when effective-sound (get @samples/samples effective-sound))
+        sample-buf (when effective-sound
+                     (get @samples/samples effective-sound))
         params (adjust-slice-params params sound-name)
         note-offset (or (get params :add) 0)
         amp (try-parse-number (or (:amp params) 1.0))
@@ -219,107 +225,150 @@
         cycle-sec (* 4 (/ 60 (or (ov/metro-bpm metro) 120)))
         raw-mono (get params :monophonic 0)
         mono-val (if (fn? raw-mono) (raw-mono beat :monophonic) raw-mono)
-        monophonic-param (is-active? mono-val)]
-    (when sound-name
-      (let [base (if sample-buf :sampler (get synths/synth-aliases sound-name sound-name))
-            monophonic (and monophonic-param (boolean (synths/supports-mono? base)))
-            sustain-sec (calculate-sustain params sample-buf dur-beats monophonic)
-            synth-key (synths/get-synth-name base params)
-            synth-var (or (synths/resolve-synth synth-key) (synths/resolve-synth base))
-            freq (when (and n (not (p/is-rest? n-raw)))
-                   (resolve-note (+ (double n) (double note-offset))))
-            default-freq (if (synths/percussive-synths base) 65.406 440.0)
-            effective-freq (or freq default-freq)
-            last-f (get-in @player-state [:last-freq [key voice-idx]])
-            has-glide (and monophonic (pos? (double slide)) last-f freq)
-            effective-slide-from (if has-glide last-f effective-freq)
-            step-sec (* dur-beats (/ 60 (or (ov/metro-bpm metro) 120)))
-            effective-slide-time (if has-glide (min step-sec (* (double slide) cycle-sec)) 0.001)
-            default-env (if (synths/percussive-synths base) :perc :adsr)
-            get-env-flag (fn [k] (if (= (get params k default-env) :perc) 1 0))
-            env-type (get-env-flag :env)
-            lpf-env-type (get-env-flag :lpf-env-type)
-            hpf-env-type (get-env-flag :hpf-env-type)
-            bpf-env-type (get-env-flag :bpf-env-type)
-            res-env-type (get-env-flag :res-env-type)
-            phaser-env-type (get-env-flag :phaser-env-type)
-            crush-env-type (get-env-flag :crush-env-type)
-            detune-env-type (get-env-flag :detune-env-type)
-            pshift-env-type (get-env-flag :pshift-env-type)
-            fshift-env-type (get-env-flag :fshift-env-type)
-            pan-env-type (get-env-flag :pan-env-type)
-            distort-env-type (get-env-flag :distort-env-type)
-            duck-val (try-parse-number (or (get params :duck) 0))
-            duck-trig-val (try-parse-number (or (get params :duck-trigger) 0))
-            duck-atk-val (try-parse-number (or (get params :duck-attack) 0.001))
-            duck-rel-val (try-parse-number (or (get params :duck-release) 0.2))
-            reserved #{:sound :note :degree :active :start :duration :env :lpf-env-type :hpf-env-type :bpf-env-type :res-env-type :phaser-env-type :crush-env-type :detune-env-type :pshift-env-type :fshift-env-type :pan-env-type :distort-env-type :add :swing :slide :legato :monophonic :gate}
-            handled #{:amp :lpf :sustain :freq :slide-from :gate :monophonic :env-type :lpf-env-type :hpf-env-type :bpf-env-type :res-env-type :phaser-env-type :crush-env-type :detune-env-type :pshift-env-type :fshift-env-type :pan-env-type :distort-env-type :duck :duck-trigger :duck-attack :duck-release :duck-bus-id}
-            args (cond-> (reduce-kv (fn [acc k v] (if (or (reserved k) (handled k)) acc (conj acc k v))) [] params)
-                   true (conj :amp amp)
-                   true (conj :freq effective-freq)
-                   true (conj :duck duck-val)
-                   true (conj :duck-trigger duck-trig-val)
-                   true (conj :duck-attack duck-atk-val)
-                   true (conj :duck-release duck-rel-val)
-                   true (conj :duck-bus-id (if-let [b (synths/get-duck-bus)] (:id b) -1))
-                   lpf (conj :lpf lpf)
-                   sustain-sec (conj :sustain sustain-sec)
-                   true (conj :slide effective-slide-time)
-                   true (conj :slide-from effective-slide-from)
-                   true (conj :gate 1)
-                   true (conj :monophonic (if monophonic 1 0))
-                   true (conj :env-type env-type)
-                   true (conj :lpf-env-type lpf-env-type)
-                   true (conj :hpf-env-type hpf-env-type)
-                   true (conj :bpf-env-type bpf-env-type)
-                   true (conj :res-env-type res-env-type)
-                   true (conj :phaser-env-type phaser-env-type)
-                   true (conj :crush-env-type crush-env-type)
-                   true (conj :detune-env-type detune-env-type)
-                   true (conj :pshift-env-type pshift-env-type)
-                   true (conj :fshift-env-type fshift-env-type)
-                   true (conj :pan-env-type pan-env-type)
-                   true (conj :distort-env-type distort-env-type)
-                   true (conj :duck-bus-id (if-let [b (synths/get-duck-bus)] (:id b) -1)))
-            args (if sample-buf (conj args :buf (:id sample-buf)) args)
-            args (if (and sample-buf (get params :begin)) (conj args :start-pos (get params :begin)) args)
-            args (if (and sample-buf (get params :rate)) (conj args :rate-s (get params :rate)) args)
-            ;; Filter out any nils (e.g. if lpf or sample-buf was nil)
-            args (->> (partition 2 args)
-                      (filter (fn [[k v]] (and (some? k) (some? v))))
-                      (apply concat)
-                      vec)]
-        (when freq (swap! player-state assoc-in [:last-freq [key voice-idx]] freq))
-        (when synth-var
-          (let [effective-note (when (and n (not (p/is-rest? n-raw)))
-                                 (+ (double n) (double note-offset)))
-                log-data (cond-> (assoc (into {} ev)
-                                        :key key
-                                        :voice-idx voice-idx
-                                        :monophonic monophonic
-                                        :sustain sustain-sec
-                                        :slide-from effective-slide-from
-                                        :params (assoc params :note n))
-                           effective-note (assoc :effective-note
-                                                 effective-note)
-                           effective-freq (assoc :effective-freq
-                                                 effective-freq))]
+        monophonic-param (is-active? mono-val)
+        base (when sound-name
+               (if sample-buf
+                 :sampler
+                 (get synths/synth-aliases sound-name sound-name)))
+        monophonic (and monophonic-param
+                        (boolean (and base (synths/supports-mono? base))))
+        sustain-sec (when sound-name
+                      (calculate-sustain params sample-buf dur-beats monophonic))
+        synth-key (when base (synths/get-synth-name base params))
+        synth-var (when base
+                    (or (synths/resolve-synth synth-key)
+                        (synths/resolve-synth base)))
+        freq (when (and n (not (p/is-rest? n-raw)))
+               (resolve-note (+ (double n) (double note-offset))))
+        default-freq (if (and base (synths/percussive-synths base))
+                       65.406
+                       440.0)
+        effective-freq (or freq default-freq)
+        last-f (get-in @player-state [:last-freq [key voice-idx]])
+        has-glide (and monophonic (pos? (double slide)) last-f freq)
+        effective-slide-from (if has-glide last-f effective-freq)
+        step-sec (* dur-beats (/ 60 (or (ov/metro-bpm metro) 120)))
+        effective-slide-time (if has-glide
+                               (min step-sec (* (double slide) cycle-sec))
+                               0.001)
+        default-env (if (and base (synths/percussive-synths base))
+                      :perc
+                      :adsr)
+        get-env-flag (fn [k] (if (= (get params k default-env) :perc) 1 0))
+        env-type (get-env-flag :env)
+        lpf-env-type (get-env-flag :lpf-env-type)
+        hpf-env-type (get-env-flag :hpf-env-type)
+        bpf-env-type (get-env-flag :bpf-env-type)
+        res-env-type (get-env-flag :res-env-type)
+        phaser-env-type (get-env-flag :phaser-env-type)
+        crush-env-type (get-env-flag :crush-env-type)
+        detune-env-type (get-env-flag :detune-env-type)
+        pshift-env-type (get-env-flag :pshift-env-type)
+        fshift-env-type (get-env-flag :fshift-env-type)
+        pan-env-type (get-env-flag :pan-env-type)
+        distort-env-type (get-env-flag :distort-env-type)
+        duck-val (try-parse-number (or (get params :duck) 0))
+        duck-trig-val (try-parse-number (or (get params :duck-trigger) 0))
+        duck-atk-val (try-parse-number (or (get params :duck-attack) 0.001))
+        duck-rel-val (try-parse-number (or (get params :duck-release) 0.2))
+        reserved #{:sound :note :degree :active :start :duration :env
+                   :lpf-env-type :hpf-env-type :bpf-env-type :res-env-type
+                   :phaser-env-type :crush-env-type :detune-env-type
+                   :pshift-env-type :fshift-env-type :pan-env-type
+                   :distort-env-type :add :swing :slide :legato
+                   :monophonic :gate :light-grid :pad-light :pad-color :pad}
+        handled #{:amp :lpf :sustain :freq :slide-from :gate :monophonic
+                  :env-type :lpf-env-type :hpf-env-type :bpf-env-type
+                  :res-env-type :phaser-env-type :crush-env-type
+                  :detune-env-type :pshift-env-type :fshift-env-type
+                  :pan-env-type :distort-env-type :duck :duck-trigger
+                  :duck-attack :duck-release :duck-bus-id}
+        args (when sound-name
+               (cond-> (reduce-kv (fn [acc k v]
+                                    (if (or (reserved k) (handled k))
+                                      acc
+                                      (conj acc k v)))
+                                  [] params)
+                 true (conj :amp amp)
+                 true (conj :freq effective-freq)
+                 true (conj :duck duck-val)
+                 true (conj :duck-trigger duck-trig-val)
+                 true (conj :duck-attack duck-atk-val)
+                 true (conj :duck-release duck-rel-val)
+                 true (conj :duck-bus-id (if-let [b (synths/get-duck-bus)]
+                                           (:id b)
+                                           -1))
+                 lpf (conj :lpf lpf)
+                 sustain-sec (conj :sustain sustain-sec)
+                 true (conj :slide effective-slide-time)
+                 true (conj :slide-from effective-slide-from)
+                 true (conj :gate 1)
+                 true (conj :monophonic (if monophonic 1 0))
+                 true (conj :env-type env-type)
+                 true (conj :lpf-env-type lpf-env-type)
+                 true (conj :hpf-env-type hpf-env-type)
+                 true (conj :bpf-env-type bpf-env-type)
+                 true (conj :res-env-type res-env-type)
+                 true (conj :phaser-env-type phaser-env-type)
+                 true (conj :crush-env-type crush-env-type)
+                 true (conj :detune-env-type detune-env-type)
+                 true (conj :pshift-env-type pshift-env-type)
+                 true (conj :fshift-env-type fshift-env-type)
+                 true (conj :pan-env-type pan-env-type)
+                 true (conj :distort-env-type distort-env-type)
+                 true (conj :duck-bus-id (if-let [b (synths/get-duck-bus)]
+                                           (:id b)
+                                           -1))
+                 sample-buf (conj :buf (:id sample-buf))
+                 (and sample-buf (get params :begin))
+                 (conj :start-pos (get params :begin))
+                 (and sample-buf (get params :rate))
+                 (conj :rate-s (get params :rate))))
+        ;; Filter out any nils
+        args (when args
+               (->> (partition 2 args)
+                    (filter (fn [[k v]] (and (some? k) (some? v))))
+                    (apply concat)
+                    vec))
+        effective-note (when (and n (not (p/is-rest? n-raw)))
+                         (+ (double n) (double note-offset)))
+        log-data (cond-> (assoc (into {} ev)
+                                :key key
+                                :voice-idx voice-idx
+                                :monophonic monophonic
+                                :params (assoc params :note n))
+                   sustain-sec (assoc :sustain sustain-sec)
+                   effective-slide-from (assoc :slide-from
+                                               effective-slide-from)
+                   effective-note (assoc :effective-note effective-note)
+                   effective-freq (assoc :effective-freq effective-freq))
+        light-grid-hook (get params :light-grid)
+        pad-light-hook (get params :pad-light)]
+    (when freq
+      (swap! player-state assoc-in [:last-freq [key voice-idx]] freq))
+    (ov/apply-at (metro beat)
+                 (fn [& _]
+                   (when (fn? light-grid-hook)
+                     (light-grid-hook (/ (double beat) 4.0) :light-grid))
+                   (when (fn? pad-light-hook)
+                     (pad-light-hook (/ (double beat) 4.0) :pad-light))
+                   (tel/log! :info {:event log-data})))
+    (when synth-var
+      (if monophonic
+        (at-metro-mono beat key voice-idx synth-var args)
+        (do
+          ;; If monophonic but now polyphonic, gate off old synth
+          (when-let [existing (get-in @player-state
+                                      [:active-synths [key voice-idx]])]
             (ov/apply-at (metro beat)
-                         (fn [& _] (tel/log! :info {:event log-data})))
-            (if monophonic
-              (at-metro-mono beat key voice-idx synth-var args)
-              (do
-                ;; If we were monophonic but now polyphonic, gate off the old synth
-                (when-let [existing (get-in @player-state [:active-synths [key voice-idx]])]
-                  (ov/apply-at (metro beat)
-                               (fn [& _]
-                                 (tel/log! :info {:action "gating off"
-                                                  :existing existing
-                                                  :key [key voice-idx]})
-                                 (gate-off (:inst existing))
-                                 (swap! player-state update :active-synths dissoc [key voice-idx]))))
-                (at-metro beat synth-var args)))))))))
+                         (fn [& _]
+                           (tel/log! :info {:action "gating off"
+                                            :existing existing
+                                            :key [key voice-idx]})
+                           (gate-off (:inst existing))
+                           (swap! player-state update :active-synths
+                                  dissoc [key voice-idx]))))
+          (at-metro beat synth-var args))))))
 
 (defn trigger-event
   "Triggers a pattern event map at the specified beat with voice/cycle parameters."
@@ -433,6 +482,7 @@
        (tel/log! :error {:msg "Error triggering event"
                          :error (ex-message e)
                          :event ev})))))
+
 
 (defn apply-swing
   "Applies swing timing shift to time t based on swing amount and step size."

@@ -228,15 +228,47 @@
           fake-out {:name "Fake MIDI Out"
                     :receiver (reify Object)}
           mock-note-on (fn [_out note vel & [chan]]
-                         (swap! sent-events conj {:type :note-on :note note :vel vel :chan (or chan 0)}))
+                         (swap! sent-events conj {:type :note-on
+                                                  :note note
+                                                  :vel vel
+                                                  :chan (or chan 0)}))
           mock-note-off (fn [_out note & [chan]]
-                          (swap! sent-events conj {:type :note-off :note note :chan (or chan 0)}))]
+                          (swap! sent-events conj {:type :note-off
+                                                   :note note
+                                                   :chan (or chan 0)}))]
       (with-redefs [overtone.midi/midi-note-on mock-note-on
                     overtone.midi/midi-note-off mock-note-off]
-        (swap! midi/midi-state assoc-in [:connected-outputs "Fake MIDI Out"] fake-out)
+        (swap! midi/midi-state assoc-in [:connected-outputs "Fake MIDI Out"]
+               fake-out)
         (swap! midi/midi-state assoc :default-output fake-out)
         (midi/light-on! [2 3] (midi/rgb 1.0 0.0 0.0))
         (is (= [{:type :note-off :note 35 :chan 0}
                 {:type :note-on :note 35 :vel 104 :chan 0}]
-               @sent-events)))))))
+               @sent-events)))))
+
+  (testing "light-grid pattern executes hooks on metronome schedule"
+    (midi/reset-midi-state!)
+    (let [grid-calls (atom [])
+          scheduled-tasks (atom [])
+          mock-apply-at (fn [target-metro-time f]
+                          (swap! scheduled-tasks conj
+                                 {:metro-time target-metro-time
+                                  :fn f}))
+          pat (p/light-grid [:red :blue :green :yellow])]
+      (with-redefs [midi/light-grid! (fn [f]
+                                       (swap! grid-calls conj (f 0 0)))
+                    overtone.core/apply-at mock-apply-at
+                    overtone.core/metro-bpm (constantly 120)
+                    player/metro (fn [& [b]] (if b (+ 1000 b) 1000))]
+        ;; Schedule cycle events at beat 0, cycle-dur 4.0
+        (#'player/schedule-cycle-events :test-flashes 0 4.0 pat 0)
+        ;; Should have scheduled 4 events at beat times 0, 1, 2, 3
+        (is (= 4 (count @scheduled-tasks)))
+        ;; Verify hooks did NOT execute eagerly during cycle scheduling
+        (is (empty? @grid-calls))
+        ;; Now execute each scheduled metronome callback in order
+        (doseq [{:keys [fn]} @scheduled-tasks]
+          (fn))
+        ;; Grid colors should have executed sequentially in order
+        (is (= [:red :blue :green :yellow] @grid-calls)))))))
 

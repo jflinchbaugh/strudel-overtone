@@ -26,13 +26,9 @@
              (space 0.4 0.25 4)))
 
   (play! :lights
-         (-> (s [:bd])
-             (gain 0)
-             (fast 4)
-             (swing 1/3)
-             (light-grid
-              (fn [time]
-                random-lights))))
+         (-> (note [:- :- :- :-])
+             (light-grid random-lights)
+             (swing 1/3)))
 
   (stop!)
 
@@ -107,15 +103,17 @@
             (slow 2)
             (adsr 0.2 0.5 0.7 0.8)
             (space 0.6 0.3 5))
-   :lights (-> (s [:bd])
-       (gain 0)
-       (light-grid
-        (fn [time]
-          random-lights))))
+   :lights (-> (light-grid [:white (fn [time] random-lights)])
+               (fast 2)))
 
   (stop!)
 
+  (light-grid! (constantly :black))
 
   (reload!)
+
+  (play!
+   :flashes (-> (light-grid [:red :blue :green :yellow])
+             (swing 1/3)))
 
   )
