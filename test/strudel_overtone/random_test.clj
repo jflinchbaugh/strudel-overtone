@@ -71,4 +71,77 @@
           pat2 (sut/sometimes sut/rev base)
           pat3 (-> base (sut/sometimes sut/rev))]
       (is (= (count (:events pat1)) (count (:events pat2))))
-      (is (= (count (:events pat1)) (count (:events pat3)))))))
+      (is (= (count (:events pat1)) (count (:events pat3))))))
+
+  (testing "statements after sometimes in a thread apply to both branches"
+    (sut/seed! 42)
+    (let [base (sut/s [:bd :sd])
+          pat (-> base
+                  (sut/sometimes sut/rev)
+                  (sut/gain 0.4))
+          evs (:events pat)
+          res-params (fn [ev cycle]
+                       (player/resolve-params
+                        (:params ev) (:time ev) cycle))
+          active-amps (fn [cycle]
+                        (binding [p/*current-cycle* cycle]
+                          (->> evs
+                               (filter (fn [e]
+                                         (not= 0 (get (res-params e cycle)
+                                                      :active 1))))
+                               (mapv (fn [e]
+                                       (:amp (res-params e cycle)))))))]
+      (doseq [cycle (range 10)]
+        (is (= [0.4 0.4] (active-amps cycle))))))
+
+  (testing "degrade after sometimes keeps remaining events with correct gain"
+    (sut/seed! 42)
+    (let [base (sut/s [:bd :sd :hh :cp])
+          pat (-> base
+                  (sut/sometimes sut/rev)
+                  (sut/degrade 0.25)
+                  (sut/gain 0.4))
+          evs (:events pat)
+          res-params (fn [ev cycle]
+                       (player/resolve-params
+                        (:params ev) (:time ev) cycle))
+          active-amps (fn [cycle]
+                        (binding [p/*current-cycle* cycle]
+                          (->> evs
+                               (filter (fn [e]
+                                         (not= 0 (get (res-params e cycle)
+                                                      :active 1))))
+                               (mapv (fn [e]
+                                       (:amp (res-params e cycle)))))))]
+      (doseq [cycle (range 10)]
+        (let [amps (active-amps cycle)]
+          (is (seq amps) "should have active events")
+          (is (every? #(= 0.4 %) amps)
+              "all active events should have gain 0.4"))))))
+
+(deftest degrade-test
+  (testing "degrade drops events probabilistically per cycle"
+    (sut/seed! 42)
+    (let [pat (-> (sut/s [:bd :sd :hh :cp])
+                  (sut/degrade 0.5))
+          evs (:events pat)
+          res-params (fn [ev cycle]
+                       (player/resolve-params
+                        (:params ev) (:time ev) cycle))
+          active-count (fn [cycle]
+                         (binding [p/*current-cycle* cycle]
+                           (->> evs
+                                (filter (fn [e]
+                                          (not= 0 (get (res-params e cycle)
+                                                       :active 1))))
+                                count)))]
+      (let [counts (mapv active-count (range 10))]
+        (is (some #(< % 4) counts) "should drop some events")
+        (is (some #(> % 0) counts) "should keep some events"))))
+
+  (testing "degrade curried form (degrade p)"
+    (sut/seed! 42)
+    (let [deg-fn (sut/degrade 0.25)]
+      (is (fn? deg-fn))
+      (let [pat (deg-fn (sut/s [:bd :sd]))]
+        (is (= 2 (count (:events pat))))))))
