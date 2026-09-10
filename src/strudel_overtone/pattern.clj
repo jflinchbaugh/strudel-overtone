@@ -164,11 +164,12 @@
     :else v))
 
 (defn- is-rest-params? [params]
-  (let [v (get params :active (constantly 1))]
-    (cond
-      (fn? v) (try (zero? (v 0 :active)) (catch Exception _ false))
-      (number? v) (zero? v)
-      :else false)))
+  (or (true? (:rest? params))
+      (is-rest? (get params :note))
+      (is-rest? (get params :sound))
+      (is-rest? (get params :value))
+      (let [v (get params :active)]
+        (and (number? v) (zero? v)))))
 
 
 (def rest-allowed-keys
@@ -199,7 +200,11 @@
              (if (is-rest? v)
                (->Event (:start p)
                         (:duration p)
-                        (merge-event-params base-params {:active (constantly 0)}))
+                        (merge-event-params
+                         base-params
+                         {:active (constantly 0)
+                          :rest? true
+                          key v}))
                (let [res (wrap-number-fn (transform-fn v))]
                  (->Event (:start p)
                           (:duration p)
@@ -238,7 +243,9 @@
                            (assoc be :params
                                   (if (or (is-rest-params? (:params be))
                                           (is-rest-params? (:params match)))
-                                    (assoc merged-params :active (constantly 0))
+                                    (assoc merged-params
+                                           :active (constantly 0)
+                                           :rest? true)
                                     merged-params)))
                          be)))
                    base-events)
@@ -263,7 +270,9 @@
                                             :duration i-dur
                                             :params (if (or (is-rest-params? (:params be))
                                                             (is-rest-params? (:params match)))
-                                                      (assoc merged-params :active (constantly 0))
+                                                      (assoc merged-params
+                                                             :active (constantly 0)
+                                                             :rest? true)
                                                       merged-params))))
                                  matches)
                             [be])))
@@ -990,16 +999,39 @@
      (apply-prob-to-pattern arg3 arg1 arg2))))
 
 (defn degrade
-  "Randomly removes events from the pattern with probability p."
-  ([pattern] (degrade pattern 0.5))
-  ([pattern probability]
-   (update pattern :events
-           (fn [evs]
-             (filter (fn [e]
-                       (let [t (:time e)
-                             r (repeatable-rand t :degrade)]
-                         (> r probability)))
-                     evs)))))
+  "Randomly drops events from pattern with probability p (default 0.5)
+   per cycle.
+   Supports:
+     (degrade pat)
+     (degrade pat p)
+     (degrade p pat)
+     (degrade p) ; curried for threading or sometimes"
+  ([arg]
+   (if (instance? Pattern arg)
+     (degrade arg 0.5)
+     (fn [pattern] (degrade pattern arg))))
+  ([arg1 arg2]
+   (cond
+     (and (instance? Pattern arg1) (number? arg2))
+     (let [prob (double arg2)]
+       (update arg1 :events
+               (fn [evs]
+                 (mapv (fn [e]
+                         (let [t (or (:time e) 0.0)]
+                           (update-in e [:params :active]
+                                      gate-active-by-cycle
+                                      (fn [c]
+                                        (let [r (repeatable-rand
+                                                 (+ (long c) (double t))
+                                                 :degrade)]
+                                          (> r prob))))))
+                       evs))))
+
+     (and (number? arg1) (instance? Pattern arg2))
+     (degrade arg2 arg1)
+
+     :else
+     (degrade arg1 (or arg2 0.5)))))
 
 (defn delay-cycles
   "Delays the start of a pattern by n cycles.
