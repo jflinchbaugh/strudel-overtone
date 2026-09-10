@@ -603,6 +603,8 @@
                 [[:main (first args)]]
                 (partition 2 args))
         something-playing? (seq (playing))]
+    (when-not something-playing?
+      (metro 0))
     (let [quant 4]
       (doseq [[key pattern] pairs]
         (let [start-loop? (not (contains? (:loops @player-state) key))]
@@ -647,6 +649,7 @@
      (when (ov/server-connected?)
        (when-let [b (synths/get-duck-bus)]
          (try (ov/control-bus-set! b 0) (catch Exception _ nil))))
+     (metro 0)
      (swap! player-state assoc :playing? false :patterns {} :loops #{} :active-synths {})))
   ([key]
    (stop-pattern! key)))
