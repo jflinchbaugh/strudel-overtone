@@ -6,10 +6,12 @@
             [overtone.core :as ov]))
 
 (comment
-
   ;; =========================================================================
   ;; 1. GETTING STARTED & TEMPO CONTROL
   ;; =========================================================================
+
+  ;; The underlying code can be changed and reloaded without stopping the REPL.
+  (reload!)
 
   ;; Set the global tempo in Cycles Per Minute (CPM).
   ;; 1 cycle = 4 metronome beats. 30 CPM = 120 BPM.
@@ -271,6 +273,7 @@
 
   ;; Repeatable randomness (seeded):
   (seed! 42)
+
   (play!
    :generative (-> (note (choose [:c4 :d4 :eb4 :g4 :ab4 :c5]))
                    (fast 2)
