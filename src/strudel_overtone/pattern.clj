@@ -18,7 +18,7 @@
   (instance? DecoratedToken x))
 
 
-(def ^:dynamic *current-cycle* 0)
+(def ^:dynamic *current-cycle* nil)
 (def ^:dynamic *current-event* nil)
 
 (defn overlay
@@ -328,8 +328,10 @@
    Use inside a pattern vector.
    Example: (s [:bd (alt :sd :cp) :bd :hh])"
   [& coll]
+  ^{:dynamic-param true
+    ::alt true}
   (fn [_ _]
-    (let [cycle *current-cycle*
+    (let [cycle (or *current-cycle* 0)
           idx (mod (long cycle) (count coll))]
       (nth coll idx))))
 
@@ -991,7 +993,7 @@
                  orig-act
                  (constantly (if (some? orig-act) orig-act 1)))]
     (fn [beat-t k]
-      (if (condition-fn *current-cycle*)
+      (if (condition-fn (or *current-cycle* 0))
         (let [res (act-fn beat-t k)]
           (if (number? res) res 1))
         0))))
@@ -1039,8 +1041,10 @@
      (apply-every-cycle-to-pattern arg3 arg1 0 arg2)
 
      :else
+     ^{:dynamic-param true
+       ::every-cycle true}
      (fn [_ _]
-       (if (zero? (mod (long *current-cycle*) (long arg1)))
+       (if (zero? (mod (long (or *current-cycle* 0)) (long arg1)))
          arg2
          arg3))))
   ([arg1 arg2 arg3 arg4]
@@ -1052,8 +1056,10 @@
      (apply-every-cycle-to-pattern arg4 arg1 arg2 arg3)
 
      :else
+     ^{:dynamic-param true
+       ::every-cycle true}
      (fn [_ _]
-       (if (zero? (mod (+ (long *current-cycle*) (long arg2))
+       (if (zero? (mod (+ (long (or *current-cycle* 0)) (long arg2))
                        (long arg1)))
          arg3
          arg4)))))
@@ -1061,13 +1067,37 @@
 (defn- resolve-grid-color-fn
   [color-fn-or-factory cycle-t cycle]
   (if (fn? color-fn-or-factory)
-    (let [res (try
-                (try (color-fn-or-factory cycle cycle-t)
-                     (catch clojure.lang.ArityException _
-                       (color-fn-or-factory cycle-t)))
-                (catch clojure.lang.ArityException _
-                  color-fn-or-factory))]
-      (if (fn? res) res color-fn-or-factory))
+    (let [c (if (some? cycle)
+              cycle
+              (if (some? *current-cycle*)
+                *current-cycle*
+                (long (Math/floor (double cycle-t)))))]
+      (cond
+        (or (:dynamic-param (meta color-fn-or-factory))
+            (::alt (meta color-fn-or-factory)))
+        (let [resolved (binding [*current-cycle* c]
+                         (color-fn-or-factory cycle-t :light-grid))]
+          (resolve-grid-color-fn resolved cycle-t c))
+
+        (= color-fn-or-factory midi/random-lights)
+        color-fn-or-factory
+
+        :else
+        (let [res (try
+                    ;; Factory fn (fn [cycle cycle-t]) ->
+                    ;; returns (fn [r c])
+                    (let [r (color-fn-or-factory c cycle-t)]
+                      (if (fn? r) r ::not-factory))
+                    (catch clojure.lang.ArityException _
+                      (try
+                        ;; Factory fn (fn [cycle-t]) -> returns (fn [r c])
+                        (let [r (color-fn-or-factory cycle-t)]
+                          (if (fn? r) r ::not-factory))
+                        (catch clojure.lang.ArityException _
+                          ::not-factory))))]
+          (if (and (not= res ::not-factory) (some? res))
+            res
+            color-fn-or-factory))))
     color-fn-or-factory))
 
 (defn light-grid
@@ -1076,8 +1106,10 @@
    The color-fn-or-factory can be:
      - A color keyword (e.g. :red, :blue, :black)
      - A 2-arg color function (fn [row col] color)
-     - A factory function (fn [time] (fn [row col] ...)) or (fn [cycle time] ...)
-     - A 3-arg function (fn [row col time] ...) or 4-arg (fn [row col cycle time] ...)"
+     - A factory function (fn [time] (fn [row col] ...))
+       or (fn [cycle time] ...)
+     - A 3-arg function (fn [row col time] ...)
+       or 4-arg (fn [row col cycle time] ...)"
   ([color-fn-or-factory]
    (cond
      (or (instance? Pattern color-fn-or-factory)
@@ -1085,60 +1117,78 @@
      color-fn-or-factory
 
      (sequential? color-fn-or-factory)
-     (make-pattern (map (fn [p]
-                          (assoc-in (->Event (:start p) (:duration p) {})
-                                    [:params :light-grid]
-                                    (fn [cycle-t _]
-                                      (let [cycle (or *current-cycle*
-                                                      (long (Math/floor (double cycle-t))))
-                                            target (resolve-grid-color-fn
-                                                    (:value p) cycle-t cycle)]
-                                        (midi/light-grid!
-                                         (fn [r c]
-                                           (if (fn? target)
-                                             (try (target r c)
-                                                  (catch clojure.lang.ArityException _
-                                                    (try (target r c cycle-t)
-                                                         (catch clojure.lang.ArityException _
-                                                           (target r c cycle cycle-t)))))
-                                             target)))
-                                        1.0))))
-                        (parse-mini color-fn-or-factory)))
+     (make-pattern
+      (map (fn [p]
+             (assoc-in (->Event (:start p) (:duration p) {})
+                       [:params :light-grid]
+                       (fn [cycle-t _]
+                         (let [cycle (if (some? *current-cycle*)
+                                       *current-cycle*
+                                       (long (Math/floor
+                                              (double cycle-t))))]
+                           (binding [*current-cycle* cycle]
+                             (let [target (resolve-grid-color-fn
+                                           (:value p) cycle-t cycle)]
+                               (midi/light-grid!
+                                (fn [r c]
+                                  (if (fn? target)
+                                    (try
+                                      (target r c)
+                                      (catch clojure.lang.ArityException _
+                                        (try
+                                          (target r c cycle-t)
+                                          (catch
+                                           clojure.lang.ArityException _
+                                            (target r c cycle cycle-t)))))
+                                    target)))
+                               1.0))))))
+           (parse-mini color-fn-or-factory)))
 
      :else
-     (make-pattern [(assoc-in (->Event 0.0 1.0 {})
-                              [:params :light-grid]
-                              (fn [cycle-t _]
-                                (let [cycle (or *current-cycle*
-                                                (long (Math/floor (double cycle-t))))
-                                      target-fn (resolve-grid-color-fn
-                                                 color-fn-or-factory cycle-t cycle)]
-                                  (midi/light-grid!
-                                   (fn [r c]
-                                     (if (fn? target-fn)
-                                       (try (target-fn r c)
-                                            (catch clojure.lang.ArityException _
-                                              (try (target-fn r c cycle-t)
-                                                   (catch clojure.lang.ArityException _
-                                                     (target-fn r c cycle cycle-t)))))
-                                       target-fn)))
-                                  1.0)))])))
+     (make-pattern
+      [(assoc-in (->Event 0.0 1.0 {})
+                 [:params :light-grid]
+                 (fn [cycle-t _]
+                   (let [cycle (if (some? *current-cycle*)
+                                 *current-cycle*
+                                 (long (Math/floor
+                                        (double cycle-t))))]
+                     (binding [*current-cycle* cycle]
+                       (let [target-fn (resolve-grid-color-fn
+                                        color-fn-or-factory cycle-t cycle)]
+                         (midi/light-grid!
+                          (fn [r c]
+                            (if (fn? target-fn)
+                              (try
+                                (target-fn r c)
+                                (catch clojure.lang.ArityException _
+                                  (try
+                                    (target-fn r c cycle-t)
+                                    (catch clojure.lang.ArityException _
+                                      (target-fn r c cycle cycle-t)))))
+                              target-fn)))
+                         1.0)))))])))
   ([target color-fn-or-factory]
-   (let [hook-fn (fn [cycle-t _]
-                   (let [cycle (or *current-cycle*
-                                   (long (Math/floor (double cycle-t))))
-                         target-fn (resolve-grid-color-fn
-                                    color-fn-or-factory cycle-t cycle)]
-                     (midi/light-grid!
-                      (fn [r c]
-                        (if (fn? target-fn)
-                          (try (target-fn r c)
-                               (catch clojure.lang.ArityException _
-                                 (try (target-fn r c cycle-t)
-                                      (catch clojure.lang.ArityException _
-                                        (target-fn r c cycle cycle-t)))))
-                          target-fn)))
-                     1.0))]
+   (let [hook-fn
+         (fn [cycle-t _]
+           (let [cycle (if (some? *current-cycle*)
+                         *current-cycle*
+                         (long (Math/floor (double cycle-t))))]
+             (binding [*current-cycle* cycle]
+               (let [target-fn (resolve-grid-color-fn
+                                color-fn-or-factory cycle-t cycle)]
+                 (midi/light-grid!
+                  (fn [r c]
+                    (if (fn? target-fn)
+                      (try
+                        (target-fn r c)
+                        (catch clojure.lang.ArityException _
+                          (try
+                            (target-fn r c cycle-t)
+                            (catch clojure.lang.ArityException _
+                              (target-fn r c cycle cycle-t)))))
+                      target-fn)))
+                 1.0))))]
      (set-param target :light-grid hook-fn))))
 
 

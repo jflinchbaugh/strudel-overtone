@@ -280,6 +280,8 @@
                    (room 0.5)
                    (gain 0.4)))
 
+  ;; TODO explain and demonstrate other random modifiers and choosers
+
   (stop!)
 
   ;; =========================================================================
@@ -343,11 +345,22 @@
                    (fast 1)))
 
   (play!
+   :light-show (-> (light-grid [(constantly :red)
+                                (constantly :blue)
+                                (constantly :green)
+                                (constantly :yellow)])
+                   (fast 1)))
+
+  (play!
+   :light-show (-> (light-grid [(alt (constantly :red) (constantly :blue))])
+                   (fast 4)))
+
+  (play!
    :light-show (-> (light-grid random-lights)
                    (fast 1)))
 
   (play!
-   :light-show (-> (light-grid [random-lights (alt :white :black)])))
+   :light-show (-> (light-grid [(alt :white :black) random-lights])))
 
 
   ;; =========================================================================
@@ -385,5 +398,7 @@
 
   ;; When finished:
   (stop!)
+
+  (reload!)
 
   )

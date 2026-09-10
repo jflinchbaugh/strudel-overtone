@@ -227,7 +227,33 @@
               hook (get-in ev [:params :light-grid])]
           (binding [strudel-overtone.pattern/*current-cycle* 3]
             (hook 3.25 :light-grid)
-            (is (= [[3 3.25 0 1]] @grid-calls))))))))
+            (is (= [[3 3.25 0 1]] @grid-calls))))
+
+        ;; 4. Dynamic alt cycling colors across cycles
+        (reset! grid-calls [])
+        (let [pat (sut/light-grid (sut/alt :red :blue :green :yellow))
+              ev (first (:events pat))
+              hook (get-in ev [:params :light-grid])]
+          (hook 0.0 :light-grid)
+          (hook 1.0 :light-grid)
+          (hook 2.0 :light-grid)
+          (hook 3.0 :light-grid)
+          (hook 4.0 :light-grid)
+          (is (= [:red :blue :green :yellow :red] @grid-calls)))
+
+        ;; 5. random-lights per-pad function
+        (let [all-pads-colors (atom [])]
+          (with-redefs [strudel-overtone.midi/light-grid!
+                        (fn [f]
+                          (dotimes [r 2]
+                            (dotimes [c 2]
+                              (swap! all-pads-colors conj (f r c)))))]
+            (let [pat (sut/light-grid strudel-overtone.midi/random-lights)
+                  ev (first (:events pat))
+                  hook (get-in ev [:params :light-grid])]
+              (hook 0.0 :light-grid)
+              (is (= 4 (count @all-pads-colors)))
+              (is (every? keyword? @all-pads-colors)))))))))
 
 (deftest pad-light-test
   (testing "pad-light as constructor and pattern modifier"
@@ -316,7 +342,42 @@
             (let [hook (get-in ev [:params :light-grid])]
               (is (fn? hook))
               (hook (* idx 0.25) :light-grid)))
-          (is (= [:red :blue :green :yellow] @grid-calls)))))))
+          (is (= [:red :blue :green :yellow] @grid-calls))))))
+
+  (testing "light-grid with alt alternates colors across cycles"
+    (let [grid-calls (atom [])]
+      (with-redefs [strudel-overtone.midi/light-grid! (fn [f]
+                                                        (swap! grid-calls conj (f 0 0)))]
+        (let [pat (sut/light-grid [sut/random-lights (sut/alt :white :black)])
+              evs (:events pat)
+              alt-ev (second evs)
+              hook (get-in alt-ev [:params :light-grid])]
+          (is (fn? hook))
+          ;; Cycle 0: alt should resolve to :white
+          (binding [strudel-overtone.pattern/*current-cycle* 0]
+            (hook 0.5 :light-grid)
+            (is (= [:white] @grid-calls)))
+          ;; Cycle 1: alt should resolve to :black
+          (reset! grid-calls [])
+          (binding [strudel-overtone.pattern/*current-cycle* 1]
+            (hook 1.5 :light-grid)
+            (is (= [:black] @grid-calls))))))
+
+  (testing "random-lights is queried per (r, c) coordinate"
+    (let [coords-seen (atom [])]
+      (with-redefs [strudel-overtone.midi/light-grid!
+                    (fn [f]
+                      (dotimes [r 2]
+                        (dotimes [c 2]
+                          (swap! coords-seen conj [r c (f r c)]))))]
+        (let [pat (sut/light-grid [sut/random-lights :blue])
+              first-ev (first (:events pat))
+              hook (get-in first-ev [:params :light-grid])]
+          (hook 0.0 :light-grid)
+          (is (= 4 (count @coords-seen)))
+          (is (= [[0 0] [0 1] [1 0] [1 1]]
+                 (mapv (fn [[r c _]] [r c]) @coords-seen)))
+          (is (every? keyword? (map #(nth % 2) @coords-seen)))))))))
 
 
 (deftest inline-params-test

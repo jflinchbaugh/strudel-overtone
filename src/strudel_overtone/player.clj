@@ -203,7 +203,9 @@
 (defn trigger-single-event
   "Triggers a single resolved event on the metronome."
   [key ev params beat dur-beats voice-idx]
-  (let [sound-param (:sound params)
+  (let [cycle (or p/*current-cycle*
+                  (long (Math/floor (/ (double beat) 4.0))))
+        sound-param (:sound params)
         n-raw (:note params)
         degree (or (get params :degree) 0)
         ;; Resolve actual MIDI note by adding degree interval to root note
@@ -348,11 +350,12 @@
       (swap! player-state assoc-in [:last-freq [key voice-idx]] freq))
     (ov/apply-at (metro beat)
                  (fn [& _]
-                   (when (fn? light-grid-hook)
-                     (light-grid-hook (/ (double beat) 4.0) :light-grid))
-                   (when (fn? pad-light-hook)
-                     (pad-light-hook (/ (double beat) 4.0) :pad-light))
-                   (tel/log! :info {:event log-data})))
+                   (binding [p/*current-cycle* cycle]
+                     (when (fn? light-grid-hook)
+                       (light-grid-hook (/ (double beat) 4.0) :light-grid))
+                     (when (fn? pad-light-hook)
+                       (pad-light-hook (/ (double beat) 4.0) :pad-light))
+                     (tel/log! :info {:event log-data}))))
     (when synth-var
       (if monophonic
         (at-metro-mono beat key voice-idx synth-var args)
@@ -387,99 +390,104 @@
                         (not (p/is-rest? (:note params)))
                         (not (p/is-rest? (:sound params))))]
        (if active?
-         (let [snd (:sound params)
-               n (:note params)
-               raw-mono (get params :monophonic 0)
-               mono-val (if (fn? raw-mono) (raw-mono beat :monophonic) raw-mono)
-               monophonic (is-active? mono-val)]
-           (cond
-             ;; Sequential sound (e.g. from alt returning a sub-vector [:snare :snare]):
-             ;; Subdivide the step duration across the items in time.
-             (and (sequential? snd) (not (string? snd)))
-             (let [cnt (count snd)
-                   sub-dur (/ (double dur-beats) (double (max 1 cnt)))]
+         (binding [p/*current-cycle* (or cycle
+                                         (long (Math/floor
+                                                (/ (double beat) 4.0))))]
+           (let [snd (:sound params)
+                 n (:note params)
+                 raw-mono (get params :monophonic 0)
+                 mono-val (if (fn? raw-mono) (raw-mono beat :monophonic) raw-mono)
+                 monophonic (is-active? mono-val)]
+             (cond
+               ;; Sequential sound (e.g. from alt returning a sub-vector [:snare :snare]):
+               ;; Subdivide the step duration across the items in time.
+               (and (sequential? snd) (not (string? snd)))
+               (let [cnt (count snd)
+                     sub-dur (/ (double dur-beats) (double (max 1 cnt)))]
+                 (doseq [[idx sub-s] (map-indexed vector snd)]
+                   (let [sub-beat (+ beat (* idx sub-dur))
+                         sub-ev (assoc-in ev [:params :sound] sub-s)]
+                     (trigger-event key sub-ev sub-beat sub-dur voice-idx cycle num-voices))))
+
+               ;; Set sound (e.g. #{:kick :hat}): simultaneous hits
+               (set? snd)
                (doseq [[idx sub-s] (map-indexed vector snd)]
-                 (let [sub-beat (+ beat (* idx sub-dur))
-                       sub-ev (assoc-in ev [:params :sound] sub-s)]
-                   (trigger-event key sub-ev sub-beat sub-dur voice-idx cycle num-voices))))
+                 (let [sub-ev (assoc-in ev [:params :sound] sub-s)]
+                   (trigger-event key sub-ev beat dur-beats (+ voice-idx idx) cycle (count snd))))
 
-             ;; Set sound (e.g. #{:kick :hat}): simultaneous hits
-             (set? snd)
-             (doseq [[idx sub-s] (map-indexed vector snd)]
-               (let [sub-ev (assoc-in ev [:params :sound] sub-s)]
-                 (trigger-event key sub-ev beat dur-beats (+ voice-idx idx) cycle (count snd))))
+               (set? n)
+               (let [notes (vec (sort-by #(double (resolve-note %)) n))
+                     num-chord-voices (count notes)]
+                 (when monophonic
+                   (doseq [[k active] (:active-synths @player-state)]
+                     (when (and (vector? k)
+                                (= (first k) key)
+                                (>= (second k) (+ voice-idx num-chord-voices)))
+                       (ov/apply-at (metro beat)
+                                    (fn [& _]
+                                      (tel/log! :info
+                                                {:action :gate-set-shrink
+                                                 :k k :beat beat})
+                                      (gate-off (:inst active))
+                                      (swap! player-state update :active-synths dissoc k))))))
+                  (doseq [[idx note] (map-indexed vector notes)]
+                    (trigger-single-event
+                     key ev (assoc params :note note)
+                     beat dur-beats (+ voice-idx idx))))
 
-             (set? n)
-             (let [notes (vec (sort-by #(double (resolve-note %)) n))
-                   num-chord-voices (count notes)]
-               (when monophonic
-                 (doseq [[k active] (:active-synths @player-state)]
-                   (when (and (vector? k)
-                              (= (first k) key)
-                              (>= (second k) (+ voice-idx num-chord-voices)))
-                     (ov/apply-at (metro beat)
-                                  (fn [& _]
-                                    (tel/log! :info
-                                              {:action :gate-set-shrink
-                                               :k k :beat beat})
-                                    (gate-off (:inst active))
-                                    (swap! player-state update :active-synths dissoc k))))))
-               (doseq [[idx note] (map-indexed vector notes)]
-                 (trigger-single-event key ev (assoc params :note note) beat dur-beats (+ voice-idx idx))))
+               (and (sequential? n) (not (string? n)))
+               ;; Each element may be a scalar note or a chord (set).
+               ;; Gate off extra voices beyond what we need.
+               (let [notes (vec n)]
+                 (when monophonic
+                   (doseq [[k active] (:active-synths @player-state)]
+                     (when (and (vector? k)
+                                (= (first k) key)
+                                (>= (second k)
+                                    (+ voice-idx (count notes))))
+                       (ov/apply-at (metro beat)
+                                    (fn [& _]
+                                      (tel/log! :info
+                                                {:action :gate-seq-shrink
+                                                 :k k :beat beat})
+                                      (gate-off (:inst active))
+                                      (swap! player-state
+                                             update :active-synths
+                                             dissoc k))))))
+                 (doseq [[idx note] (map-indexed vector notes)]
+                   (if (set? note)
+                     ;; Chord within a sequence: recurse so the set
+                     ;; branch handles multi-voice gating properly.
+                     (trigger-event key
+                                    (assoc-in ev [:params :note] note)
+                                    beat dur-beats
+                                    (+ voice-idx idx) cycle)
+                     (trigger-single-event key ev
+                                           (assoc params :note note)
+                                           beat dur-beats
+                                           (+ voice-idx idx)))))
 
-             (and (sequential? n) (not (string? n)))
-             ;; Each element may be a scalar note or a chord (set).
-             ;; Gate off extra voices beyond what we need.
-             (let [notes (vec n)]
-               (when monophonic
-                 (doseq [[k active] (:active-synths @player-state)]
-                   (when (and (vector? k)
-                              (= (first k) key)
-                              (>= (second k)
-                                  (+ voice-idx (count notes))))
-                     (ov/apply-at (metro beat)
-                                  (fn [& _]
-                                    (tel/log! :info
-                                              {:action :gate-seq-shrink
-                                               :k k :beat beat})
-                                    (gate-off (:inst active))
-                                    (swap! player-state
-                                           update :active-synths
-                                           dissoc k))))))
-               (doseq [[idx note] (map-indexed vector notes)]
-                 (if (set? note)
-                   ;; Chord within a sequence: recurse so the set
-                   ;; branch handles multi-voice gating properly.
-                   (trigger-event key
-                                  (assoc-in ev [:params :note] note)
-                                  beat dur-beats
-                                  (+ voice-idx idx) cycle)
-                   (trigger-single-event key ev
-                                         (assoc params :note note)
-                                         beat dur-beats
-                                         (+ voice-idx idx)))))
-
-             :else
-             (do
-               ;; Only the first voice (vidx=0) does cleanup.
-               ;; Gate voices >= num-voices so chord siblings
-               ;; (voice 1, 2, ...) are preserved.
-               (when (and monophonic (zero? voice-idx))
-                 (doseq [[k active] (:active-synths @player-state)]
-                   (when (and (vector? k)
-                              (= (first k) key)
-                              (>= (second k) num-voices))
-                     (ov/apply-at (metro beat)
-                                  (fn [& _]
-                                    (tel/log! :info
-                                              {:action :gate-single-note
-                                               :k k :beat beat
-                                               :num-voices num-voices})
-                                    (gate-off (:inst active))
-                                    (swap! player-state update
-                                           :active-synths dissoc k))))))
-               (trigger-single-event
-                key ev params beat dur-beats voice-idx))))
+               :else
+               (do
+                 ;; Only the first voice (vidx=0) does cleanup.
+                 ;; Gate voices >= num-voices so chord siblings
+                 ;; (voice 1, 2, ...) are preserved.
+                 (when (and monophonic (zero? voice-idx))
+                   (doseq [[k active] (:active-synths @player-state)]
+                     (when (and (vector? k)
+                                (= (first k) key)
+                                (>= (second k) num-voices))
+                       (ov/apply-at (metro beat)
+                                    (fn [& _]
+                                      (tel/log! :info
+                                                {:action :gate-single-note
+                                                 :k k :beat beat
+                                                 :num-voices num-voices})
+                                      (gate-off (:inst active))
+                                      (swap! player-state update
+                                             :active-synths dissoc k))))))
+                 (trigger-single-event
+                  key ev params beat dur-beats voice-idx)))))
          ;; Deactivated event: If it was monophonic, gate off existing instances but preserve tracking
          (let [raw-mono (get params :monophonic 0)
                mono-val (if (fn? raw-mono) (raw-mono beat :monophonic) raw-mono)
