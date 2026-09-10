@@ -261,7 +261,7 @@
   ;; 10. CONTINUOUS SIGNALS (LFOs) & REPEATABLE RANDOMNESS
   ;; =========================================================================
 
-  ;; Smooth sweeping filter LFO with sine-sig:
+  ;; Smooth sweeping filter LFO and pan with sine-sig:
   (play!
    :sweep (-> (note [:c3 :eb3 :g3 :bb3])
               (s :saw)
@@ -287,16 +287,27 @@
   ;; =========================================================================
 
   ;; (load-sample! :sample-key "path/to/file.wav")
-  ;; (load-freesound! :freesound-key 20933)
+  ;; (load-freesound! :freesound-key 202537)
   ;; (slice-sample! :slice-name :source-key begin-norm end-norm)
 
-  (comment
-    (load-freesound! :amen 20933)
-    (slice-sample! :amen-hit :amen 0.0 0.125)
-    (slice-sample! :amen-snare :amen 0.25 0.375)
-    (play!
-     :amen-loop
-     (s [:amen-hit :amen-snare [:amen-hit :amen-hit] :amen-snare])))
+  (glide-cpm 36 4)
+
+  (load-freesound! :amen 202537)
+
+  (slice-sample! :amen-hit :amen 0.0 0.03)
+
+  (slice-sample! :amen-snare :amen 0.56 0.590)
+
+  (play!
+   :amen-loop (s [:amen-hit :amen-snare [:amen-hit :amen-snare] :amen-snare]))
+
+  (play!
+   :amen-loop (s [:amen-hit
+                  :amen-snare
+                  [(alt :- :- :- :amen-snare) :amen-hit]
+                  :amen-snare]))
+
+  (stop!)
 
   ;; =========================================================================
   ;; 12. HARDWARE MIDI & CONTROLLER LIGHTS

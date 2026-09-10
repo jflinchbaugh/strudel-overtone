@@ -60,7 +60,7 @@ Load and slice your own samples.
 (load-sample! :my-kick "path/to/kick.wav")
 
 ;; Load from Freesound
-(load-freesound! :amen 20933)
+(load-freesound! :amen 202537)
 
 ;; Create slices
 (slice-sample! :kick :amen 0 0.1)

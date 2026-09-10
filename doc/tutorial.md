@@ -286,7 +286,7 @@ sequences:
 (load-sample! :kick "samples/99sounds/kick.wav")
 
 ;; Load from Freesound.org by ID
-(load-freesound! :amen 20933)
+(load-freesound! :amen 202537)
 ```
 
 ### Slicing Loops
