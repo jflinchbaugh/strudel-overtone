@@ -283,7 +283,42 @@
                    (room 0.5)
                    (gain 0.4)))
 
-  ;; TODO explain and demonstrate other random modifiers and choosers
+  ;; Weighted random selection (wchoose):
+  ;; Pairs of [value weight] give higher probability to certain choices.
+  (play!
+   :weighted (-> (note (wchoose [[:c3 4] [:g3 2] [:eb3 2] [:bb3 1]]))
+                 (s :saw)
+                 (gain 0.4)
+                 (pan (srand -0.5 0.5))))
+
+  ;; Random integers (irand) for semitone transpositions or octave jumps:
+  (play!
+   :steppy (-> (note [:c3 :g3 :bb3 :eb4])
+               (add (irand -1 1))
+               (s :square)
+               (gain 0.35)))
+
+  ;; Fixed random sequence (choose-n) and looping random segments (ribbon):
+  ;; choose-n creates a fixed sequence of n random choices.
+  ;; ribbon freezes a window: (ribbon offset-cycles len-cycles).
+  (play!
+   :frozen (-> (note (choose-n 8 [:c4 :d4 :eb4 :f4 :g4 :bb4]))
+               (s :sine)
+               (gain 0.4)
+               (ribbon 0 2)))
+
+  ;; Probabilistic transforms:
+  ;; - sometimes: applies a transformation with 50% probability per cycle
+  ;; - degrade: randomly drops events with probability p (default 0.5)
+  (play!
+   :probabilistic (-> (note [:c4 :eb4 :g4 :bb4])
+                      (s :saw)
+                      (gain 0.4)
+                      (degrade 0.25)
+                      (sometimes rev)
+                      ))
+
+  (reload!)
 
   (stop!)
 

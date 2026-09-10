@@ -922,19 +922,72 @@
                      (assoc e :time (+ cycle-idx new-rel-t))))
                  evs))))
 
+(defn- gate-active-by-cycle [orig-act condition-fn]
+  (let [act-fn (if (fn? orig-act)
+                 orig-act
+                 (constantly (if (some? orig-act) orig-act 1)))]
+    (fn [beat-t k]
+      (if (condition-fn (or *current-cycle* 0))
+        (let [res (act-fn beat-t k)]
+          (if (number? res) res 1))
+        0))))
+
+(defn- apply-prob-to-pattern [pattern prob f]
+  (let [orig-events (map (fn [e]
+                           (update-in e [:params :active]
+                                      gate-active-by-cycle
+                                      (fn [c]
+                                        (let [r (repeatable-rand
+                                                 (long c) :sometimes)]
+                                          (>= r prob)))))
+                         (:events pattern))
+        trans-pat (f pattern)
+        trans-events (map (fn [e]
+                            (update-in e [:params :active]
+                                       gate-active-by-cycle
+                                       (fn [c]
+                                         (let [r (repeatable-rand
+                                                  (long c) :sometimes)]
+                                           (< r prob)))))
+                          (:events trans-pat))]
+    (assoc pattern
+           :events (concat orig-events trans-events)
+           :length (or (:length trans-pat) (:length pattern) 1.0))))
+
 (defn sometimes
-  "Randomly applies function f to the pattern with 50% probability per cycle."
-  [f pattern]
-  (update pattern :events
-          (fn [evs]
-            (map (fn [e]
-                   (let [t (:time e)
-                         cycle-idx (long t)
-                         r (repeatable-rand cycle-idx :sometimes)]
-                     (if (< r 0.5)
-                       ((f (make-pattern [e])) :events 0) ; Apply f to single event
-                       e)))
-                 evs))))
+  "Randomly applies function f to pattern with probability prob (default 0.5)
+   per cycle.
+   Supports threading: (-> pat (sometimes rev))
+   Also supports: (sometimes f pat), (sometimes pat f),
+   (sometimes prob f pat), (sometimes pat prob f)"
+  ([f]
+   (fn [pattern] (sometimes pattern 0.5 f)))
+  ([arg1 arg2]
+   (cond
+     (and (instance? Pattern arg1) (fn? arg2))
+     (apply-prob-to-pattern arg1 0.5 arg2)
+
+     (and (fn? arg1) (instance? Pattern arg2))
+     (apply-prob-to-pattern arg2 0.5 arg1)
+
+     (and (number? arg1) (fn? arg2))
+     (fn [pattern] (apply-prob-to-pattern pattern arg1 arg2))
+
+     :else
+     (apply-prob-to-pattern arg2 0.5 arg1)))
+  ([arg1 arg2 arg3]
+   (cond
+     (and (instance? Pattern arg1) (number? arg2) (fn? arg3))
+     (apply-prob-to-pattern arg1 arg2 arg3)
+
+     (and (number? arg1) (fn? arg2) (instance? Pattern arg3))
+     (apply-prob-to-pattern arg3 arg1 arg2)
+
+     (and (instance? Pattern arg1) (fn? arg2) (number? arg3))
+     (apply-prob-to-pattern arg1 arg3 arg2)
+
+     :else
+     (apply-prob-to-pattern arg3 arg1 arg2))))
 
 (defn degrade
   "Randomly removes events from the pattern with probability p."
@@ -987,16 +1040,6 @@
          (let [rot (mod (long rotate) n)]
            (vec (concat (subvec base (- n rot))
                         (subvec base 0 (- n rot))))))))))
-
-(defn- gate-active-by-cycle [orig-act condition-fn]
-  (let [act-fn (if (fn? orig-act)
-                 orig-act
-                 (constantly (if (some? orig-act) orig-act 1)))]
-    (fn [beat-t k]
-      (if (condition-fn (or *current-cycle* 0))
-        (let [res (act-fn beat-t k)]
-          (if (number? res) res 1))
-        0))))
 
 (defn- apply-every-cycle-to-pattern [pattern n offset f]
   (let [offset (or offset 0)
