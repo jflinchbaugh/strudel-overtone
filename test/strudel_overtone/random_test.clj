@@ -4,7 +4,8 @@
             [strudel-overtone.pattern :as p]
             [strudel-overtone.player :as player]
             [strudel-overtone.synths :as synths]
-            [overtone.core :as ov]))
+            [overtone.core :as ov])
+  (:import [strudel_overtone.pattern Pattern]))
 
 (deftest trigger-event-with-streams-test
   (testing "trigger-event resolves stream functions for numeric params"
@@ -145,3 +146,40 @@
       (is (fn? deg-fn))
       (let [pat (deg-fn (sut/s [:bd :sd]))]
         (is (= 2 (count (:events pat))))))))
+
+(deftest curried-transforms-test
+  (testing "curried fast and slow work with sometimes"
+    (let [fast-fn (sut/fast 2)
+          slow-fn (sut/slow 2)]
+      (is (fn? fast-fn))
+      (is (fn? slow-fn))
+      (let [pat (-> (sut/s [:bd :sd])
+                    (sut/sometimes (sut/fast 2)))]
+        (is (instance? Pattern pat)))))
+
+  (testing "curried add, pan, gain, lpf work with sometimes"
+    (let [add-fn (sut/add 12)
+          pan-fn (sut/pan -1)
+          gain-fn (sut/gain 0.2)
+          lpf-fn (sut/lpf 800)]
+      (is (fn? add-fn))
+      (is (fn? pan-fn))
+      (is (fn? gain-fn))
+      (is (fn? lpf-fn))
+      (let [pat (-> (sut/note [:c4 :eb4])
+                    (sut/sometimes (sut/add 12))
+                    (sut/sometimes (sut/pan -1))
+                    (sut/sometimes (sut/lpf 800)))]
+        (is (instance? Pattern pat)))))
+
+  (testing "curried echo, early, late work with sometimes"
+    (let [echo-fn (sut/echo 0.25 0.5)
+          early-fn (sut/early 0.25)
+          late-fn (sut/late 0.25)]
+      (is (fn? echo-fn))
+      (is (fn? early-fn))
+      (is (fn? late-fn))
+      (let [pat (-> (sut/s [:bd :sd])
+                    (sut/sometimes (sut/echo 0.25 0.5))
+                    (sut/sometimes (sut/early 0.25)))]
+        (is (instance? Pattern pat))))))

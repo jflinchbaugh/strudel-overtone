@@ -313,11 +313,11 @@
   (play!
    :probabilistic (-> (note [:c4 :eb4 :g4 :bb4])
                       (s :saw)
-                      (lpf 400)
                       (sometimes rev)
+                      (sometimes (lpf 600))
+                      (sometimes (add 12))
                       (degrade 0.25)
-                      (gain 0.4)
-                      ))
+                      (gain 0.4)))
 
   (reload!)
 

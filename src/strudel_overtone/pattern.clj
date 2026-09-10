@@ -441,60 +441,71 @@
 (defn gain
   "Sets the gain (amplitude/volume) of the pattern.
    Values: 0.0 (silent) to 1.0 (default) or higher."
-  [pattern gain-amp] (set-param pattern :amp gain-amp))
+  ([gain-amp] (fn [pattern] (gain pattern gain-amp)))
+  ([pattern gain-amp] (set-param pattern :amp gain-amp)))
 
 (defn swing
   "Sets the swing amount (shuffle feel).
    Delays every second 8th note by the specified amount (fraction of an 8th note).
    Values: 0.0 (straight) to ~0.33 (triplet feel) to 0.5 (hard swing)."
-  [pattern swing-amount] (set-param pattern :swing swing-amount))
+  ([swing-amount] (fn [pattern] (swing pattern swing-amount)))
+  ([pattern swing-amount] (set-param pattern :swing swing-amount)))
 
 (defn duck
   "Sets the ducking amount (how much this sound is ducked by the sidechain).
    Values: 0.0 (none) to 1.0 (full duck)."
-  [pattern duck-amount] (set-param pattern :duck duck-amount))
+  ([duck-amount] (fn [pattern] (duck pattern duck-amount)))
+  ([pattern duck-amount] (set-param pattern :duck duck-amount)))
 
 (defn duck-trigger
   "Sets the ducking trigger amount (how much this sound triggers the sidechain).
    Values: 0.0 (none) to 1.0 (full trigger)."
-  [pattern trigger-amount] (set-param pattern :duck-trigger trigger-amount))
+  ([trigger-amount] (fn [pattern] (duck-trigger pattern trigger-amount)))
+  ([pattern trigger-amount] (set-param pattern :duck-trigger trigger-amount)))
 
 (defn duck-attack
   "Sets the sidechain trigger attack time in seconds.
    Default: 0.001 (1ms)."
-  [pattern attack-sec] (set-param pattern :duck-attack attack-sec))
+  ([attack-sec] (fn [pattern] (duck-attack pattern attack-sec)))
+  ([pattern attack-sec] (set-param pattern :duck-attack attack-sec)))
 
 (defn duck-release
   "Sets the sidechain trigger release time in seconds.
    Default: 0.2 (200ms)."
-  [pattern release-sec] (set-param pattern :duck-release release-sec))
+  ([release-sec] (fn [pattern] (duck-release pattern release-sec)))
+  ([pattern release-sec] (set-param pattern :duck-release release-sec)))
 
 (defn lpf
   "Sets the Low Pass Filter lpf frequency.
    Values: Frequency in Hz (e.g. 100 to 20000)."
-  [pattern cutoff-hz] (set-param pattern :lpf cutoff-hz))
+  ([cutoff-hz] (fn [pattern] (lpf pattern cutoff-hz)))
+  ([pattern cutoff-hz] (set-param pattern :lpf cutoff-hz)))
 
 (defn pan
   "Sets the stereo panning.
    Values: -1.0 (left) to 1.0 (right). 0.0 is center."
-  [pattern pan-pos] (set-param pattern :pan pan-pos))
+  ([pan-pos] (fn [pattern] (pan pattern pan-pos)))
+  ([pattern pan-pos] (set-param pattern :pan pan-pos)))
 
 (defn resonance
   "Sets the filter resonance (inverse bandwidth).
    Values: 0.0 (resonant) to 1.0 (flat).
    Note: In Overtone this maps to 'rq',
    so lower values mean MORE resonance."
-  [pattern res-amount] (set-param pattern :resonance res-amount))
+  ([res-amount] (fn [pattern] (resonance pattern res-amount)))
+  ([pattern res-amount] (set-param pattern :resonance res-amount)))
 
 (defn sustain
   "Sets the note duration (sustain time) in seconds.
    If not set, it defaults to the duration of the step."
-  [pattern sustain-sec] (set-param pattern :sustain sustain-sec))
+  ([sustain-sec] (fn [pattern] (sustain pattern sustain-sec)))
+  ([pattern sustain-sec] (set-param pattern :sustain sustain-sec)))
 
 (defn legato
   "Sets the note legato (duration multiplier).
    Values: 1.0 (standard), >1.0 (overlapping), <1.0 (staccato)."
-  [pattern legato-amount] (set-param pattern :legato legato-amount))
+  ([legato-amount] (fn [pattern] (legato pattern legato-amount)))
+  ([pattern legato-amount] (set-param pattern :legato legato-amount)))
 
 (defn monophonic
   "Enables monophonic mode for the pattern.
@@ -511,119 +522,141 @@
 (defn width
   "Sets the pulse width for square waves.
    Values: 0.0 to 1.0. 0.5 is a square wave."
-  [pattern width-amount] (set-param pattern :width width-amount))
+  ([width-amount] (fn [pattern] (width pattern width-amount)))
+  ([pattern width-amount] (set-param pattern :width width-amount)))
 
 (defn carrier-ratio
   "Sets the FM carrier frequency ratio.
    Values: Ratio multiplier for the carrier frequency."
-  [pattern ratio] (set-param pattern :carrier-ratio ratio))
+  ([ratio] (fn [pattern] (carrier-ratio pattern ratio)))
+  ([pattern ratio] (set-param pattern :carrier-ratio ratio)))
 
 (defn modulator-ratio
   "Sets the FM modulator frequency ratio.
    Values: Ratio multiplier for the modulator frequency."
-  [pattern ratio] (set-param pattern :modulator-ratio ratio))
+  ([ratio] (fn [pattern] (modulator-ratio pattern ratio)))
+  ([pattern ratio] (set-param pattern :modulator-ratio ratio)))
 
 (defn mod-index
   "Sets the FM modulation index (depth).
    Values: Higher values create brighter/noisier timbres."
-  [pattern index-amount] (set-param pattern :mod-index index-amount))
+  ([index-amount] (fn [pattern] (mod-index pattern index-amount)))
+  ([pattern index-amount] (set-param pattern :mod-index index-amount)))
 
 (defn detune
   "Sets the detuning amount in cents.
    Values: -100 to 100 cents (100 cents = 1 semitone)."
-  [pattern detune-cents] (set-param pattern :detune detune-cents))
+  ([detune-cents] (fn [pattern] (detune pattern detune-cents)))
+  ([pattern detune-cents] (set-param pattern :detune detune-cents)))
 
 (defn add
   "Offsets the MIDI note number.
    Values: Semitones (e.g. 12 for +1 octave, -12 for -1 octave)."
-  [pattern note-offset] (set-param pattern :add note-offset))
+  ([note-offset] (fn [pattern] (add pattern note-offset)))
+  ([pattern note-offset] (set-param pattern :add note-offset)))
 
 (defn degrees
   "Maps degree integers to MIDI notes using a scale.
    degree-vals: a list pattern of integers (1-indexed).
    Example: (-> (note :c4) (degrees :major [1 3 5 8]))"
-  [pattern scale-name degree-vals]
-  (set-param pattern :degree degree-vals
-             (fn [d]
-               (fn [beat key]
-                 (ov/degree->interval d scale-name)))))
+  ([scale-name degree-vals]
+   (fn [pattern] (degrees pattern scale-name degree-vals)))
+  ([pattern scale-name degree-vals]
+   (set-param pattern :degree degree-vals
+              (fn [d]
+                (fn [beat key]
+                  (ov/degree->interval d scale-name))))))
 
 (defn chaos
   "Sets the chaos parameter for the Crackle synth.
    Values: 1.0 (steady) to 2.0 (chaotic/crackling)."
-  [pattern chaos-amount] (set-param pattern :chaos chaos-amount))
+  ([chaos-amount] (fn [pattern] (chaos pattern chaos-amount)))
+  ([pattern chaos-amount] (set-param pattern :chaos chaos-amount)))
 
 (defn coef
   "Sets the reflection coefficient for the Karplus-Strong (ks-stringer) synth.
    Values: -1.0 to 1.0. High values result in longer decay."
-  [pattern reflection-coef] (set-param pattern :coef reflection-coef))
+  ([reflection-coef] (fn [pattern] (coef pattern reflection-coef)))
+  ([pattern reflection-coef] (set-param pattern :coef reflection-coef)))
 
 (defn crush
   "Sets the bitcrushing amount.
    Values: 0.0 (clean) to 1.0 (s-max destruction: 4-bit, 2kHz sample rate)."
-  [pattern crush-amount] (set-param pattern :crush crush-amount))
+  ([crush-amount] (fn [pattern] (crush pattern crush-amount)))
+  ([pattern crush-amount] (set-param pattern :crush crush-amount)))
 
 (defn distort
   "Sets the distortion amount.
    Values: 0.0 (clean) to 1.0 (heavy distortion)."
-  [pattern distort-amount] (set-param pattern :distort distort-amount))
+  ([distort-amount] (fn [pattern] (distort pattern distort-amount)))
+  ([pattern distort-amount] (set-param pattern :distort distort-amount)))
 
 (defn hpf
   "Sets the High Pass Filter lpf frequency.
    Values: Frequency in Hz. 0 disables it."
-  [pattern cutoff-hz] (set-param pattern :hpf cutoff-hz))
+  ([cutoff-hz] (fn [pattern] (hpf pattern cutoff-hz)))
+  ([pattern cutoff-hz] (set-param pattern :hpf cutoff-hz)))
 
 (defn bpf
   "Sets the Band Pass Filter center frequency.
    Values: Frequency in Hz. -1 disables it."
-  [pattern cutoff-hz] (set-param pattern :bpf cutoff-hz))
+  ([cutoff-hz] (fn [pattern] (bpf pattern cutoff-hz)))
+  ([pattern cutoff-hz] (set-param pattern :bpf cutoff-hz)))
 
 (defn room
   "Sets the reverb mix amount (dry/wet).
    Values: 0.0 (completely dry) to 1.0 (completely wet).
    Default: 0.0 (no reverb)."
-  [pattern room-amount] (set-param pattern :room room-amount))
+  ([room-amount] (fn [pattern] (room pattern room-amount)))
+  ([pattern room-amount] (set-param pattern :room room-amount)))
 
 (defn room-size
   "Sets the perceived size of the reverberant space.
    Values: 0.0 (small room) to 1.0 (massive hall).
    Affects decay time and reflection density.
    Default: 0.5."
-  [pattern size-amount] (set-param pattern :room-size size-amount))
+  ([size-amount] (fn [pattern] (room-size pattern size-amount)))
+  ([pattern size-amount] (set-param pattern :room-size size-amount)))
 
 (defn damp
   "Sets the high-frequency damping of the reverb.
    Values: 0.0 (bright, reflective) to 1.0 (dark, absorbed).
    Controls how quickly high frequencies decay.
    Default: 0.5."
-  [pattern damp-amount] (set-param pattern :damp damp-amount))
+  ([damp-amount] (fn [pattern] (damp pattern damp-amount)))
+  ([pattern damp-amount] (set-param pattern :damp damp-amount)))
 
 (defn vibrato
   "Sets the vibrato rate.
    Values: Frequency in Hz (speed). 0 disables it.
    Depth is fixed at 0.02 (2%)."
-  [pattern freq-hz] (set-param pattern :vibrato freq-hz))
+  ([freq-hz] (fn [pattern] (vibrato pattern freq-hz)))
+  ([pattern freq-hz] (set-param pattern :vibrato freq-hz)))
 
 (defn echo-delay
   "Sets the echo delay time.
    Values: Time in seconds (e.g. 0.25). 0 disables it.
    Note: Automatically adds repeats (feedback)."
-  [pattern delay-sec] (set-param pattern :delay delay-sec))
+  ([delay-sec] (fn [pattern] (echo-delay pattern delay-sec)))
+  ([pattern delay-sec] (set-param pattern :delay delay-sec)))
 
 (defn echo-repeats
   "Sets the number of echo repeats (feedback).
    Values: Number of repeats (e.g. 4). Default is 4."
-  [pattern num-repeats] (set-param pattern :repeats num-repeats))
+  ([num-repeats] (fn [pattern] (echo-repeats pattern num-repeats)))
+  ([pattern num-repeats] (set-param pattern :repeats num-repeats)))
 
 (defn step
   "Sets the step parameter, primarily used by additive synths.
    Determines the spacing between harmonics."
-  [pattern step-size] (set-param pattern :step step-size))
+  ([step-size] (fn [pattern] (step pattern step-size)))
+  ([pattern step-size] (set-param pattern :step step-size)))
 
 (defn rate
   "Sets the playback rate for samples.
    Values: 1.0 (normal), 0.5 (half speed), -1.0 (reverse), etc."
-  [pattern playback-rate] (set-param pattern :rate playback-rate))
+  ([playback-rate] (fn [pattern] (rate pattern playback-rate)))
+  ([pattern playback-rate] (set-param pattern :rate playback-rate)))
 
 (def speed
   "Alias for rate.
@@ -634,51 +667,61 @@
   "Sets the pitch shift in semitones.
    Uses a time-domain granular pitch shifter.
    Values: -24 to 24 (default 0)."
-  [pattern shift-semitones] (set-param pattern :pshift shift-semitones))
+  ([shift-semitones] (fn [pattern] (pshift pattern shift-semitones)))
+  ([pattern shift-semitones] (set-param pattern :pshift shift-semitones)))
 
 (defn fshift
   "Sets the frequency shift in Hz.
    Shifts all frequencies by a fixed amount.
    Values: -2000 to 2000 (default 0)."
-  [pattern shift-hz] (set-param pattern :fshift shift-hz))
+  ([shift-hz] (fn [pattern] (fshift pattern shift-hz)))
+  ([pattern shift-hz] (set-param pattern :fshift shift-hz)))
 
 (defn tremolo-hz
   "Sets the tremolo (amplitude modulation) frequency in Hz.
    Values: 0.1 to 20 (default 0)."
-  [pattern freq-hz] (set-param pattern :tremolo-hz freq-hz))
+  ([freq-hz] (fn [pattern] (tremolo-hz pattern freq-hz)))
+  ([pattern freq-hz] (set-param pattern :tremolo-hz freq-hz)))
 
 (defn tremolo-depth
   "Sets the tremolo depth.
    Values: 0.0 (none) to 1.0 (full modulation)."
-  [pattern depth-amount] (set-param pattern :tremolo-depth depth-amount))
+  ([depth-amount] (fn [pattern] (tremolo-depth pattern depth-amount)))
+  ([pattern depth-amount] (set-param pattern :tremolo-depth depth-amount)))
 
 (defn pan-hz
   "Sets the auto-pan (panning modulation) frequency in Hz.
    Values: 0.1 to 20 (default 0)."
-  [pattern freq-hz] (set-param pattern :pan-hz freq-hz))
+  ([freq-hz] (fn [pattern] (pan-hz pattern freq-hz)))
+  ([pattern freq-hz] (set-param pattern :pan-hz freq-hz)))
 
 (defn pan-depth
   "Sets the auto-pan depth.
    Values: 0.0 (center) to 1.0 (full stereo sweep)."
-  [pattern depth-amount] (set-param pattern :pan-depth depth-amount))
+  ([depth-amount] (fn [pattern] (pan-depth pattern depth-amount)))
+  ([pattern depth-amount] (set-param pattern :pan-depth depth-amount)))
 
 (defn phaser-hz
   "Sets the phaser frequency in Hz.
    Values: 0.1 to 10 (default 0)."
-  [pattern freq-hz] (set-param pattern :phaser-hz freq-hz))
+  ([freq-hz] (fn [pattern] (phaser-hz pattern freq-hz)))
+  ([pattern freq-hz] (set-param pattern :phaser-hz freq-hz)))
 
 (defn phaser-depth
   "Sets the phaser depth (mix).
    Values: 0.0 (dry) to 1.0 (wet)."
-  [pattern depth-amount] (set-param pattern :phaser-depth depth-amount))
+  ([depth-amount] (fn [pattern] (phaser-depth pattern depth-amount)))
+  ([pattern depth-amount] (set-param pattern :phaser-depth depth-amount)))
 
 (defn begin
   "Sets the start position of the sample (0.0 to 1.0)."
-  [pattern pos-amount] (set-param pattern :begin pos-amount))
+  ([pos-amount] (fn [pattern] (begin pattern pos-amount)))
+  ([pattern pos-amount] (set-param pattern :begin pos-amount)))
 
 (defn end
   "Sets the end position of the sample (0.0 to 1.0)."
-  [pattern pos-amount] (set-param pattern :end pos-amount))
+  ([pos-amount] (fn [pattern] (end pattern pos-amount)))
+  ([pattern pos-amount] (set-param pattern :end pos-amount)))
 
 (defn looping
   "Sets the loop flag. 1 for loop, 0 for one-shot. (default 0)."
@@ -831,49 +874,84 @@
 
 (defn echo
   "Sets delay/echo parameters at once.
-   Usage: (echo pat delay-time repeats)"
-  ([pattern] (echo pattern 0.25 4))
-  ([pattern delay-sec] (echo pattern delay-sec 4))
+   Usage: (echo pat delay-time repeats)
+   Supports curried (echo delay-sec repeats) or (echo delay-sec)."
+  ([arg]
+   (if (map? arg)
+     (echo arg 0.25 4)
+     (fn [pattern] (echo pattern arg 4))))
+  ([arg1 arg2]
+   (if (map? arg1)
+     (echo arg1 arg2 4)
+     (fn [pattern] (echo pattern arg1 arg2))))
   ([pattern delay-sec repeats]
    (params pattern {:delay delay-sec :repeats repeats})))
 
 ;; --- Time/Structural Modifiers ---
 
 (defn fast
-  "Speeds up the pattern playback speed by amount multiplier."
-  [pattern amount]
-  (let [amount-fn (wrap-number-fn amount)]
-    (update pattern :cycles
-            (fn [old-val]
-              (let [old-fn (wrap-number-fn old-val)]
-                (fn [t seed]
-                  (* (old-fn t seed) (amount-fn t seed))))))))
+  "Speeds up the pattern playback speed by amount multiplier.
+   Supports (fast pat amount), (fast amount pat),
+   and curried (fast amount)."
+  ([amount]
+   (fn [pattern] (fast pattern amount)))
+  ([arg1 arg2]
+   (if (number? arg1)
+     (fast arg2 arg1)
+     (let [amount-fn (wrap-number-fn arg2)]
+       (update arg1 :cycles
+               (fn [old-val]
+                 (let [old-fn (wrap-number-fn old-val)]
+                   (fn [t seed]
+                     (* (old-fn t seed) (amount-fn t seed))))))))))
 
 (defn slow
-  "Slows down the pattern playback speed by amount divisor."
-  [pattern amount]
-  (let [amount-fn (wrap-number-fn amount)]
-    (update pattern :cycles
-            (fn [old-val]
-              (let [old-fn (wrap-number-fn old-val)]
-                (fn [t seed]
-                  (/ (old-fn t seed) (amount-fn t seed))))))))
+  "Slows down the pattern playback speed by amount divisor.
+   Supports (slow pat amount), (slow amount pat),
+   and curried (slow amount)."
+  ([amount]
+   (fn [pattern] (slow pattern amount)))
+  ([arg1 arg2]
+   (if (number? arg1)
+     (slow arg2 arg1)
+     (let [amount-fn (wrap-number-fn arg2)]
+       (update arg1 :cycles
+               (fn [old-val]
+                 (let [old-fn (wrap-number-fn old-val)]
+                   (fn [t seed]
+                     (/ (old-fn t seed) (amount-fn t seed))))))))))
 
 (defn early
-  "Shifts the start time of all events in the pattern earlier by amount cycles."
-  [pattern cycles]
-  (update pattern :events (fn [evs] (map (fn [e] (update e :time - cycles)) evs))))
+  "Shifts the start time of all events earlier by amount cycles.
+   Supports (early pat cycles), (early cycles pat),
+   and curried (early cycles)."
+  ([cycles]
+   (fn [pattern] (early pattern cycles)))
+  ([arg1 arg2]
+   (if (number? arg1)
+     (early arg2 arg1)
+     (update arg1 :events
+             (fn [evs] (map (fn [e] (update e :time - arg2)) evs))))))
 
 (defn late
-  "Shifts the start time of all events in the pattern later by amount cycles."
-  [pattern cycles]
-  (update pattern :events (fn [evs] (map (fn [e] (update e :time + cycles)) evs))))
+  "Shifts the start time of all events later by amount cycles.
+   Supports (late pat cycles), (late cycles pat),
+   and curried (late cycles)."
+  ([cycles]
+   (fn [pattern] (late pattern cycles)))
+  ([arg1 arg2]
+   (if (number? arg1)
+     (late arg2 arg1)
+     (update arg1 :events
+             (fn [evs] (map (fn [e] (update e :time + arg2)) evs))))))
 
 (defn ribbon
   "Loops a specific segment of a pattern.
    offset: start point in cycles
    len: length of segment in cycles"
-  [pattern offset-cycles len-cycles]
+  ([offset-cycles len-cycles]
+   (fn [pattern] (ribbon pattern offset-cycles len-cycles)))
+  ([pattern offset-cycles len-cycles]
   (let [source-events (:events pattern)
         ;; Determine the number of cycles in the source pattern
         max-source-t (if (seq source-events)
@@ -915,7 +993,7 @@
                                                         (fn [_t k] (v (* orig-t 4.0) k))
                                                         v)))
                                              {} ps))))))
-                segment-events))))
+                segment-events)))))
 
 (defn rev
   "Reverses the events within a cycle (0 to 1 range)."
