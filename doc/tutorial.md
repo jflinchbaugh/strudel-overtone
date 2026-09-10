@@ -256,17 +256,24 @@ Sequence melodies by modal scale degrees:
            (lpf 1800)))
 ```
 
-### Chords with Overtone Helpers
-Leverage `overtone.core` chord functions directly:
+### Chords & Chord Progressions
+Use `chord` to produce a simultaneous chord set, or `chord-seq` for arpeggiated
+sequences:
 ```clojure
 ;; Generate chord tones as simultaneous sets
-(play! :chords
-       (-> (note [(ov/chord :c3 :minor7)
-                  (ov/chord :f3 :minor7)
-                  (ov/chord :g3 :7)])
-           (s :saw)
-           (slow 2)
-           (room 0.4)))
+(play!
+ :chords (-> (note [(chord :c3 :minor7)
+                    (chord :f3 :minor7)
+                    (chord :g3 :7)])
+             (s :saw)
+             (slow 2)
+             (room 0.4)))
+
+;; Arpeggiate chord tones sequentially with chord-seq
+(play!
+ :arpeggio (-> (note (chord-seq :c4 :minor7))
+               (s :sine)
+               (fast 2)))
 ```
 
 ---

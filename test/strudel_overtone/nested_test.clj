@@ -1,6 +1,7 @@
 (ns strudel-overtone.nested-test
   (:require [clojure.test :refer :all]
-            [strudel-overtone.core :as sut]))
+            [strudel-overtone.core :as sut]
+            [strudel-overtone.player :as player]))
 
 (defn approx= [a b]
   (< (abs (- a b)) 0.01))
@@ -86,7 +87,23 @@
         (is (= 2 (count middle-evs)))
         (is (= #{:e4 :g4} (set (map
                                  #(get-in % [:params :note])
-                                 middle-evs))))))))
+                                 middle-evs)))))))
+
+  (testing "chord helper returns a set of notes playing simultaneously"
+    (let [c-chord (sut/chord :c3 :minor7)]
+      (is (set? c-chord))
+      (is (= #{48 51 55 58} c-chord))
+      ;; When used in a pattern vector, it plays simultaneously as 1 step
+      (let [pat (sut/note [(sut/chord :c3 :minor7)])
+            evs (:events pat)]
+        (is (= 4 (count evs)))
+        (is (every? #(approx= 0.0 (:time %)) evs))
+        (is (every? #(approx= 1.0 (:duration %)) evs)))))
+
+  (testing "chord-seq helper returns a sequence of notes"
+    (let [c-seq (sut/chord-seq :c3 :minor7)]
+      (is (sequential? c-seq))
+      (is (= '(48 51 55 58) (seq c-seq))))))
 
 (deftest cartesian-product-test
   (testing "Combining sets of notes and instruments creates Cartesian product"
@@ -116,3 +133,26 @@
         (is (contains? combos [:c4 :violin]))
         (is (contains? combos [:e4 :piano]))
         (is (contains? combos [:e4 :violin]))))))
+
+(deftest dynamic-sub-pattern-test
+  (testing "trigger-event supports sequential sounds from alt"
+    (let [triggered (atom [])]
+      (with-redefs [player/trigger-single-event
+                    (fn [k ev params beat dur vidx]
+                      (swap! triggered conj {:sound (:sound params)
+                                             :beat beat
+                                             :dur dur}))]
+        ;; Cycle 0: alt returns :snare
+        (let [pat (sut/s [:kick (sut/alt :snare [:snare :snare])])
+              ev (second (:events pat))]
+          (sut/trigger-event :test ev 2.0 2.0 0 0 1)
+          (is (= [{:sound :snare :beat 2.0 :dur 2.0}] @triggered)))
+
+        (reset! triggered [])
+        ;; Cycle 1: alt returns [:snare :snare] -> should subdivide duration into two hits
+        (let [pat (sut/s [:kick (sut/alt :snare [:snare :snare])])
+              ev (second (:events pat))]
+          (sut/trigger-event :test ev 2.0 2.0 0 1 1)
+          (is (= [{:sound :snare :beat 2.0 :dur 1.0}
+                  {:sound :snare :beat 3.0 :dur 1.0}]
+                 @triggered)))))))

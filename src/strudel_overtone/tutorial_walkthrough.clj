@@ -100,20 +100,22 @@
                     (lpf 900)
                     (gain 0.8)))
 
-  ;; Chords using overtone helpers
-  ;; TODO ov/chord produces a list, not a set, so they don't play simultaneously.
-  ;;      we should give ourselves a wrapper for chord that also converts
-  ;;      it to a set to play simultaneously.
-  ;;      or is it useful to have a chord as a sequence of notes?
-  ;;      we could convert it back to a list in that case, i guess.
+  ;; Chords using chord helper (returns a set, playing simultaneously):
   (play!
-   :chords (-> (note [(ov/chord :c3 :minor7)
-                      (ov/chord :f3 :minor7)
-                      (ov/chord :g3 :7)])
+   :chords (-> (note [(chord :c3 :minor7)
+                      (chord :f3 :minor7)
+                      (chord :g3 :7)])
                (s :saw)
                (slow 2)
                (room 0.4)
                (gain 0.5)))
+
+  ;; Use chord-seq when you want an arpeggiated sequence of chord notes:
+  (play!
+   :arpeggio (-> (note (chord-seq :c4 :minor7))
+                 (s :sine)
+                 (fast 4)
+                 (gain 0.6)))
 
   (stop!)
 
@@ -167,7 +169,20 @@
                   (gain 0.7)))
 
   ;; Sound design shortcuts:
-  ;; (acid cutoff res depth), (drive distort crush), (space room delay repeats)
+  ;; (acid cutoff res depth) - instant squelchy 303 filter envelope:
+  (play!
+   :quick-acid (-> (note [:c2 :eb2 :f2 :g2])
+                   (s :tb303)
+                   (acid 400 0.85 3500)
+                   (gain 0.7)))
+
+  ;; (drive distort crush) - warm saturation and crunchy bitcrushing:
+  (play!
+   :gritty-drums (-> (s [:kick :hat :snare :hat])
+                     (drive 0.6 0.3)
+                     (gain 0.8)))
+
+  ;; (space room delay repeats) - cavernous reverb and tempo-synced echo:
   (play!
    :ambient-keys (-> (note [:c4 :g4 :d5 :a5])
                      (s :sine)

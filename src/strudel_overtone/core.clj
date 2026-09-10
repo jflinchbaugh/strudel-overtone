@@ -27,7 +27,7 @@
 
 ;; DSL Modifiers
 (import-vars p
-             s simul note gain swing duck duck-trigger duck-attack
+             s simul chord chord-seq note gain swing duck duck-trigger duck-attack
              duck-release lpf pan resonance sustain
              legato monophonic mono width carrier-ratio
              modulator-ratio mod-index detune add chaos coef crush
@@ -70,7 +70,7 @@
 
 ;; --- Pitch/Music Re-exports ---
 (import-vars ov
-             chord scale chord-degree invert-chord find-chord
+             scale chord-degree invert-chord find-chord
              find-note-name degree->interval)
 
 (def note->midi ov/note)

@@ -387,11 +387,28 @@
                         (not (p/is-rest? (:note params)))
                         (not (p/is-rest? (:sound params))))]
        (if active?
-         (let [n (:note params)
+         (let [snd (:sound params)
+               n (:note params)
                raw-mono (get params :monophonic 0)
                mono-val (if (fn? raw-mono) (raw-mono beat :monophonic) raw-mono)
                monophonic (is-active? mono-val)]
            (cond
+             ;; Sequential sound (e.g. from alt returning a sub-vector [:snare :snare]):
+             ;; Subdivide the step duration across the items in time.
+             (and (sequential? snd) (not (string? snd)))
+             (let [cnt (count snd)
+                   sub-dur (/ (double dur-beats) (double (max 1 cnt)))]
+               (doseq [[idx sub-s] (map-indexed vector snd)]
+                 (let [sub-beat (+ beat (* idx sub-dur))
+                       sub-ev (assoc-in ev [:params :sound] sub-s)]
+                   (trigger-event key sub-ev sub-beat sub-dur voice-idx cycle num-voices))))
+
+             ;; Set sound (e.g. #{:kick :hat}): simultaneous hits
+             (set? snd)
+             (doseq [[idx sub-s] (map-indexed vector snd)]
+               (let [sub-ev (assoc-in ev [:params :sound] sub-s)]
+                 (trigger-event key sub-ev beat dur-beats (+ voice-idx idx) cycle (count snd))))
+
              (set? n)
              (let [notes (vec (sort-by #(double (resolve-note %)) n))
                    num-chord-voices (count notes)]

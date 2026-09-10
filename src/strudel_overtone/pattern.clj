@@ -400,6 +400,24 @@
   [pattern]
   (set pattern))
 
+(defn chord-seq
+  "Returns a sequence of MIDI pitches for the specified chord from Overtone.
+   Useful for arpeggios, choose-n, or sequential step patterns.
+   Example: (chord-seq :c3 :minor7) -> (48 51 55 58)"
+  ([root chord-name]
+   (ov/chord root chord-name))
+  ([root chord-name inversion]
+   (ov/chord root chord-name inversion)))
+
+(defn chord
+  "Returns a set of MIDI pitches for the specified chord, designed to play
+   simultaneously as a single chord hit within strudel-overtone patterns.
+   Example: (chord :c3 :minor7) -> #{48 51 55 58}"
+  ([root chord-name]
+   (set (ov/chord root chord-name)))
+  ([root chord-name inversion]
+   (set (ov/chord root chord-name inversion))))
+
 (defn note
   "Creates a pattern from a sequence of note keywords,
    or sets the note of an existing pattern.
