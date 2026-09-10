@@ -313,34 +313,42 @@
   ;; 12. HARDWARE MIDI & CONTROLLER LIGHTS
   ;; =========================================================================
 
-  (comment
-    ;; 1. Connect to your MIDI device
-    (midi-in-devices)
-    (midi-in-connect!)
+  ;; 1. Connect to your MIDI device
+  (midi-in-devices)
+  (midi-in-connect!)
 
-    ;; 2. Enable logging to discover hardware CC numbers
-    (midi-debug! true)
-    (midi-debug! false)
+  ;; 2. Enable logging to discover hardware CC numbers
+  (midi-debug! true)
+  (midi-debug! false)
 
-    ;; 3. Map a knob to filter cutoff
-    (def-midi-cc! :knob-cutoff 74 :min 200 :max 8000 :curve :exp :default 800)
+  ;; 3. Map a knob to filter cutoff
+  (def-midi-cc! :knob-cutoff 0 :min 200 :max 8000 :curve :exp :default 800)
 
-    ;; 4. Play with live knob tweaking
-    (play!
-     :midi-acid (-> (note [:c2 :eb2 :g2 :c3])
-                    (s :tb303)
-                    (lpf (midi-cc :knob-cutoff))))
+  ;; 4. Play with live knob tweaking
+  (play!
+   :midi-acid (-> (note [:c2 :eb2 :g2 :c3])
+                  (s :tb303)
+                  (lpf (midi-cc :knob-cutoff))))
 
-    ;; 5. Performance pad toggle
-    (def-midi-pad-toggle! 36
-      (fn [_] (play! :kick (s (euclid 4 8 :kick))))
-      (fn [_] (stop! :kick)))
+  ;; 5. Performance pad toggle
+  (def-midi-pad-toggle! 36
+    (fn [_] (play! :kick (s (euclid 4 8 :kick))))
+    (fn [_] (stop! :kick)))
 
-    ;; 6. Hardware Launchpad/SmartPAD grid lighting
-    (midi-out-connect!)
-    (play!
-     :light-show (-> (light-grid [:red :blue :green :yellow])
-                     (fast 2))))
+  ;; 6. Hardware Launchpad/SmartPAD grid lighting
+  (midi-out-connect!)
+
+  (play!
+   :light-show (-> (light-grid [:red :blue :green :yellow])
+                   (fast 1)))
+
+  (play!
+   :light-show (-> (light-grid random-lights)
+                   (fast 1)))
+
+  (play!
+   :light-show (-> (light-grid [random-lights (alt :white :black)])))
+
 
   ;; =========================================================================
   ;; 13. PUTTING IT ALL TOGETHER: MINI-TRACK
@@ -376,4 +384,6 @@
              (gain 0.4)))
 
   ;; When finished:
-  (stop!))
+  (stop!)
+
+  )
