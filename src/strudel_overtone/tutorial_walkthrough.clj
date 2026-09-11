@@ -401,6 +401,7 @@
   (play!
    :light-show (-> (light-grid [(alt :white :black) random-lights])))
 
+  (stop!)
 
   ;; =========================================================================
   ;; 13. PUTTING IT ALL TOGETHER: MINI-TRACK
