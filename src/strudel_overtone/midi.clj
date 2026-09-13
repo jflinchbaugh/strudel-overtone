@@ -87,7 +87,8 @@
          (let [new-state (swap! state-atom not)]
            (if new-state
              (when on-fn (on-fn msg))
-             (when off-fn (off-fn msg)))))))))
+             (when off-fn (off-fn msg)))))
+       nil))))
 
 (defn get-midi-cc-val
   "Retrieves the current scaled value for a named mapping or CC number."
@@ -360,7 +361,7 @@
      (let [chan (long (or channel 0))
            pad (long pad-note)]
        (cond
-         (or (false? color-or-vel) (nil? color-or-vel) (zero? color-or-vel))
+         (or (false? color-or-vel) (nil? color-or-vel))
          (ov-midi/midi-note-off out pad chan)
 
          (true? color-or-vel)

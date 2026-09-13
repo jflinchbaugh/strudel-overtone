@@ -272,3 +272,111 @@
         ;; Grid colors should have executed sequentially in order
         (is (= [:red :blue :green :yellow] @grid-calls)))))))
 
+(deftest midi-dispatch-edge-cases-test
+  (testing "note-on with zero velocity triggers pad off-fn"
+    (midi/reset-midi-state!)
+    (let [released (atom nil)]
+      (midi/def-midi-pad! 40 (constantly nil) (fn [msg] (reset! released msg)))
+      (midi/handle-midi-msg {:cmd :note-on :data1 40 :data2 0})
+      (is (some? @released))
+      (is (= 40 (:note @released)))
+      (is (== 0.0 (:velocity @released)))))
+
+  (testing "unregistered pad note does not error"
+    (midi/reset-midi-state!)
+    (is (nil? (midi/handle-midi-msg {:cmd :note-on :data1 99 :data2 127})))
+    (is (nil? (midi/handle-midi-msg {:cmd :note-off :data1 99 :data2 0}))))
+
+  (testing "unmapped CC updates raw-cc map"
+    (midi/reset-midi-state!)
+    (midi/handle-midi-msg {:cmd :control-change :data1 22 :data2 85})
+    (is (== 85.0 (get-in @midi/midi-state [:raw-cc 22])))
+    (is (== (/ 85.0 127.0) (midi/get-midi-cc-val 22))))
+
+  (testing "debug format handles note-off and unknown commands"
+    (let [off-log (midi/format-midi-debug-msg
+                   {:cmd :note-off :data1 42 :channel 1})
+          unknown-log (midi/format-midi-debug-msg
+                       {:cmd :pitch-bend :data1 64 :data2 0 :channel 2})]
+      (is (= {:midi-in :note-off :note 42 :vel 0 :channel 1} off-log))
+      (is (= {:midi-in :pitch-bend :data1 64 :data2 0 :channel 2}
+             unknown-log)))))
+
+(deftest midi-named-pads-and-rgb-test
+  (testing "named pad 4-arity definitions"
+    (midi/reset-midi-state!)
+    (let [hit (atom nil)
+          toggled (atom :idle)]
+      (midi/def-midi-pad! :kick-pad 36
+        (fn [_] (reset! hit :kicked))
+        nil)
+      (is (= :kick-pad (get-in @midi/midi-state [:pads 36 :name])))
+      (midi/handle-midi-msg {:cmd :note-on :data1 36 :data2 100})
+      (is (= :kicked @hit))
+
+      (midi/def-midi-pad-toggle! :snare-toggle 37
+        (fn [_] (reset! toggled :on))
+        (fn [_] (reset! toggled :off)))
+      (is (= :snare-toggle (get-in @midi/midi-state [:pads 37 :name])))
+      (midi/handle-midi-msg {:cmd :note-on :data1 37 :data2 127})
+      (is (= :on @toggled))
+      (midi/handle-midi-msg {:cmd :note-on :data1 37 :data2 127})
+      (is (= :off @toggled))))
+
+  (testing "rgb constructor with collection argument"
+    (is (= 104 (midi/rgb [255 0 0])))
+    (is (= 88 (midi/rgb [0 255 0])))
+    (is (= 72 (midi/rgb [0.0 0.0 1.0]))))
+
+  (testing "midi-set-pad-light! with boolean true"
+    (midi/reset-midi-state!)
+    (let [sent (atom [])
+          fake-out {:name "Fake Out" :receiver (reify Object)}]
+      (with-redefs [overtone.midi/midi-note-on
+                    (fn [_out note vel chan]
+                      (swap! sent conj {:type :note-on
+                                        :note note
+                                        :vel vel
+                                        :chan chan}))]
+        (swap! midi/midi-state assoc :default-output fake-out)
+        (midi/midi-set-pad-light! 36 true)
+        (is (= [{:type :note-on :note 36 :vel 127 :chan 0}] @sent)))))
+
+  (testing "midi-send-cc! by keyword mapping"
+    (midi/reset-midi-state!)
+    (let [sent (atom [])
+          fake-out {:name "Fake Out" :receiver (reify Object)}]
+      (with-redefs [overtone.midi/midi-control
+                    (fn [_out cc val chan]
+                      (swap! sent conj {:cc cc :val val :chan chan}))]
+        (swap! midi/midi-state assoc :default-output fake-out)
+        (midi/def-midi-cc! :sweep 44 :min 0 :max 100)
+        (midi/midi-send-cc! :sweep 80)
+        (is (= [{:cc 44 :val 80 :chan 0}] @sent))))))
+
+(deftest midi-connection-lifecycle-test
+  (testing "mocked midi-in and midi-out connect/disconnect"
+    (midi/reset-midi-state!)
+    (let [fake-in {:name "Mock-In"}
+          fake-out {:name "Mock-Out"}]
+      (with-redefs [overtone.midi/midi-sources (constantly [fake-in])
+                    overtone.midi/midi-sinks (constantly [fake-out])
+                    overtone.midi/midi-in (fn [_] {:handle :in})
+                    overtone.midi/midi-out (fn [_] {:handle :out})
+                    overtone.midi/midi-handle-events (fn [& _] nil)]
+        ;; Connect default devices
+        (is (= "Mock-In" (midi/midi-in-connect!)))
+        (is (contains? (:connected-inputs @midi/midi-state) "Mock-In"))
+
+        (is (= "Mock-Out" (midi/midi-out-connect!)))
+        (is (contains? (:connected-outputs @midi/midi-state) "Mock-Out"))
+        (is (some? (:default-output @midi/midi-state)))
+
+        ;; Disconnect by key
+        (midi/midi-in-disconnect! "Mock-In")
+        (is (empty? (:connected-inputs @midi/midi-state)))
+
+        (midi/midi-out-disconnect! "Mock-Out")
+        (is (empty? (:connected-outputs @midi/midi-state)))
+        (is (nil? (:default-output @midi/midi-state)))))))
+
