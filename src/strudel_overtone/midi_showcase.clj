@@ -153,7 +153,7 @@
   ;; Euclidean rhythm triggering random grid light pulses
   (play! :random-pulse
          (-> (euclid 5 8 :hat)
-             (light-grid  [_t] random-lights))))
+             (light-grid  [_t] random-lights)))
 
   ;; --- 10. pad-light Instrument & Modifiers ---
   ;; Sequence individual pad hits directly:

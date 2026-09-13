@@ -19,4 +19,6 @@ making it look a little like Strudel.
 
 - All: `$ clj -T:build test`
 - An individual test: `$ clj -T:build test -n strudel-evertone.params-test`
+- Coverage: `$ clj -T:build coverage` or `$ clj -M:test-coverage`
+
 

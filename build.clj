@@ -18,6 +18,18 @@
     (when-not (zero? exit) (throw (ex-info "Tests failed" {}))))
   opts)
 
+(defn coverage "Run test coverage via cloverage." [opts]
+  (let [basis    (b/create-basis {:aliases [:test-coverage]})
+        cmds     (b/java-command
+                  {:basis     basis
+                   :main      'clojure.main
+                   :main-args ["-m" "cloverage.coverage"
+                               "--src-ns-path" "src"
+                               "--test-ns-path" "test"]})
+        {:keys [exit]} (b/process cmds)]
+    (when-not (zero? exit) (throw (ex-info "Coverage failed" {}))))
+  opts)
+
 (defn- uber-opts [opts]
   (assoc opts
          :lib lib :main main
