@@ -2,7 +2,6 @@
   (:require [clojure.test :refer [deftest testing is]]
             [strudel-overtone.core :as sut]
             [strudel-overtone.synths :as synths]
-            [strudel-overtone.additive-showcase :as additive]
             [overtone.core :as ov]))
 
 (deftest synth-helpers-test
@@ -46,6 +45,7 @@
 
 (deftest def-additive-macro-test
   (testing "def-additive! macro expands and registers additive synth var"
-    (let [v (synths/resolve-synth :add-organ)]
+    (sut/def-additive! :test-additive-organ [1.0 0.5 0.25])
+    (let [v (synths/resolve-synth :test-additive-organ)]
       (is (some? v))
       (is (ifn? @v)))))

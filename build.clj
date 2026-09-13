@@ -25,7 +25,11 @@
                    :main      'clojure.main
                    :main-args ["-m" "cloverage.coverage"
                                "--src-ns-path" "src"
-                               "--test-ns-path" "test"]})
+                               "--test-ns-path" "test"
+                               "-e" ".*showcase.*"
+                               "-e" ".*tutorial.*"
+                               "-e" ".*demo.*"
+                               "-e" ".*song.*"]})
         {:keys [exit]} (b/process cmds)]
     (when-not (zero? exit) (throw (ex-info "Coverage failed" {}))))
   opts)
