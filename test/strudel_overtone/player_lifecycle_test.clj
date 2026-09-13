@@ -142,3 +142,50 @@
             (is (some #(= :c4 %) notes))
             (is (some #(= :e4 %) notes))
             (is (some #(= :g4 %) notes))))))))
+
+(deftest player-edge-cases-test
+  (testing "glide-cpm with default steps-per-cycle"
+    (let [scheduled (atom [])
+          bpm-atom (atom 480)]
+      (with-redefs [player/metro (fn [& args]
+                                   (if (seq args)
+                                     (reset! bpm-atom (second args))
+                                     @bpm-atom))
+                    ov/metro-bpm (fn [_] @bpm-atom)
+                    ov/apply-at (fn [t f]
+                                  (swap! scheduled conj [t f]))]
+        (player/glide-cpm 140 2)
+        (is (= 2 (count @scheduled))))))
+
+  (testing "trigger-single-event with string legato and pad-light hook"
+    (let [pad-calls (atom [])
+          synth-calls (atom [])]
+      (with-redefs [player/metro (constantly 0)
+                    ov/metro-bpm (constantly 120)
+                    synths/resolve-synth (constantly (fn [& args] args))
+                    ov/apply-at (fn [ms f & args] (apply f args))
+                    player/at-metro (fn [b s-var args]
+                                      (swap! synth-calls conj args))]
+        (let [ev (sut/->Event 0 1 {:note :c4
+                                   :sound :saw
+                                   :legato "1.5"
+                                   :sustain "0.8"
+                                   :pad-light (fn [t k]
+                                                (swap! pad-calls conj [t k]))})]
+          (player/trigger-single-event :test-pad ev (:params ev) 0 1 0)
+          (is (= 1 (count @pad-calls)))
+          (is (= 1 (count @synth-calls)))))))
+
+  (testing "play-loop error logging"
+    (let [p-state (atom {:playing? true
+                         :loops #{:err}
+                         :patterns {:err {:cycles (fn [& _]
+                                                    (throw
+                                                     (Exception. "boom")))}}})
+          rescheduled (atom [])]
+      (with-redefs [player/player-state p-state
+                    player/metro (constantly 0)
+                    ov/apply-by (fn [ms f args]
+                                  (swap! rescheduled conj [ms f args]))]
+        (player/play-loop :err 0 0)
+        (is (= 1 (count @rescheduled)))))))

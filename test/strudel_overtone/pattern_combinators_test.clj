@@ -195,3 +195,58 @@
       (let [curried-color (sut/pad-light :green)]
         (is (fn? curried-color))
         (is (instance? Pattern (curried-color base)))))))
+
+(deftest chords-and-curried-effects-test
+  (testing "chord and chord-seq with inversion"
+    (let [c (sut/chord :c4 :major 1)
+          cs (sut/chord-seq :c4 :major 1)]
+      (is (= #{64 67 72} c))
+      (is (= [64 67 72] cs))))
+
+  (testing "curried effect helper functions"
+    (let [base (sut/note [:c4])
+          p (-> base
+                ((sut/modulator-ratio 2.5))
+                ((sut/mod-index 4.0))
+                ((sut/detune 15))
+                ((sut/crush 0.3))
+                ((sut/distort 0.5))
+                ((sut/hpf 200))
+                ((sut/bpf 500))
+                ((sut/room 0.7))
+                ((sut/room-size 0.8))
+                ((sut/damp 0.4))
+                ((sut/vibrato 6.0))
+                ((sut/echo-delay 0.2))
+                ((sut/begin 0.1))
+                ((sut/end 0.9)))
+          params (:params (first (:events p)))]
+      (is (= 2.5 ((:modulator-ratio params) 0 :modulator-ratio)))
+      (is (= 4.0 ((:mod-index params) 0 :mod-index)))
+      (is (= 15 ((:detune params) 0 :detune)))
+      (is (= 0.3 ((:crush params) 0 :crush)))
+      (is (= 0.5 ((:distort params) 0 :distort)))
+      (is (= 200 ((:hpf params) 0 :hpf)))
+      (is (= 500 ((:bpf params) 0 :bpf)))
+      (is (= 0.7 ((:room params) 0 :room)))
+      (is (= 0.8 ((:room-size params) 0 :room-size)))
+      (is (= 0.4 ((:damp params) 0 :damp)))
+      (is (= 6.0 ((:vibrato params) 0 :vibrato)))
+      (is (= 0.2 ((:delay params) 0 :delay)))
+      (is (= 0.1 ((:begin params) 0 :begin)))
+      (is (= 0.9 ((:end params) 0 :end)))))
+
+  (testing "looping and env constructors"
+    (let [p-loop (sut/looping (sut/s [:bd]) 1)
+          p-env (sut/env [:adsr :perc])
+          loop-fn (:loop? (:params (first (:events p-loop))))]
+      (is (= 1 (if (fn? loop-fn) (loop-fn 0 :loop?) loop-fn)))
+      (is (instance? Pattern p-env))))
+
+  (testing "combine-param-values note combining function"
+    (let [p1 (sut/note [:c4])
+          p2 (sut/note [:d4])
+          combined (@#'p/combine-patterns p1 p2 :note)
+          note-fn (get-in (first (:events combined)) [:params :note])]
+      (is (fn? note-fn))
+      (is (= :d4 (note-fn 0 :note))))))

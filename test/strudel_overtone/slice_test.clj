@@ -120,4 +120,10 @@
         (sut/slice-sample-ms! :ms-slice :break 500 1500)
         (let [slice (get @samples/sample-slices :ms-slice)]
           (is (sut-test/approx= 0.25 (:begin slice)))
-          (is (sut-test/approx= 0.75 (:end slice))))))))
+          (is (sut-test/approx= 0.75 (:end slice)))))))
+
+  (testing "slice-sample-ms! logs error when source sample not found"
+    (with-redefs [samples/samples (atom {})
+                  samples/sample-slices (atom {})]
+      (sut/slice-sample-ms! :fail-slice :missing 100 200)
+      (is (nil? (get @samples/sample-slices :fail-slice))))))
