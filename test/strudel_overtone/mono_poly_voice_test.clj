@@ -42,6 +42,70 @@
         (let [pat (-> (sut/note [:c4]) (sut/mono))]
           (doseq [[vidx ev] (map-indexed vector (:events pat))]
             (player/trigger-event :p1 ev 4 1 vidx)))
-        
+
         (is (= 1 (count (:active-synths @player-state))) "Should only have 1 active synth")
-        (is (= 2 (count @gate-calls)) "Should have gated off the 2 extra voices")))))
+        (is (= 2 (count @gate-calls)) "Should have gated off the 2 extra voices"))))
+
+  (testing "monophonic chord shrink gates off extra voices in set? n branch"
+    (let [gate-calls (atom [])
+          player-state (atom {:playing? true
+                              :loops #{:p1}
+                              :patterns {}
+                              :active-synths {[:p1 0] {:inst {:id 0}}
+                                              [:p1 1] {:inst {:id 1}}
+                                              [:p1 2] {:inst {:id 2}}}})
+          metro (fn [& _] 0)]
+      (with-redefs [player/player-state player-state
+                    player/gate-off (fn [inst] (swap! gate-calls conj inst))
+                    player/trigger-single-event (fn [& _] nil)
+                    player/metro metro
+                    ov/apply-at (fn [_ f] (f))
+                    ov/note (fn [n] (if (keyword? n) 60 n))
+                    ov/midi->hz (fn [n] n)
+                    ov/node-active? (constantly true)]
+        ;; Directly trigger an event containing a set of 2 notes monophonically
+        (let [ev (sut/->Event 0 1 {:note #{:c3 :e3} :sound :saw :monophonic 1})]
+          (player/trigger-event :p1 ev 0 1))
+        (is (= 1 (count @gate-calls)) "Voice 2 should be gated off")
+        (is (not (contains? (:active-synths @player-state) [:p1 2])))
+        (is (contains? (:active-synths @player-state) [:p1 0]))
+        (is (contains? (:active-synths @player-state) [:p1 1])))))
+
+  (testing "monophonic sequential note shrink gates off extra voices"
+    (let [gate-calls (atom [])
+          player-state (atom {:playing? true
+                              :loops #{:p1}
+                              :patterns {}
+                              :active-synths {[:p1 0] {:inst {:id 0}}
+                                              [:p1 1] {:inst {:id 1}}
+                                              [:p1 2] {:inst {:id 2}}}})
+          metro (fn [& _] 0)]
+      (with-redefs [player/player-state player-state
+                    player/gate-off (fn [inst] (swap! gate-calls conj inst))
+                    player/trigger-single-event (fn [& _] nil)
+                    player/metro metro
+                    ov/apply-at (fn [_ f] (f))
+                    ov/note (fn [n] (if (keyword? n) 60 n))
+                    ov/midi->hz (fn [n] n)
+                    ov/node-active? (constantly true)]
+        ;; Event with sequential vector of 2 notes (voice 0 and voice 1)
+        (let [ev (sut/->Event 0 1 {:note [:c3 :e3] :sound :saw :monophonic 1})]
+          (player/trigger-event :p1 ev 0 1))
+        (is (= 1 (count @gate-calls)) "Voice 2 should be gated off")
+        (is (not (contains? (:active-synths @player-state) [:p1 2])))
+        (is (contains? (:active-synths @player-state) [:p1 0]))
+        (is (contains? (:active-synths @player-state) [:p1 1])))))
+
+  (testing "simultaneous sound sets trigger each sound across voice indices"
+    (let [triggered (atom [])]
+      (with-redefs [player/trigger-single-event
+                    (fn [k ev params beat dur vidx]
+                      (swap! triggered conj {:key k
+                                             :sound (:sound params)
+                                             :beat beat
+                                             :voice vidx}))]
+        (let [ev (sut/->Event 0 1 {:sound #{:kick :hat}})]
+          (player/trigger-event :drums ev 0 1))
+        (is (= 2 (count @triggered)))
+        (is (= #{:kick :hat} (set (map :sound @triggered))))
+        (is (= #{0 1} (set (map :voice @triggered))))))))
