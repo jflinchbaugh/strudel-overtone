@@ -7,8 +7,11 @@ making it look a little like Strudel.
 
 * Ensure `pipewire` is running to serve as our JACK server
 * Start supernova and an nrepl: `./supernova.sh`
-* The script will try to wire supernova to a system output in pipewire,
-  but sometimes it needs to be checked in `qpwgraph`
+  * The script will try to wire supernova to a system output in pipewire,
+    but sometimes it needs to be checked in `qpwgraph`
+  * The script also starts the Clojure REPL with CIDER and refactoring support
+    connected to the supernova server.
+    (Watch the CIDER dependencies it loads when upgrading.)
 * In Emacs:
   * Start emacs
   * _connect_ to the running repl
